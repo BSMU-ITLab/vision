@@ -18,7 +18,7 @@ setuptools.setup(
     entry_points={
         ## 'gui_scripts': [
         'console_scripts': [
-            'bsmu-vision = bsmu.vision.main:run_main',
+            'bsmu-vision = bsmu.vision.main:run_app',
         ]
     },
     classifiers=[

@@ -1,0 +1,27 @@
+from __future__ import annotations
+
+from PySide2.QtWidgets import QMdiArea
+
+from bsmu.vision.plugin import Plugin
+
+
+class MdiPlugin(Plugin):
+    def __init__(self, app: App):
+        super().__init__(app)
+
+        self.main_window = app.enable_plugin('bsmu.vision_main_window.MainWindowPlugin').main_window
+        # print(self.main_window.__class__)
+        # print(type(self.main_window).__name__)
+
+        self.mdi = Mdi()
+
+    def _enable(self):
+        self.main_window.setCentralWidget(self.mdi)
+
+    def _disable(self):
+        self.main_window.takeCentralWidget()
+
+
+class Mdi(QMdiArea):
+    def __init__(self):
+        super().__init__()

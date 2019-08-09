@@ -1,18 +1,20 @@
+from __future__ import annotations
+
 from PySide2.QtWidgets import QMainWindow
 
 from bsmu.vision.plugin import Plugin
 
 
 class MainWindowPlugin(Plugin):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, app: App):
+        super().__init__(app)
 
         self.main_window = MainWindow()
 
     def _enable(self):
         self.main_window.show()
 
-    def disable(self):
+    def _disable(self):
         self.main_window.hide()
 
 

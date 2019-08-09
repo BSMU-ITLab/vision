@@ -24,12 +24,15 @@ class App(QApplication):
         print('config', config)
         print(config['plugins'])
 
-        self.plugin_manager = PluginManager()
+        self.plugin_manager = PluginManager(self)
         if config is not None:
             self.plugin_manager.enable_plugins(config['plugins'])
 
         # exit() ###
         # self.aboutToQuit.connect(self.save_config)
+
+    def enable_plugin(self, full_name: str):
+        return self.plugin_manager.enable_plugin(full_name)
 
     def load_config(self):
         config = None

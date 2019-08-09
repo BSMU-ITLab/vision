@@ -1,12 +1,16 @@
 from PySide2.QtCore import QObject, Signal
 
+from bsmu.vision.app import App
+
 
 class Plugin(QObject):
     enabled = Signal()
     disabled = Signal()
 
-    def __init__(self):
+    def __init__(self, app: App):
         super().__init__()
+
+        self.app = app
 
         self.print_action('init')
 

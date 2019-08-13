@@ -12,7 +12,7 @@ class FileLoadingManagerPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
-        file_loader_registry_plugin = app.enable_plugin('bsmu.vision_file_loader_registry.FileLoaderRegistryPlugin')
+        file_loader_registry_plugin = app.enable_plugin('bsmu.vision.loaders.registry.FileLoaderRegistryPlugin')
         self.file_loading_manager = FileLoadingManager(file_loader_registry_plugin.file_loader_registry)
 
 

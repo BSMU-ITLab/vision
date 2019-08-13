@@ -3,9 +3,15 @@ from __future__ import annotations
 from PySide2.QtWidgets import QMainWindow
 
 from bsmu.vision.plugin import Plugin
+from bsmu.vision.setup_info import SetupInfo
+from bsmu.vision.version import Version
 
 
 class MainWindowPlugin(Plugin):
+    # setup_info = SetupInfo(name='bsmu-vision-main-window',
+    #                        version=Version(0, 0, 1),
+    #                        py_modules=('main',))
+
     def __init__(self, app: App):
         super().__init__(app)
 

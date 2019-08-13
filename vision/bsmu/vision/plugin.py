@@ -1,9 +1,11 @@
-from PySide2.QtCore import QObject, Signal
+from __future__ import annotations
 
-from bsmu.vision.app import App
+from PySide2.QtCore import QObject, Signal
 
 
 class Plugin(QObject):
+    # setup_info = None
+
     enabled = Signal()
     disabled = Signal()
 

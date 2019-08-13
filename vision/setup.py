@@ -14,7 +14,11 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/IvanKosik/vision',
-    packages=setuptools.find_namespace_packages(include=['bsmu.*']),
+    packages=setuptools.find_namespace_packages(include=('bsmu.*',)),
+    install_requires=[
+        'PySide2',
+        'PyYAML'
+    ],
     entry_points={
         ## 'gui_scripts': [
         'console_scripts': [

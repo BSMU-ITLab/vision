@@ -8,12 +8,12 @@ import yaml
 from bsmu.vision.plugin_manager import PluginManager
 
 
-CONFIG_FILE_PATH = Path('config.yml')
+CONFIG_FILE_PATH = (Path(__file__).parent / 'config.yml').resolve()
 
 
 # def test():
 #     with open(CONFIG_FILE_PATH, 'w') as config_file:
-#         yaml.dump({'plugins': ['main-window', 'dicom-loader', 'file-walker']}, config_file)
+#         yaml.dump({'plugins': ['bsmu.vision_main_window.MainWindowPlugin']}, config_file)
 
 
 class App(QApplication):
@@ -25,6 +25,7 @@ class App(QApplication):
         print(config['plugins'])
 
         self.plugin_manager = PluginManager(self)
+
         if config is not None:
             self.plugin_manager.enable_plugins(config['plugins'])
 
@@ -36,6 +37,7 @@ class App(QApplication):
 
     def load_config(self):
         config = None
+        print('config path', CONFIG_FILE_PATH.absolute())
         if CONFIG_FILE_PATH.exists():
             with open(CONFIG_FILE_PATH, 'r') as config_file:
                 config = yaml.safe_load(config_file)

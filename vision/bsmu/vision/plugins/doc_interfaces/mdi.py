@@ -9,7 +9,7 @@ class MdiPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
-        self.main_window = app.enable_plugin('bsmu.vision_main_window.MainWindowPlugin').main_window
+        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
         # print(self.main_window.__class__)
         # print(type(self.main_window).__name__)
 

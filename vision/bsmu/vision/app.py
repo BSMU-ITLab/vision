@@ -22,7 +22,7 @@ class App(QApplication):
 
         config = self.load_config()
         print('config', config)
-        print(config['plugins'])
+        # print(config['plugins'])
 
         self.plugin_manager = PluginManager(self)
 

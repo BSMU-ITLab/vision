@@ -7,7 +7,7 @@ from bsmu.vision.plugin import Plugin
 
 class DataVisualizationManagerPlugin(Plugin):
     def __init__(self, app: App):
-        super().__init__()
+        super().__init__(app)
 
         data_visualizer_registry_plugin = app.enable_plugin(
             'bsmu.vision.plugins.visualizers.registry.DataVisualizerRegistryPlugin')

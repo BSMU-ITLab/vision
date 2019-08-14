@@ -11,15 +11,15 @@ class DataVisualizerPlugin(Plugin):
     def __init__(self, app: App, data_visualizer_cls):
         super().__init__(app)
 
-        self.data_visualizer_registry = app.enable_plugin(
-            'bsmu.vision.visualizers.registry.DataVisualizerRegistryPlugin').data_visualizer_registry
+        # self.data_visualizer_registry = app.enable_plugin(
+        #     'bsmu.vision.visualizers.registry.DataVisualizerRegistryPlugin').data_visualizer_registry
         self.data_visualizer_cls = data_visualizer_cls
 
-    def _enable(self):
-        self.data_visualizer_registry.register_visualizer_cls(self.data_visualizer_cls)
-
-    def _disable(self):
-        self.data_visualizer_registry.unregister_visualizer_cls(self.data_visualizer_cls)
+    # def _enable(self):
+    #     self.data_visualizer_registry.register_visualizer_cls(self.data_visualizer_cls)
+    #
+    # def _disable(self):
+    #     self.data_visualizer_registry.unregister_visualizer_cls(self.data_visualizer_cls)
 
 
 class DataVisualizerMeta(abc.ABCMeta, type(QObject)):
@@ -51,4 +51,4 @@ class DataVisualizer(QObject, metaclass=DataVisualizerMeta):
 
     @abc.abstractmethod
     def _visualize_data(self, data: Data):
-        ...
+        pass

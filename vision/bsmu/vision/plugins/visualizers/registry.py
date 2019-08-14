@@ -11,6 +11,20 @@ class DataVisualizerRegistryPlugin(Plugin):
 
         self.data_visualizer_registry = DataVisualizerRegistry()
 
+    def _enable(self):
+        self.data_visualizer_registry.clear()
+
+        for plugin in self.app.enabled_plugins():
+            if isinstance(plugin, DataVisualizerPlugin):
+
+
+        return
+
+        ...
+
+    def _disable(self):
+        ...
+
 
 class DataVisualizerRegistry:
     def __init__(self):
@@ -33,3 +47,6 @@ class DataVisualizerRegistry:
 
     def contains(self, data_type: Type[Data]) -> bool:
         return data_type in self._registry
+
+    def clear(self):
+        self._registry.clear()

@@ -57,4 +57,4 @@ class FileLoader(QObject, metaclass=FileLoaderMeta):
 
     @abc.abstractmethod
     def _load_file(self, path: Path) -> Data:
-        ...
+        pass

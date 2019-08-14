@@ -8,17 +8,17 @@ class PluginManager:
     def __init__(self, app: App):
         self.app = app
 
-        self.plugins = {}
+        self.enabled_plugins = {}
 
     def enable_plugin(self, full_name: str):
-        if full_name in self.plugins:
-            return self.plugins[full_name]
+        if full_name in self.enabled_plugins:
+            return self.enabled_plugins[full_name]
 
         module_name, class_name = full_name.rsplit(".", 1)
         plugin_class = getattr(importlib.import_module(module_name), class_name)
         plugin = plugin_class(self.app)
         plugin.enable()
-        self.plugins[full_name] = plugin
+        self.enabled_plugins[full_name] = plugin
         # print('plugin_module', module_name)
         # print('class', class_name)
         # print('plugin', plugin)
@@ -28,5 +28,5 @@ class PluginManager:
         for full_name in full_names:
             self.enable_plugin(full_name)
 
-    def plugin(self, full_name):
-        return self.plugins.get(full_name)
+    def enabled_plugin(self, full_name):
+        return self.enabled_plugins.get(full_name)

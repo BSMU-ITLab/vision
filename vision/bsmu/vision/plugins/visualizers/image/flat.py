@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bsmu.vision.widgets.viewers.image.layered import FlatImageViewer
 from bsmu.vision.plugins.visualizers.image.base import ImageVisualizerPlugin, ImageVisualizer
 
 

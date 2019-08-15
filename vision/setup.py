@@ -15,6 +15,21 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='https://github.com/IvanKosik/vision',
     packages=setuptools.find_namespace_packages(include=('bsmu.*',)),
+
+
+    # package_data={
+    #     # If any package contains *.yml files, include them:
+    #     '': ['*.yml'],
+    #     # And include any *.msg files found in the 'hello' package, too:
+    #     # 'hello': ['*.msg'],
+    # },
+
+    data_files=[
+        # ('config', ['bsmu/vision/config.yml', 'bsmu/vision/dumped_config.yml'])
+        ('config/bsmu/vision', ['bsmu/vision/config.yml', 'bsmu/vision/dumped_config.yml'])
+    ],
+
+
     install_requires=[
         'PySide2',
         'PyYAML'

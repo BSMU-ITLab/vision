@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Type, List, Union
 
 from PySide2.QtWidgets import QApplication
-import yaml
+# import yaml
 
 from bsmu.vision.plugin_manager import PluginManager
 
@@ -15,10 +15,57 @@ CONFIG_FILE_PATH = (Path(__file__).parent / 'config.yml').resolve()
 #     with open(CONFIG_FILE_PATH, 'w') as config_file:
 #         yaml.dump({'plugins': ['bsmu.vision_main_window.MainWindowPlugin']}, config_file)
 
+import configparser
+from ruamel.yaml import YAML
+
 
 class App(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
+
+        print('Hello, App')
+        print('prefix:', sys.prefix)
+
+        yaml = YAML(typ='rt')
+
+        with open(CONFIG_FILE_PATH, 'r') as config_file:
+            code = yaml.load(config_file)
+            print(code)
+            print(code['plugins'])
+
+        # code['plugins'].append('new_plugin')
+        # code['new'] = ['new section', 1, 2]
+        # code['new'] = 'women'
+        # code['new'] = {'women': 33}
+        code['new']['women'] = 112
+
+        # code['name']['given'] = 'Bob'
+        with open('dumped_config.yml', 'w') as dump_file:
+            yaml.dump(code, dump_file)
+
+        exit()
+
+
+        config = configparser.ConfigParser()
+        print(config.sections())
+
+        config.read(str(CONFIG_FILE_PATH))
+        print(config)
+        print(config.sections())
+        with open('dumped_config.yml', 'w') as dump_file:
+            config.write(dump_file)
+        exit()
+
+
+        with open(CONFIG_FILE_PATH, 'r') as config_file:
+            config = yaml.safe_load(config_file)
+            print(config)
+            with open('dumped_config.yml', 'w') as dump_file:
+                yaml.dump(config, dump_file)
+        exit()
+
+
+
 
         config = self.load_config()
         print('config', config)

@@ -25,8 +25,8 @@ setuptools.setup(
     # },
 
     data_files=[
-        # ('config', ['bsmu/vision/config.yml', 'bsmu/vision/dumped_config.yml'])
-        ('config/bsmu/vision', ['bsmu/vision/config.yml', 'bsmu/vision/dumped_config.yml'])
+        # ('config', ['bsmu/vision/App.cfg.yaml', 'bsmu/vision/dumped_config.yml'])
+        ('config/bsmu/vision', ['bsmu/vision/App.cfg.yaml', 'bsmu/vision/dumped_config.yml'])
     ],
 
 

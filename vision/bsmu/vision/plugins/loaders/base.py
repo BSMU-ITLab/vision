@@ -4,7 +4,7 @@ from typing import Type
 
 from PySide2.QtCore import QObject, Signal
 
-from bsmu.vision.plugin import Plugin
+from bsmu.vision.app.plugin import Plugin
 
 
 class FileLoaderPlugin(Plugin):

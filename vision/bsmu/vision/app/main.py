@@ -4,7 +4,7 @@ from bsmu.vision.app import App
 
 
 def run_app():
-    print('Hello, Vision!')
+    print('Run, Vision! Run!')
 
     app = App(sys.argv)
     app.run()

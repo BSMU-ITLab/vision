@@ -4,7 +4,7 @@ from typing import Type, Optional
 
 from PySide2.QtCore import QObject, Signal
 
-from bsmu.vision.plugin import Plugin
+from bsmu.vision.app.plugin import Plugin
 from bsmu.vision_core.data import Data
 
 
@@ -12,7 +12,7 @@ class FileLoadingManagerPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
-        file_loader_registry_plugin = app.enable_plugin('bsmu.vision.loaders.registry.FileLoaderRegistryPlugin')
+        file_loader_registry_plugin = app.enable_plugin('bsmu.vision.plugins.loaders.registry.FileLoaderRegistryPlugin')
         self.file_loading_manager = FileLoadingManager(file_loader_registry_plugin.file_loader_registry)
 
 

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from PySiside2.QtCore import QObject, Signal
-
-from core import settings
-
 import numpy as np
 
+from PySide2.QtCore import QObject, Signal
 
-class Colormap(QObject):
+
+class ColorMapper(QObject):
     changed = Signal()  #% rename to lut_changed
     active_color_class_changed = Signal(int)
 
@@ -61,8 +59,8 @@ class Colormap(QObject):
         color_array = np.array([color.red(), color.green(), color.blue(), color.alpha()], np.uint8)
         self.set_class_color_array(class_number, color_array)
 
-    def colored_image(self, image):
-        return self.lut[image]
+    def colored_image(self, indexed_image):
+        return self.lut[indexed_image]
 
-    def colored_premultiplied_image(self, image):
-        return self.premultiplied_lut[image]
+    def colored_premultiplied_image(self, indexed_image):
+        return self.premultiplied_lut[indexed_image]

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Type
 
-from bsmu.vision.plugin import Plugin
+from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin
 
 
 class DataVisualizerRegistryPlugin(Plugin):
@@ -12,18 +13,31 @@ class DataVisualizerRegistryPlugin(Plugin):
         self.data_visualizer_registry = DataVisualizerRegistry()
 
     def _enable(self):
-        self.data_visualizer_registry.clear()
-
         for plugin in self.app.enabled_plugins():
-            if isinstance(plugin, DataVisualizerPlugin):
+            self._register_visualizer_plugin(plugin)
 
-
-        return
-
-        ...
+        self.app.plugin_enabled.connect(self._on_app_plugin_enabled)
+        self.app.plugin_disabled.connect(self._on_app_plugin_disabled)
 
     def _disable(self):
-        ...
+        self.app.plugin_enabled.disconnect(self._on_app_plugin_enabled)
+        self.app.plugin_disabled.disconnect(self._on_app_plugin_disabled)
+
+        self.data_visualizer_registry.clear()
+
+    def _register_visualizer_plugin(self, plugin: Plugin):
+        if isinstance(plugin, DataVisualizerPlugin):
+            self.data_visualizer_registry.register_visualizer_cls(plugin.data_visualizer_cls)
+
+    def _unregister_visualizer_plugin(self, plugin: Plugin):
+        if isinstance(plugin, DataVisualizerPlugin):
+            self.data_visualizer_registry.unregister_visualizer_cls(plugin.data_visualizer_cls)
+
+    def _on_app_plugin_enabled(self, plugin: Plugin):
+        self._register_visualizer_plugin(plugin)
+
+    def _on_app_plugin_disabled(self, plugin: Plugin):
+        self._unregister_visualizer_plugin(plugin)
 
 
 class DataVisualizerRegistry:

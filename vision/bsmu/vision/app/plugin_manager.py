@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 import importlib
+from functools import partial
 from typing import List
 
+from PySide2.QtCore import QObject, Signal
 
-class PluginManager:
+from bsmu.vision.app.plugin import Plugin
+
+
+class PluginManager(QObject):
+    plugin_enabled = Signal(Plugin)
+    plugin_disabled = Signal(Plugin)
+
     def __init__(self, app: App):
+        super().__init__()
+
         self.app = app
 
         self.enabled_plugins = {}
@@ -17,6 +27,10 @@ class PluginManager:
         module_name, class_name = full_name.rsplit(".", 1)
         plugin_class = getattr(importlib.import_module(module_name), class_name)
         plugin = plugin_class(self.app)
+
+        plugin.enabled.connect(partial(self.plugin_enabled, plugin))
+        plugin.disabled.connect(partial(self.plugin_disabled, plugin))
+
         plugin.enable()
         self.enabled_plugins[full_name] = plugin
         # print('plugin_module', module_name)

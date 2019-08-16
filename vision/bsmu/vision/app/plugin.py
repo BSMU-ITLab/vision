@@ -6,8 +6,8 @@ from PySide2.QtCore import QObject, Signal
 class Plugin(QObject):
     # setup_info = None
 
-    enabled = Signal()
-    disabled = Signal()
+    enabled = Signal('Plugin')
+    disabled = Signal('Plugin')
 
     def __init__(self, app: App):
         super().__init__()
@@ -22,7 +22,7 @@ class Plugin(QObject):
     def enable(self):
         self.print_action('enable')
         self._enable()
-        self.enabled.emit()
+        self.enabled.emit(self)
 
     def _enable(self):
         pass
@@ -30,7 +30,7 @@ class Plugin(QObject):
     def disable(self):
         self.print_action('disable')
         self._disable()
-        self.disabled.emit()
+        self.disabled.emit(self)
 
     def _disable(self):
         pass

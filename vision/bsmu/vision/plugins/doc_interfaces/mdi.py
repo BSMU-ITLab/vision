@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide2.QtWidgets import QMdiArea
 
-from bsmu.vision.plugin import Plugin
+from bsmu.vision.app.plugin import Plugin
 
 
 class MdiPlugin(Plugin):

@@ -4,7 +4,8 @@ import abc
 
 from PySide2.QtCore import QObject, Signal
 
-from bsmu.vision.plugin import Plugin
+from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+from bsmu.vision.app.plugin import Plugin
 
 
 class DataVisualizerPlugin(Plugin):

@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from PySide2.QtWidgets import QMainWindow
 
-from bsmu.vision.plugin import Plugin
-from bsmu.vision.setup_info import SetupInfo
-from bsmu.vision.version import Version
+from bsmu.vision.app.plugin import Plugin
 
 
 class MainWindowPlugin(Plugin):

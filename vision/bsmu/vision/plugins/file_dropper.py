@@ -4,20 +4,20 @@ from pathlib import Path
 
 from PySide2.QtCore import QObject, QEvent
 
-from bsmu.vision.plugin import Plugin
+from bsmu.vision.app.plugin import Plugin
 
 
 class FileDropperPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
-        self.mdi = app.enable_plugin('bsmu.vision.doc_interfaces.mdi.MdiPlugin').mdi
-        file_loading_manager_plugin = app.enable_plugin('bsmu.vision.loaders.manager.FileLoadingManagerPlugin')
+        self.mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
+        file_loading_manager_plugin = app.enable_plugin('bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin')
         data_visualization_manager_plugin = app.enable_plugin(
-            'bsmu.vision.visualizers.manager.DataVisualizationManagerPlugin')
+            'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin')
 
         self.file_dropper = FileDropper(file_loading_manager_plugin.file_loading_manager,
-                                        data_visualization_manager_plugin.visualization_manager)
+                                        data_visualization_manager_plugin.data_visualization_manager)
 
     def _enable(self):
         self.mdi.setAcceptDrops(True)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Type, Optional
 
-from bsmu.vision.plugin import Plugin
+from bsmu.vision.app.plugin import Plugin
 
 
 class FileLoaderRegistryPlugin(Plugin):

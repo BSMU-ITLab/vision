@@ -28,8 +28,8 @@ class PluginManager(QObject):
         plugin_class = getattr(importlib.import_module(module_name), class_name)
         plugin = plugin_class(self.app)
 
-        plugin.enabled.connect(partial(self.plugin_enabled, plugin))
-        plugin.disabled.connect(partial(self.plugin_disabled, plugin))
+        plugin.enabled.connect(self.plugin_enabled)
+        plugin.disabled.connect(self.plugin_disabled)
 
         plugin.enable()
         self.enabled_plugins[full_name] = plugin

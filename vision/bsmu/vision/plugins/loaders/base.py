@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import abc
 import inspect
 from typing import Type
 
 from PySide2.QtCore import QObject, Signal
 
+from bsmu.vision_core.data import Data
 from bsmu.vision.app.plugin import Plugin
 
 
@@ -13,7 +16,7 @@ class FileLoaderPlugin(Plugin):
 
         self.file_loader_cls = file_loader_cls
 
-        file_loader_registry_plugin = app.enable_plugin('bsmu.vision_file_loader_registry.FileLoaderRegistryPlugin')
+        file_loader_registry_plugin = app.enable_plugin('bsmu.vision.plugins.loaders.registry.FileLoaderRegistryPlugin')
         self.file_loader_registry = file_loader_registry_plugin.file_loader_registry
 
     def _enable(self):

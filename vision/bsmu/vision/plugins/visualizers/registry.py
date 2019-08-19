@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Type
+from typing import Type, Optional
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin
@@ -56,8 +56,8 @@ class DataVisualizerRegistry:
             assert self._registry[data_type] == visualizer_cls, 'Data type registered for other visualizer'
             del self._registry[data_type]
 
-    def visualizer_cls(self, data_type: Type[Data]) -> Type[DataVisualizer]:
-        return self._registry[data_type]
+    def visualizer_cls(self, data_type: Type[Data]) -> Optional[Type[DataVisualizer]]:
+        return self._registry.get(data_type)
 
     def contains(self, data_type: Type[Data]) -> bool:
         return data_type in self._registry

@@ -6,8 +6,8 @@ from PySide2.QtCore import QObject, Signal
 class Plugin(QObject):
     # setup_info = None
 
-    enabled = Signal('Plugin')
-    disabled = Signal('Plugin')
+    enabled = Signal(QObject)  # Have to be a Plugin instead of QObject, but the Plugin is not defined yet
+    disabled = Signal(QObject)  # Same as above
 
     def __init__(self, app: App):
         super().__init__()

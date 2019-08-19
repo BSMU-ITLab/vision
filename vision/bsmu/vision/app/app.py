@@ -19,6 +19,48 @@ class App(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
 
+
+        from skimage.io import imread
+        from PySide2.QtCore import Qt
+        from PySide2.QtGui import QPixmap
+        from PySide2.QtWidgets import QGraphicsScene, QGraphicsPixmapItem, QLabel
+        from bsmu.vision_core.converters.image import numpy_rgba_image_to_qimage, converted_to_rgba
+        from bsmu.vision_core.image import FlatImage
+        from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
+        from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+
+        image = imread('../../../tests/images/spacex.jpg')
+
+        flat_image = FlatImage(image)
+        self.layered_image_viewer = LayeredImageViewer(flat_image)
+        self.layered_image_viewer.show()
+
+        '''
+        print(type(image), image.shape, image.dtype)
+        image = converted_to_rgba(image)
+        print(type(image), image.shape, image.dtype)
+
+        qimage = numpy_rgba_image_to_qimage(image)
+        pixmap = QPixmap.fromImage(qimage)
+
+        self.label = QLabel()
+        self.label.setPixmap(pixmap)
+        self.label.show()
+        '''
+
+        '''
+        pixmap_item = QGraphicsPixmapItem(pixmap)
+        pixmap_item.setTransformationMode(Qt.SmoothTransformation)
+
+        scene = QGraphicsScene()
+        scene.addItem(pixmap_item)
+
+        self.view = GraphicsView(scene, zoomable=True)
+        self.view.show()
+        '''
+
+
+        '''
         print(f'App started. Prefix: {sys.prefix}')
 
         self.config = Config(CONFIG_FILE_PATH)
@@ -33,6 +75,7 @@ class App(QApplication):
             self.plugin_manager.enable_plugins(self.config.data['plugins'])
 
         # self.aboutToQuit.connect(self.config.config)
+        '''
 
     def enable_plugin(self, full_name: str):
         return self.plugin_manager.enable_plugin(full_name)

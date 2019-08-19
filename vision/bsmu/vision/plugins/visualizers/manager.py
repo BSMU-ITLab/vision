@@ -33,6 +33,7 @@ class DataVisualizationManager(QObject):
     def visualize_data(self, data: Data):
         print('Visualize data:', type(data))
         visualizer_cls = self.data_visualizer_registry.visualizer_cls(type(data))
-        visualizer = visualizer_cls(self.mdi)
-        data_viewer_sub_window = visualizer.visualize_data(data)
-        self.data_visualized.emit(data_viewer_sub_window)
+        if visualizer_cls is not None:
+            visualizer = visualizer_cls(self.mdi)
+            data_viewer_sub_window = visualizer.visualize_data(data)
+            self.data_visualized.emit(data_viewer_sub_window)

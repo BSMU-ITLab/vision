@@ -49,6 +49,7 @@ class FileDropper(QObject):
         mime_data = event.mimeData()
         if mime_data.hasUrls():
             self.dragged_file_path = Path(mime_data.urls()[0].toLocalFile())
+            print(self.dragged_file_path)
             if self.file_loading_manager.can_load_file(self.dragged_file_path):
                 event.accept()
                 return

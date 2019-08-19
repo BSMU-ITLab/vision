@@ -15,6 +15,7 @@ class ColorMapper(QObject):
         self.lut = np.zeros((12, 4), np.uint8)
         self.premultiplied_lut = np.zeros_like(self.lut)
 
+        '''
         self.set_class_color_array(settings.NO_MASK_CLASS, settings.NO_MASK_COLOR)
         self.set_class_color_array(settings.MASK_CLASS, settings.MASK_COLOR)
         self.set_class_color_array(settings.TOOL_BACKGROUND_CLASS, settings.TOOL_BACKGROUND)
@@ -30,6 +31,7 @@ class ColorMapper(QObject):
         self.set_class_color_array(settings.TOOL_BACKGROUND_2_CLASS, settings.TOOL_BACKGROUND_2)
 
         self.active_color_class = settings.MASK_CLASS
+        '''
 
         '''
         self.lut = np.array([settings.NO_MASK_COLOR,

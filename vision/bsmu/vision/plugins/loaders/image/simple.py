@@ -16,4 +16,4 @@ class SimpleImageFileLoader(ImageFileLoader):
 
     def _load_file(self, path: Path):
         print('Load Simple Image')
-        return FlatImage(skimage.io.imread(str(path)), path)
+        return FlatImage(skimage.io.imread(str(path)), None, path)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from bsmu.vision.widgets.viewers.image.layered import FlatImageViewer
+from bsmu.vision_core.image import FlatImage
+from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.plugins.visualizers.image.base import ImageVisualizerPlugin, ImageVisualizer
 
@@ -16,8 +17,8 @@ class FlatImageVisualizer(ImageVisualizer):
     def _visualize_data(self, data: FlatImage):
         print('visualize flat image')
 
-        image_viewer = FlatImageViewer(data)
+        image_viewer = LayeredImageViewer(data)
         sub_window = DataViewerSubWindow(image_viewer)
-        self.mdi_area.addSubWindow(sub_window)
+        self.mdi.addSubWindow(sub_window)
         sub_window.show()
         return sub_window

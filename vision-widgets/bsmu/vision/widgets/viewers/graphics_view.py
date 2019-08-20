@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import partial
 
-from PySide2.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QPointF, QSizeF
+from PySide2.QtCore import Qt, QObject, Signal, QTimeLine, QEvent
 from PySide2.QtWidgets import QGraphicsView
 
 
@@ -20,8 +20,6 @@ class GraphicsView(QGraphicsView):
         if self.zoomable:
             self.enable_zooming()
 
-        self.scene_center = None
-
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
@@ -30,57 +28,7 @@ class GraphicsView(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.NoAnchor)
 
         view_smooth_zoom = _ViewSmoothZoom(self, self)
-        view_smooth_zoom.zoom_finished.connect(self.on_zoom_finished)
         self.viewport().installEventFilter(view_smooth_zoom)
-
-    '''
-    def mousePressEvent(self, event: QMouseEvent):
-        pos = self.pixmap_item.mapFromScene(self.mapToScene(event.pos()))
-        item = QGraphicsEllipseItem(pos.x() - 5, pos.y() - 5, 10, 10, self.pixmap_item)
-        # self.scene().addItem(QGraphicsEllipseItem(pos.x() - 5, pos.y() - 5, 10, 10, self.pixmap_item))
-    '''
-
-    def on_zoom_finished(self):
-        self.scene_center = self.mapToScene(self.viewport().rect().center())
-
-    # def center_image(self):
-    #     ...
-    #     '''
-    #     pixmap_size = self.pixmap_item.boundingRect().size()
-    #     margins_size = pixmap_size
-    #     top_left_point = QPointF(self.pixmap_item.pos() - QPointF(margins_size.width(), margins_size.height()))
-    #     size = QSizeF(2 * margins_size + pixmap_size)
-    #     self.setSceneRect(QRectF(top_left_point, size))
-    #     self.fitInView(self.pixmap_item, Qt.KeepAspectRatio)
-    #     # self.centerOn(self.pixmap_item)
-    #     '''
-    #
-    # def showEvent(self, event: QShowEvent):
-    #     self.center_image()
-    #
-    # def resizeEvent(self, e):
-    #     '''
-    #     if not self.scene_center:
-    #         self.on_zoom_finished()
-    #     print('RESIZE', self.scene_center)
-    #     self.centerOn(self.scene_center)
-    #     '''
-    #     self.center_image()
-    #
-    #     super().resizeEvent(e)
-
-
-class _Zoom:  # TODO: Use Python 3.7 dataclasses
-    def __init__(self, pos, factor):
-        self.pos = pos
-        self.factor = factor
-
-
-class _ZoomTimeLine(QTimeLine):
-    def __init__(self, duration: int = 1000, parent: QObject = None):
-        super().__init__(duration, parent)
-
-        self.finished.connect(self.deleteLater)
 
 
 class _ViewSmoothZoom(QObject):
@@ -104,6 +52,7 @@ class _ViewSmoothZoom(QObject):
     def on_wheel_scrolled(self, event):
         zoom_factor = self.zoom_in_factor if event.angleDelta().y() > 0 else self.zoom_out_factor
         zoom_factor = 1 + zoom_factor / (SMOOTH_ZOOM_DURATION / SMOOTH_ZOOM_UPDATE_INTERVAL)
+
         zoom = _Zoom(event.pos(), zoom_factor)
         zoom_time_line = _ZoomTimeLine(SMOOTH_ZOOM_DURATION, self)
         zoom_time_line.setUpdateInterval(SMOOTH_ZOOM_UPDATE_INTERVAL)
@@ -114,8 +63,22 @@ class _ViewSmoothZoom(QObject):
     def zoom_view(self, zoom, time_line_value):  # PySide signal doesn't work without one more parameter from signal (time_line_value)
         old_pos = self.view.mapToScene(zoom.pos)
         self.view.scale(zoom.factor, zoom.factor)
+
         new_pos = self.view.mapToScene(zoom.pos)
 
         # Move the scene's view to old position
         delta = new_pos - old_pos
         self.view.translate(delta.x(), delta.y())
+
+
+class _Zoom:  # TODO: Use Python 3.7 dataclasses
+    def __init__(self, pos, factor):
+        self.pos = pos
+        self.factor = factor
+
+
+class _ZoomTimeLine(QTimeLine):
+    def __init__(self, duration: int = 1000, parent: QObject = None):
+        super().__init__(duration, parent)
+
+        self.finished.connect(self.deleteLater)

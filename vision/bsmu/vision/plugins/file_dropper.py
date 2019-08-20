@@ -33,7 +33,8 @@ class FileDropper(QObject):
 
         self.file_loading_manager = file_loading_manager
         self.visualization_manager = visualization_manager
-        self.dragged_file_path = None
+
+        self.dragged_loadable_file_paths = []
 
     def eventFilter(self, watched_obj, event):
         if event.type() == QEvent.DragEnter:
@@ -46,16 +47,18 @@ class FileDropper(QObject):
             return super().eventFilter(watched_obj, event)
 
     def on_drag_enter(self, event):
+        self.dragged_loadable_file_paths.clear()
+
         mime_data = event.mimeData()
-        if mime_data.hasUrls():
-            self.dragged_file_path = Path(mime_data.urls()[0].toLocalFile())
-            print('dragged file:', self.dragged_file_path)
-            if self.file_loading_manager.can_load_file(self.dragged_file_path):
-                event.accept()
-                return
-        event.ignore()
+        for url in mime_data.urls():
+            file_path = Path(url.toLocalFile())
+            if self.file_loading_manager.can_load_file(file_path):
+                self.dragged_loadable_file_paths.append(file_path)
+
+        event.setAccepted(bool(self.dragged_loadable_file_paths))
 
     def on_drop(self, event):
-        print('drop', self.dragged_file_path)
-        data = self.file_loading_manager.load_file(self.dragged_file_path)
-        self.visualization_manager.visualize_data(data)
+        print('drop', self.dragged_loadable_file_paths)
+        for file_path in self.dragged_loadable_file_paths:
+            data = self.file_loading_manager.load_file(file_path)
+            self.visualization_manager.visualize_data(data)

@@ -16,12 +16,12 @@ class DataVisualizerRegistryPlugin(Plugin):
         for plugin in self.app.enabled_plugins():
             self._register_visualizer_plugin(plugin)
 
-        self.app.plugin_enabled.connect(self._on_app_plugin_enabled)
-        self.app.plugin_disabled.connect(self._on_app_plugin_disabled)
+        self.app.plugin_enabled.connect(self._register_visualizer_plugin)
+        self.app.plugin_disabled.connect(self._unregister_visualizer_plugin)
 
     def _disable(self):
-        self.app.plugin_enabled.disconnect(self._on_app_plugin_enabled)
-        self.app.plugin_disabled.disconnect(self._on_app_plugin_disabled)
+        self.app.plugin_enabled.disconnect(self._register_visualizer_plugin)
+        self.app.plugin_disabled.disconnect(self._unregister_visualizer_plugin)
 
         self.data_visualizer_registry.clear()
 
@@ -32,12 +32,6 @@ class DataVisualizerRegistryPlugin(Plugin):
     def _unregister_visualizer_plugin(self, plugin: Plugin):
         if isinstance(plugin, DataVisualizerPlugin):
             self.data_visualizer_registry.unregister_visualizer_cls(plugin.data_visualizer_cls)
-
-    def _on_app_plugin_enabled(self, plugin: Plugin):
-        self._register_visualizer_plugin(plugin)
-
-    def _on_app_plugin_disabled(self, plugin: Plugin):
-        self._unregister_visualizer_plugin(plugin)
 
 
 class DataVisualizerRegistry:

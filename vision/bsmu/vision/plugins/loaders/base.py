@@ -16,15 +16,6 @@ class FileLoaderPlugin(Plugin):
 
         self.file_loader_cls = file_loader_cls
 
-        file_loader_registry_plugin = app.enable_plugin('bsmu.vision.plugins.loaders.registry.FileLoaderRegistryPlugin')
-        self.file_loader_registry = file_loader_registry_plugin.file_loader_registry
-
-    def _enable(self):
-        self.file_loader_registry.register_loader_cls(self.file_loader_cls)
-
-    def _disable(self):
-        self.file_loader_registry.unregister_loader_cls(self.file_loader_cls)
-
 
 class FileLoaderMeta(abc.ABCMeta, type(QObject)):
     _FORMATS = ()

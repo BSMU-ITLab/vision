@@ -9,15 +9,26 @@ from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.app.plugin_manager import PluginManager
 
 
-CONFIG_FILE_PATH = (Path(__file__).parent / 'App.cfg.yaml').resolve()
+CONFIG_FILE_PATH = (Path(__file__).parent / 'App.conf.yaml').resolve()
 
 
 class App(QApplication):
     plugin_enabled = Signal(Plugin)
     plugin_disabled = Signal(Plugin)
 
-    def __init__(self, argv):
+    def __init__(self, argv, childs=()):
         super().__init__(argv)
+
+        self.childs = childs
+        print('childs:', childs)
+
+
+        from bsmu.vision.app.config_uniter import ConfigUniter
+        config_uniter = ConfigUniter(childs)
+        united_config = config_uniter.unite_configs('App.conf.yaml')
+        print('united_config:', united_config.data)
+        exit()
+
 
         '''
         from skimage.io import imread

@@ -6,7 +6,7 @@ with open('README.md', 'r') as fh:
 
 
 setuptools.setup(
-    name='bsmu-vision',
+    name='bsmu.vision',
     version='0.0.1',
     author='Ivan Kosik',
     author_email='ivankosik91@gmail.com',
@@ -31,8 +31,12 @@ setuptools.setup(
 
 
     install_requires=[
+        'numpy',
         'PySide2',
-        'PyYAML'
+        'ruamel.yaml',
+
+        'bsmu.vision_core',
+        'bsmu.vision.widgets'
     ],
     entry_points={
         ## 'gui_scripts': [

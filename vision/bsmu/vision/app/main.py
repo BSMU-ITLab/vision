@@ -2,11 +2,20 @@ import sys
 
 from bsmu.vision.app import App
 
+print('VVV: ', __file__)
 
-def run_app():
+
+def run_app(childs=()):
+    # run_app.test_var = []
+
     print('Run, Vision! Run!')
+    print('VVV: ', __file__)
+    # print('VVV test_var', run_app.test_var)
+    print('VVV child', childs + (__file__,))
 
-    app = App(sys.argv)
+    # print('VVV child', (*childs, __file__))
+
+    app = App(sys.argv, childs + (__file__,))
     app.run()
 
 

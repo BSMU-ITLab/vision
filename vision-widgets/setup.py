@@ -2,7 +2,7 @@ import setuptools
 
 
 setuptools.setup(
-    name='bsmu.vision_core',
+    name='bsmu.vision.widgets',
     version='0.0.1',
     author='Ivan Kosik',
     author_email='ivankosik91@gmail.com',

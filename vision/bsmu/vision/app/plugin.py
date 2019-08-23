@@ -38,6 +38,15 @@ class Plugin(QObject):
     def print_action(self, action_str):
         print(f'{action_str} {self.name()} plugin')
 
+    def config(self, relative_config_file_path):
+        import sys
+        from pathlib import Path
+        configs_parent_dir = Path(sys.modules[self.__module__].__file__).parent
+        # import inspect
+        # plugin_file_path = inspect.getfile(self.__class__)
+        united_config = self.app.config_uniter.unite_configs(configs_parent_dir, relative_config_file_path)
+        return united_config
+
     @classmethod
     def name(cls):
         return cls.__name__

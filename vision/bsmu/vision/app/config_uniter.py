@@ -7,18 +7,18 @@ from ruamel.yaml import YAML
 
 class ConfigUniter:
     def __init__(self, childs):
-        assert childs, 'At least one child!!!'
+        # assert childs, 'At least one child!!!'
 
         self.childs = [Path(child).parent.resolve() for child in childs]
-        self.root = self.childs[-1]
+        # self.root = self.childs[-1]
 
-    def unite_configs(self, config_relative_path):
+    def unite_configs(self, configs_parent_dir, config_relative_path):
         yaml = YAML()
 
-        with open(self.root / config_relative_path) as file:
+        with open(configs_parent_dir / config_relative_path) as file:
             data = yaml.load(file)
 
-        for child in reversed(self.childs[:-1]):
+        for child in reversed(self.childs):
             with open(child / config_relative_path) as fp:
                 child_data = yaml.load(fp)
 

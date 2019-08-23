@@ -21,13 +21,18 @@ class App(QApplication):
 
         self.childs = childs
         print('childs:', childs)
+        print('module', App.__module__)
+        print(sys.modules[self.__module__].__file__)
+        # exit()
 
 
         from bsmu.vision.app.config_uniter import ConfigUniter
-        config_uniter = ConfigUniter(childs)
-        united_config = config_uniter.unite_configs('App.conf.yaml')
+        self.config_uniter = ConfigUniter(childs)
+
+        united_config = self.config_uniter.unite_configs(Path(__file__).parent, 'App.conf.yaml')
         print('united_config:', united_config.data)
-        exit()
+        # exit()
+
 
 
         '''

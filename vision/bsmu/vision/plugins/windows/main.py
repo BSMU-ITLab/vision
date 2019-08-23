@@ -13,7 +13,10 @@ class MainWindowPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
-        self.main_window = MainWindow()
+        self.united_config = self.config('configs/MainWindowPlugin.conf.yaml')
+        print('MainWindow config', self.united_config.data)
+
+        self.main_window = MainWindow(self.united_config.data['title'])
 
     def _enable(self):
         self.main_window.show()
@@ -23,9 +26,10 @@ class MainWindowPlugin(Plugin):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, title: str = ''):
         super().__init__()
 
         self.resize(800, 600)
         self.move(300, 300)
-        self.setWindowTitle('Vision')
+        # self.setWindowTitle('Vision')
+        self.setWindowTitle(title)

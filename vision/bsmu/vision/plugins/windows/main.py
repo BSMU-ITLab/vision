@@ -13,8 +13,7 @@ class MainWindowPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
-        self.united_config = self.config('configs/MainWindowPlugin.conf.yaml')
-        print('MainWindow config', self.united_config.data)
+        self.united_config = self.config()
 
         self.main_window = MainWindow(self.united_config.data['title'])
 
@@ -31,5 +30,4 @@ class MainWindow(QMainWindow):
 
         self.resize(800, 600)
         self.move(300, 300)
-        # self.setWindowTitle('Vision')
         self.setWindowTitle(title)

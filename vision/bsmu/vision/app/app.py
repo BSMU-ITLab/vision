@@ -4,36 +4,24 @@ from pathlib import Path
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QApplication
 
-from bsmu.vision.app.config import Config
+# from bsmu.vision.app.config import Config
+from bsmu.vision.app.config_uniter import ConfigUniter
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.app.plugin_manager import PluginManager
 
 
-CONFIG_FILE_PATH = (Path(__file__).parent / 'App.conf.yaml').resolve()
+# CONFIG_FILE_PATH = (Path(__file__).parent / 'App.conf.yaml').resolve()
 
 
 class App(QApplication):
     plugin_enabled = Signal(Plugin)
     plugin_disabled = Signal(Plugin)
 
-    def __init__(self, argv, childs=()):
+    def __init__(self, argv, child_config_paths: tuple = ()):
         super().__init__(argv)
 
-        self.childs = childs
-        print('childs:', childs)
-        print('module', App.__module__)
-        print(sys.modules[self.__module__].__file__)
-        # exit()
-
-
-        from bsmu.vision.app.config_uniter import ConfigUniter
-        self.config_uniter = ConfigUniter(childs)
-
-        united_config = self.config_uniter.unite_configs(Path(__file__).parent, 'App.conf.yaml')
-        print('united_config:', united_config.data)
-        # exit()
-
-
+        self.config_uniter = ConfigUniter(child_config_paths)
+        self.united_config = self.config_uniter.unite_configs(Path(__file__).parent.resolve(), 'App.conf.yaml')
 
         '''
         from skimage.io import imread
@@ -74,16 +62,16 @@ class App(QApplication):
 
         print(f'App started. Prefix: {sys.prefix}')
 
-        self.config = Config(CONFIG_FILE_PATH)
-        self.config.load()
-        print(f'Config:\n{self.config.data}')
+        # self.config = Config(CONFIG_FILE_PATH)
+        # self.config.load()
+        # print(f'Config:\n{self.config.data}')
 
         self.plugin_manager = PluginManager(self)
         self.plugin_manager.plugin_enabled.connect(self.plugin_enabled)
         self.plugin_manager.plugin_disabled.connect(self.plugin_disabled)
 
-        if self.config.data is not None:
-            self.plugin_manager.enable_plugins(self.config.data['plugins'])
+        if self.united_config.data is not None:
+            self.plugin_manager.enable_plugins(self.united_config.data['plugins'])
 
         # self.aboutToQuit.connect(self.config.config)
 

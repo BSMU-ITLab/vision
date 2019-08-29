@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide2.QtCore import QObject, Signal, QRectF
-from PySide2.QtGui import QPainter
+from PySide2.QtGui import QPainter, QImage
 from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsItem
 
 from bsmu.vision_core.image import FlatImage
@@ -60,7 +60,10 @@ class _ImageItemLayer(QObject):
                 raise NotImplementedError
 
             self._displayed_array_data = displayed_rgba_array.data
-            self._displayed_image_cache = image_converter.numpy_rgba_image_to_qimage(displayed_rgba_array)
+            displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied if displayed_rgba_array.itemsize == 1 \
+                else QImage.Format_RGBA64_Premultiplied
+            self._displayed_image_cache = image_converter.numpy_rgba_image_to_qimage(
+                displayed_rgba_array, displayed_qimage_format)
         return self._displayed_image_cache
 
     def _on_image_updated(self):

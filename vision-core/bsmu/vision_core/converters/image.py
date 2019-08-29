@@ -29,7 +29,7 @@ def numpy_rgba_image_to_qimage(numpy_image, image_format: QImage.Format = QImage
     # print(numpy_image.flags['C_CONTIGUOUS'])
 
     height, width, channel = numpy_image.shape
-    bytes_per_line = width * channel
+    bytes_per_line = width * channel * numpy_image.itemsize
     return QImage(numpy_image.data, width, height, bytes_per_line, image_format)
 
 

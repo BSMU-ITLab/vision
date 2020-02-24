@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide2.QtCore import QObject, Signal, QRectF
 from PySide2.QtGui import QPainter, QImage
-from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsItem
+from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
 
 from bsmu.vision_core.image import FlatImage
 import bsmu.vision_core.converters.image as image_converter
@@ -13,7 +13,7 @@ from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
 class _ImageItemLayer(QObject):
     max_id = 0
 
-    updated = Signal(FlatImage)
+    image_updated = Signal(FlatImage)
 
     def __init__(self, image: FlatImage = None, name: str = '',
                  visible: bool = True, opacity: float = 1):
@@ -33,15 +33,15 @@ class _ImageItemLayer(QObject):
         self._displayed_array_data = None
 
     @property
-    def image_path(self):
+    def image_path(self) -> Path:
         return self.image.path
 
     @property  # TODO: this is slow. If we need only setter, there are alternatives without getter
-    def image(self):
+    def image(self) -> FlatImage:
         return self._image
 
     @image.setter
-    def image(self, value):
+    def image(self, value: FlatImage):
         if self._image != value:
             self._image = value
             self._on_image_updated()
@@ -69,14 +69,17 @@ class _ImageItemLayer(QObject):
     def _on_image_updated(self):
         print('_ImageItemLayer _on_image_updated (image array updated or layer image changed)')
         self._displayed_image_cache = None
-        self.updated.emit(self.image)
+        self.image_updated.emit(self.image)
 
 
-class _LayeredImageItem(QGraphicsItem):
+class _LayeredImageItem(QGraphicsObject):
+    active_layer_changed = Signal(QGraphicsObject, QGraphicsObject)
+
     def __init__(self, parent: QGraphicsItem = None):
         super().__init__(parent)
 
         self.layers = []
+        self.active_layer = None
 
         self._bounding_rect = QRectF()
 
@@ -88,12 +91,14 @@ class _LayeredImageItem(QGraphicsItem):
         self.layers.append(layer)
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
-        layer.updated.connect(self.update)
+        layer.image_updated.connect(self._on_layer_updated)
 
         if len(self.layers) == 1:  # If was added first layer
-            self.update_bounding_rect()
+            self.active_layer = layer
+            self.active_layer_changed.emit(None, self.active_layer)
+            self._update_bounding_rect()
 
-    def update_bounding_rect(self):
+    def _update_bounding_rect(self):
         self.prepareGeometryChange()
 
         if self.layers:
@@ -112,11 +117,15 @@ class _LayeredImageItem(QGraphicsItem):
                 painter.setOpacity(layer.opacity)
                 painter.drawImage(self._bounding_rect.topLeft(), layer.displayed_image)
 
+    def _on_layer_updated(self, image):
+        self._update_bounding_rect()
+
 
 class LayeredImageViewer(DataViewer):
     # before_image_changed = Signal()
     # image_changed = Signal()
     # colormap_active_class_changed = Signal(int)
+    data_name_changed = Signal(str)
 
     def __init__(self, image: FlatImage = None, zoomable=True):
         super().__init__(image)
@@ -124,6 +133,7 @@ class LayeredImageViewer(DataViewer):
         print('FlatImageViewer __init__')
 
         self.layered_image_item = _LayeredImageItem()
+        self.layered_image_item.active_layer_changed.connect(self._on_active_layer_changed)
 
         self.graphics_scene = QGraphicsScene()
         self.graphics_scene.addItem(self.layered_image_item)
@@ -142,6 +152,23 @@ class LayeredImageViewer(DataViewer):
     def add_layer(self, image: FlatImage = None, name: str = ''):
         self.layered_image_item.add_layer(image, name)
 
+    @property
+    def active_layer(self):
+        return self.layered_image_item.active_layer
+
+    @property
+    def layers(self):
+        return self.layered_image_item.layers
+
     def center(self):
         print('center')
         self.graphics_view.centerOn(self.layered_image_item)
+
+    def _on_active_layer_changed(self, old_active_layer: _ImageItemLayer, new_active_layer: _ImageItemLayer):
+        if old_active_layer is not None:
+            old_active_layer.image_updated.disconnect(self._on_active_layer_image_updated)
+        if new_active_layer is not None:
+            new_active_layer.image_updated.connect(self._on_active_layer_image_updated)
+
+    def _on_active_layer_image_updated(self, image: FlatImage):
+        self.data_name_changed.emit(image.path.name)

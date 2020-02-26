@@ -86,8 +86,9 @@ class _LayeredImageItem(QGraphicsObject):
     def boundingRect(self):
         return self._bounding_rect
 
-    def add_layer(self, image: FlatImage = None, name: str = ''):
-        layer = _ImageItemLayer(image, name)
+    def add_layer(self, image: FlatImage = None, name: str = '',
+                  visible: bool = True, opacity: float = 1):
+        layer = _ImageItemLayer(image, name, visible, opacity)
         self.layers.append(layer)
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
@@ -149,8 +150,9 @@ class LayeredImageViewer(DataViewer):
             print('shape:', image.array.shape)
             self.add_layer(image)
 
-    def add_layer(self, image: FlatImage = None, name: str = ''):
-        self.layered_image_item.add_layer(image, name)
+    def add_layer(self, image: FlatImage = None, name: str = '',
+                  visible: bool = True, opacity: float = 1):
+        self.layered_image_item.add_layer(image, name, visible, opacity)
 
     @property
     def active_layer(self):

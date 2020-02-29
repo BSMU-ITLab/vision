@@ -4,10 +4,10 @@ from PySide2.QtCore import QObject, Signal, QRectF
 from PySide2.QtGui import QPainter, QImage
 from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
 
-from bsmu.vision_core.image import FlatImage
 import bsmu.vision_core.converters.image as image_converter
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
+from bsmu.vision_core.image import FlatImage
 
 
 class _ImageItemLayer(QObject):
@@ -57,9 +57,6 @@ class _ImageItemLayer(QObject):
                 displayed_rgba_array = image_converter.converted_to_rgba(self.image.array)
             else:
                 displayed_rgba_array = self.image.colored_premultiplied_array
-                # raise NotImplementedError
-
-            print('displayed_rgba_array SHAPE', displayed_rgba_array.shape)
 
             self._displayed_array_data = displayed_rgba_array.data
             displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied if displayed_rgba_array.itemsize == 1 \

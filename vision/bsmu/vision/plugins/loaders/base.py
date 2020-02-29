@@ -44,11 +44,11 @@ class FileLoader(QObject, metaclass=FileLoaderMeta):
     def formats(self):
         return type(self).formats
 
-    def load_file(self, path: Path) -> Data:
-        data = self._load_file(path)
+    def load_file(self, path: Path, **kwargs) -> Data:
+        data = self._load_file(path, **kwargs)
         self.file_loaded.emit(data)
         return data
 
     @abc.abstractmethod
-    def _load_file(self, path: Path) -> Data:
+    def _load_file(self, path: Path, **kwargs) -> Data:
         pass

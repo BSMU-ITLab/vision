@@ -1,12 +1,13 @@
 layers:
-#  masks:
-#    palette:
-#      - [1, 200, 90, 90, 80]
-#      - [2, 90, 90, 200, 80]
-#    opacity: 0.8
-  predictions:
-    as_gray: True
+  masks:
+    load_as_gray: True
     palette:
-      - [0, 100, 100, 200, 200]
-      - [1, 200, 200, 200, 220]
-    opacity: 0.5
+      - [0, 0, 0, 0, 0]
+      - [1, 0, 255, 0, 255]
+    opacity: 0.3
+  predictions:
+    load_as_gray: True
+    palette:
+      - [0, 0, 0, 0, 0]
+      - [1, 255, 127, 0, 255]
+    opacity: 0.3

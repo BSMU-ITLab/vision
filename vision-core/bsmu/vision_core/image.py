@@ -28,8 +28,6 @@ class Image(Data):
 
     @property
     def colored_premultiplied_array(self) -> ndarray:
-        print('colored_premultiplied_array', self.palette.premultiplied_array.shape, self.array.shape)
-        print('result', self.palette.premultiplied_array[self.array].shape)
         return self.palette.premultiplied_array[self.array]
 
     def _check_array_palette_matching(self):

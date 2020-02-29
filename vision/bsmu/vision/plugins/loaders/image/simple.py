@@ -14,6 +14,6 @@ class SimpleImageFileLoaderPlugin(ImageFileLoaderPlugin):
 class SimpleImageFileLoader(ImageFileLoader):
     _FORMATS = ('png', 'jpg')
 
-    def _load_file(self, path: Path):
+    def _load_file(self, path: Path, **kwargs):
         print('Load Simple Image')
-        return FlatImage(skimage.io.imread(str(path)), None, path)
+        return FlatImage(skimage.io.imread(str(path), **kwargs), None, path)

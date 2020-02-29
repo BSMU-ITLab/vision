@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 from PySide2.QtCore import QObject
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision_core.palette import Palette
+
+if TYPE_CHECKING:
+    from bsmu.vision.app import App
 
 
 class ImageViewerPathOverlayerPlugin(Plugin):
@@ -42,15 +47,10 @@ class ImageViewerPathOverlayer(QObject):
             layers_dir = image_path.parents[1]
             for layer_name, layer_properties in self.config_data['layers'].items():
                 layer_image_path = layers_dir / layer_name / image_path.name
-                print(layer_name, layer_image_path.exists(), layer_image_path)
                 if layer_image_path.exists():
-                    if layer_properties['as_gray']:
-                        print('YYYYYYYYYYY')
-                    image = self.loading_manager.load_file(layer_image_path)
-                    print('IMMMM', image.array.shape)
-                    image.array = np.rint(image.array / 255).astype(int)     ####### To convert predictions to binary image
-                    print('image unique', np.unique(image.array))
+                    image = self.loading_manager.load_file(layer_image_path, as_gray=layer_properties['load_as_gray'])
+                    image.array = np.rint(image.array).astype(np.uint8)
+                    # image.array = np.rint(image.array / 255).astype(np.uint8)     ####### To convert predictions to binary image
                     image.palette = Palette.from_sparse_index_list(list(layer_properties['palette']))
-                    # print('PALETTE', image.palette.array)
                     layer_opacity = layer_properties['opacity']
                     layered_image_viewer.add_layer(image, layer_name, opacity=layer_opacity)

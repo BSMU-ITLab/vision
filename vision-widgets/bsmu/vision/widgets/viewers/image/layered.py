@@ -14,6 +14,7 @@ class _ImageItemLayer(QObject):
     max_id = 0
 
     image_updated = Signal(FlatImage)
+    visibility_updated = Signal()
 
     def __init__(self, image: FlatImage = None, name: str = '',
                  visible: bool = True, opacity: float = 1):
@@ -24,7 +25,7 @@ class _ImageItemLayer(QObject):
         self._image = None
         self.image = image #if image is not None else Image()
         self.name = name if name else 'Layer ' + str(self.id)
-        self.visible = visible
+        self._visible = visible
         self.opacity = opacity
 
         self._displayed_image_cache = None
@@ -46,6 +47,16 @@ class _ImageItemLayer(QObject):
             self._image = value
             self._on_image_updated()
             self._image.updated.connect(self._on_image_updated)
+
+    @property
+    def visible(self) -> bool:
+        return self._visible
+
+    @visible.setter
+    def visible(self, value: bool):
+        if self._visible != value:
+            self._visible = value
+            self.visibility_updated.emit()
 
     @property
     def displayed_image(self):
@@ -91,7 +102,8 @@ class _LayeredImageItem(QGraphicsObject):
         self.layers.append(layer)
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
-        layer.image_updated.connect(self._on_layer_updated)
+        layer.image_updated.connect(self._on_layer_image_updated)
+        layer.visibility_updated.connect(self.update)
 
         if len(self.layers) == 1:  # If was added first layer
             self.active_layer = layer
@@ -117,8 +129,8 @@ class _LayeredImageItem(QGraphicsObject):
                 painter.setOpacity(layer.opacity)
                 painter.drawImage(self._bounding_rect.topLeft(), layer.displayed_image)
 
-    def _on_layer_updated(self, image):
-        self._update_bounding_rect()
+    def _on_layer_image_updated(self, image: FlatImage):
+        self.update()
 
 
 class LayeredImageViewer(DataViewer):

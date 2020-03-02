@@ -1,12 +1,10 @@
 layers:
   masks:
-    load_as_gray: True
     palette:
       - [0, 0, 0, 0, 0]
       - [1, 0, 255, 0, 255]
     opacity: 0.3
   predictions:
-    load_as_gray: True
     palette:
       - [0, 0, 0, 0, 0]
       - [1, 255, 127, 0, 255]

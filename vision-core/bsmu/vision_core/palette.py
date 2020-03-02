@@ -9,7 +9,7 @@ class Palette:
         self._premultiplied_array_cache = None
 
     @classmethod
-    def from_sparse_index_list(cls, sparse_index_list: list):
+    def from_sparse_index_list(cls, sparse_index_list: list) -> Palette:
         sparse_index_array = np.array(sparse_index_list)
         palette_array = np.zeros((256, 4), dtype=np.uint8)
         palette_array[sparse_index_array[:, 0]] = sparse_index_array[:, 1:]

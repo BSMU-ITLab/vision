@@ -48,9 +48,9 @@ class ImageViewerPathOverlayer(QObject):
             for layer_name, layer_properties in self.config_data['layers'].items():
                 layer_image_path = layers_dir / layer_name / image_path.name
                 if layer_image_path.exists():
-                    image = self.loading_manager.load_file(layer_image_path, as_gray=layer_properties['load_as_gray'])
-                    image.array = np.rint(image.array).astype(np.uint8)
-                    # image.array = np.rint(image.array / 255).astype(np.uint8)     ####### To convert predictions to binary image
-                    image.palette = Palette.from_sparse_index_list(list(layer_properties['palette']))
+                    palette_property = layer_properties.get('palette')
+                    palette = None if palette_property is None \
+                        else Palette.from_sparse_index_list(list(palette_property))
+                    image = self.loading_manager.load_file(layer_image_path, palette=palette)
                     layer_opacity = layer_properties['opacity']
                     layered_image_viewer.add_layer(image, layer_name, opacity=layer_opacity)

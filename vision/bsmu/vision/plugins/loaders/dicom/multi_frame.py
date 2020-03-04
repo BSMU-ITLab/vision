@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
-from bsmu.vision_core.dicom import Dicom
+from bsmu.vision_core.image import VolumeImage
 
 import pydicom
 from pydicom.dataset import FileDataset
@@ -15,11 +15,11 @@ class MultiFrameDicomFileLoaderPlugin(FileLoaderPlugin):
 class MultiFrameDicomFileLoader(FileLoader):
     _FORMATS = ('dcm',)
 
-    def _load_file(self, path: Path, **kwargs):
+    def _load_file(self, path: Path, **kwargs) -> VolumeImage:
         print('Load Multi-frame DICOM')
 
         dataset = pydicom.dcmread(str(path))
-        return Dicom(dataset, path)
+        return VolumeImage(dataset.pixel_array, path=path)
 
 
 

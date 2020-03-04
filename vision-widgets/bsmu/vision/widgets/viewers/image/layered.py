@@ -139,7 +139,7 @@ class LayeredImageViewer(DataViewer):
     # colormap_active_class_changed = Signal(int)
     data_name_changed = Signal(str)
 
-    def __init__(self, image: FlatImage = None, zoomable=True):
+    def __init__(self, image: FlatImage = None, zoomable: bool = True):
         super().__init__(image)
 
         print('FlatImageViewer __init__')

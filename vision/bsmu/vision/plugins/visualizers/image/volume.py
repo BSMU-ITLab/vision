@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import numpy as np
-
 from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin, DataVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+from bsmu.vision.widgets.viewers.image.slice import VolumeSliceImageViewer
+from bsmu.vision_core.constants import PlaneAxis
 from bsmu.vision_core.dicom import Dicom
 from bsmu.vision_core.image import FlatImage, VolumeImage
 
@@ -17,30 +17,11 @@ class VolumeImageVisualizerPlugin(DataVisualizerPlugin):
 class VolumeImageVisualizer(DataVisualizer):
     _DATA_TYPES = (VolumeImage, )
 
-    def _visualize_data(self, data: Dicom):
-        print('visualize plane dicom')
+    def _visualize_data(self, image: VolumeImage):
+        print('visualize volume image')
 
 
-        print('===', data.array.min(), data.array.max())
-
-        window_width = data.array.max() - data.array.min()
-        window_level = (data.array.max() + data.array.min()) / 2
-
-        slice_a = data.array[:, :, 200]
-        # slice_a[slice_a < window_level - window_width / 2] = 0
-        # slice_a[slice_a > window_level + window_width / 2] = 255
-
-        print('before', slice_a.min(), slice_a.max())
-        lutvalue = np.piecewise(slice_a,
-                                [slice_a <= (window_level - 0.5 - (window_width - 1) / 2),
-                                 slice_a > (window_level - 0.5 + (window_width - 1) / 2)],
-                                [0, 255, lambda slice_a:
-                                ((slice_a - (window_level - 0.5)) / (window_width - 1) + 0.5) *
-                                (255 - 0)])
-        slice_a = lutvalue
-        print('after', slice_a.min(), slice_a.max(), slice_a.dtype)
-        slice_a = slice_a.astype(np.uint8, copy=False)
-        print('after astype', slice_a.min(), slice_a.max(), slice_a.dtype)
+        print('===', image.array.min(), image.array.max())
 
 
         # lutvalue = util.piecewise(data,
@@ -51,25 +32,24 @@ class VolumeImageVisualizer(DataVisualizer):
         #                           (255 - 0)])
 
 
-        a = FlatImage(slice_a)
+        # a = FlatImage(slice_a)
 
-        image_viewer = LayeredImageViewer(a)
+        image_viewer = VolumeSliceImageViewer(PlaneAxis.X, image)
         sub_window = LayeredImageViewerSubWindow(image_viewer)
         # sub_window.setWindowTitle(data.path.name)
         # image_viewer.data_name_changed.connect(sub_window.setWindowTitle)
         self.mdi.addSubWindow(sub_window)
         sub_window.show()
 
-        a = FlatImage(data.array[:, 200, :])
-        image_viewer = LayeredImageViewer(a)
+
+        image_viewer = VolumeSliceImageViewer(PlaneAxis.Y, image)
         sub_window = LayeredImageViewerSubWindow(image_viewer)
         # sub_window.setWindowTitle(data.path.name)
         # image_viewer.data_name_changed.connect(sub_window.setWindowTitle)
         self.mdi.addSubWindow(sub_window)
         sub_window.show()
 
-        a = FlatImage(data.array[200, :, :])
-        image_viewer = LayeredImageViewer(a)
+        image_viewer = VolumeSliceImageViewer(PlaneAxis.Z, image)
         sub_window = LayeredImageViewerSubWindow(image_viewer)
         # sub_window.setWindowTitle(data.path.name)
         # image_viewer.data_name_changed.connect(sub_window.setWindowTitle)

@@ -19,6 +19,7 @@ class MultiFrameDicomFileLoader(FileLoader):
         print('Load Multi-frame DICOM')
 
         dataset = pydicom.dcmread(str(path))
+        print('DICOM shape', dataset.pixel_array.shape)
         return VolumeImage(dataset.pixel_array, path=path)
 
 

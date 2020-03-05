@@ -127,6 +127,7 @@ class _LayeredImageItem(QGraphicsObject):
         for layer in self.layers:
             if layer.image is not None and layer.visible:
                 painter.setOpacity(layer.opacity)
+                print('displll', layer.displayed_image.min(), layer.displayed_image.max(), layer.displayed_image.shape)
                 painter.drawImage(self._bounding_rect.topLeft(), layer.displayed_image)
 
     def _on_layer_image_updated(self, image: FlatImage):
@@ -158,7 +159,7 @@ class LayeredImageViewer(DataViewer):
         self.setLayout(grid_layout)
 
         if image is not None:
-            print('shape:', image.array.shape)
+            print('layer shape:', image.array.shape)
             self.add_layer(image)
 
     def add_layer(self, image: FlatImage = None, name: str = '',

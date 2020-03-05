@@ -8,3 +8,7 @@ class DataViewer(QWidget):
         super().__init__()
 
         self.data = data
+
+    @property
+    def data_path_name(self):
+        return self.data.path_name

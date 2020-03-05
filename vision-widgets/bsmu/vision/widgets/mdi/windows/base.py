@@ -9,6 +9,8 @@ class DataViewerSubWindow(QMdiSubWindow):
 
         self.viewer = viewer
 
+        self.setWindowTitle(self.viewer.data_path_name)
+
     @property
     def viewer(self):
         return self.widget()

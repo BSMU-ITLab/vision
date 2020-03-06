@@ -2,6 +2,7 @@ plugins:
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
   - bsmu.vision.plugins.loaders.dicom.multi_frame.MultiFrameDicomFileLoaderPlugin
+  - bsmu.vision.plugins.loaders.nifti.base.NiftiFileLoaderPlugin
   - bsmu.vision.plugins.visualizers.image.flat.FlatImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.volume.VolumeImageVisualizerPlugin
   - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin

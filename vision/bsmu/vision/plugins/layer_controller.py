@@ -10,7 +10,7 @@ from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubW
 
 if TYPE_CHECKING:
     from bsmu.vision.app import App
-    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
     from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
 
 

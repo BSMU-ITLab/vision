@@ -6,14 +6,14 @@ import numpy as np
 from PySide2.QtWidgets import QVBoxLayout
 
 from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 from bsmu.vision_core.constants import PlaneAxis
 from bsmu.vision_core.image import FlatImage
 
 
-class VolumeSliceImageViewer(DataViewer):
+class VolumeSliceImageViewer(LayeredImageViewer):
     def __init__(self, plane_axis: PlaneAxis, data: VolumeImage = None, zoomable: bool = True):
-        super().__init__(data)
+        super().__init__(data, zoomable)
 
         self.plane_axis = plane_axis
 
@@ -26,11 +26,13 @@ class VolumeSliceImageViewer(DataViewer):
         # Temporary assert
         assert windowed_center_slice_pixels.flags['C_CONTIGUOUS'], 'array of center slice pixels is not CONTIGUOUS'
 
-        self._layered_image_viewer = LayeredImageViewer(FlatImage(windowed_center_slice_pixels), zoomable)
+        self.add_layer(FlatImage(windowed_center_slice_pixels))
 
-        self.layout = QVBoxLayout()
-        self.layout.addWidget(self._layered_image_viewer)
-        self.setLayout(self.layout)
+        # self._layered_image_viewer = LayeredImageViewer(FlatImage(windowed_center_slice_pixels), zoomable)
+        #
+        # self.layout = QVBoxLayout()
+        # self.layout.addWidget(self._layered_image_viewer)
+        # self.setLayout(self.layout)
 
     def show_slice(self, slice_number: int):
         ...

@@ -44,7 +44,8 @@ class MainWindow(QMainWindow):
 class MenuType(Enum):
     FILE = 1
     VIEW = 2
-    HELP = 3
+    TOOLS = 3
+    HELP = 4
 
 
 class MenuBar(QMenuBar):
@@ -55,6 +56,7 @@ class MenuBar(QMenuBar):
 
         self.add_menu(MenuType.FILE)
         self.add_menu(MenuType.VIEW)
+        self.add_menu(MenuType.TOOLS)
         self.add_menu(MenuType.HELP)
         # TODO: It's better to add menus at runtime (if they needed), but we have to keep correct menus order,
         #  using self.insertMenu instead of self.addMenu

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import bsmu.vision_core.converters.image as image_converter
 from PySide2.QtCore import QObject, Signal, QRectF
 from PySide2.QtGui import QPainter, QImage
 from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
+from bsmu.vision_core.image import FlatImage
 
-import bsmu.vision_core.converters.image as image_converter
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
-from bsmu.vision_core.image import FlatImage
 
 
 class _ImageItemLayer(QObject):
@@ -139,8 +139,8 @@ class LayeredImageViewer(DataViewer):
     # colormap_active_class_changed = Signal(int)
     data_name_changed = Signal(str)
 
-    def __init__(self, image: FlatImage = None, zoomable: bool = True):
-        super().__init__(image)
+    def __init__(self, data: Image = None, zoomable: bool = True):
+        super().__init__(data)
 
         print('FlatImageViewer __init__')
 
@@ -156,10 +156,6 @@ class LayeredImageViewer(DataViewer):
         grid_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout.addWidget(self.graphics_view)
         self.setLayout(grid_layout)
-
-        if image is not None:
-            print('layer shape:', image.array.shape)
-            self.add_layer(image)
 
     def add_layer(self, image: FlatImage = None, name: str = '',
                   visible: bool = True, opacity: float = 1):

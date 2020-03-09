@@ -3,35 +3,29 @@ from __future__ import annotations
 from PySide2.QtCore import QEvent
 from PySide2.QtCore import Qt
 
-from bsmu.vision.plugins.tools.base import ToolPlugin, Tool
-from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
+from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, ViewerTool
 
 
-class SmartBrushImageViewerToolPlugin(ToolPlugin):
+class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):
     def __init__(self, app: App):
         super().__init__(app, SmartBrushImageViewerTool, 'Smart Brush', Qt.CTRL + Qt.Key_B)
 
-        self.mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
 
-        self.smart_brush_tool = SmartBrushImageViewerTool(self.mdi)
+class SmartBrushImageViewerTool(ViewerTool):
+    def __init__(self, viewer: LayeredImageViewer):
+        super().__init__(viewer)
 
-
-class SmartBrushImageViewerTool(Tool):
-    def __init__(self, mdi: Mdi):
-        super().__init__()
-
-        self.mdi = mdi
-
-    def activate(self):
-        print('activate SmartBrushImageViewerTool')
-        for sub_window in self.mdi.subWindowList():
-            if not isinstance(sub_window, LayeredImageViewerSubWindow):
-                continue
-
-            layered_image_viewer = sub_window.viewer
-            layered_image_viewer.viewport().installEventFilter(self)
+    # def activate(self):
+    #     print('activate SmartBrushImageViewerTool')
 
     def eventFilter(self, watched_obj: QObject, event: QEvent):
         if event.type() == QEvent.MouseButtonPress:
-            print('on mouse pressed', event)
+            print('on mouse pressed', event, event.pos())
+
+            # image_coords = self.viewer.pos_to_image_coords(event.pos())
+            p_coords = self.viewer.pos_to_image_pixel_coords(event.pos())
+            print('p_coords', p_coords)
+
             return True
+
+        return super().eventFilter(watched_obj, event)

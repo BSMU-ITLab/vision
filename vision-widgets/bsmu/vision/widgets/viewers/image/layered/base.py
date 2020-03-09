@@ -169,6 +169,31 @@ class LayeredImageViewer(DataViewer):
     def layers(self):
         return self.layered_image_item.layers
 
+    def pos_to_image_pixel_coords(self, pos):
+        # pixmap_pos = self.pixmap_item.mapFromScene(self.mapToScene(pos))
+        # return [round(pixmap_pos.y()), round(pixmap_pos.x())]
+
+        print('var1 ', self.graphics_view.viewport().mapFrom(self, pos))
+        print('var2 ', self.graphics_view.mapFrom(self, pos))
+
+        ppp = self.graphics_view.viewport().mapFrom(self, pos)
+
+        print('par', self.graphics_view.parent())
+        print('par2', self.graphics_view.viewport().parent())
+
+        viewport_coords = ppp
+        print('viewport_coords', ppp)
+        scene_coords = self.graphics_view.mapToScene(viewport_coords)
+        print('csene_coords', scene_coords)
+
+        layered_image_item_coords = self.layered_image_item.mapFromScene(scene_coords)
+        print('layered_image_item_coords', layered_image_item_coords)
+
+        # pos = self.graphics_view.mapToScene(ppp)
+        pos = layered_image_item_coords
+
+        return [round(pos.y()), round(pos.x())]
+
     def center(self):
         print('center')
         self.graphics_view.centerOn(self.layered_image_item)

@@ -23,7 +23,7 @@ class SmartBrushImageViewerTool(ViewerTool):
             print('on mouse pressed', event, event.pos())
 
             # image_coords = self.viewer.pos_to_image_coords(event.pos())
-            p_coords = self.viewer.pos_to_image_pixel_coords(event.pos())
+            p_coords = self.pos_to_image_pixel_coords(event.pos())
             print('p_coords', p_coords)
 
             return True

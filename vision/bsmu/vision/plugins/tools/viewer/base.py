@@ -71,4 +71,7 @@ class ViewerTool(QObject):
     def activate(self):
         # self.viewer.viewport().installEventFilter(self)
         print('aCT type', type(self.viewer))
-        self.viewer.installEventFilter(self)
+        self.viewer.viewport.installEventFilter(self)
+
+    def pos_to_image_pixel_coords(self, viewport_pos: QPoint):
+        return self.viewer.viewport_pos_to_image_pixel_coords(viewport_pos)

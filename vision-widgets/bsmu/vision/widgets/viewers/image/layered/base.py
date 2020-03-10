@@ -116,9 +116,10 @@ class _LayeredImageItem(QGraphicsObject):
         if self.layers:
             image = self.layers[0].displayed_image
             image_rect = image.rect()
-            # self._bounding_rect = QRectF(image_rect)  # center of the item will be in top left point of image
-            self._bounding_rect = QRectF(-image_rect.width() / 2, -image_rect.height() / 2,
-                                         image_rect.width(), image_rect.height())
+            self._bounding_rect = QRectF(image_rect)  # item position will be in the top left point of image
+            # Item position will be in the center of image
+            # self._bounding_rect = QRectF(-image_rect.width() / 2, -image_rect.height() / 2,
+            #                              image_rect.width(), image_rect.height())
         else:
             self._bounding_rect = QRectF()
 
@@ -169,30 +170,19 @@ class LayeredImageViewer(DataViewer):
     def layers(self):
         return self.layered_image_item.layers
 
-    def pos_to_image_pixel_coords(self, pos):
-        # pixmap_pos = self.pixmap_item.mapFromScene(self.mapToScene(pos))
-        # return [round(pixmap_pos.y()), round(pixmap_pos.x())]
+    @property
+    def viewport(self):
+        return self.graphics_view.viewport()
 
-        print('var1 ', self.graphics_view.viewport().mapFrom(self, pos))
-        print('var2 ', self.graphics_view.mapFrom(self, pos))
+    def viewport_pos_to_image_pixel_coords(self, viewport_pos: QPoint):
+        scene_pos = self.graphics_view.mapToScene(viewport_pos)
+        layered_image_item_pos = self.layered_image_item.mapFromScene(scene_pos)
+        return [round(layered_image_item_pos.y()), round(layered_image_item_pos.x())]
 
-        ppp = self.graphics_view.viewport().mapFrom(self, pos)
-
-        print('par', self.graphics_view.parent())
-        print('par2', self.graphics_view.viewport().parent())
-
-        viewport_coords = ppp
-        print('viewport_coords', ppp)
-        scene_coords = self.graphics_view.mapToScene(viewport_coords)
-        print('csene_coords', scene_coords)
-
-        layered_image_item_coords = self.layered_image_item.mapFromScene(scene_coords)
-        print('layered_image_item_coords', layered_image_item_coords)
-
-        # pos = self.graphics_view.mapToScene(ppp)
-        pos = layered_image_item_coords
-
-        return [round(pos.y()), round(pos.x())]
+    def pos_to_image_pixel_coords(self, pos: QPoint):
+        graphics_view_pos = self.graphics_view.mapFrom(self, pos)
+        viewport_pos = self.viewport.mapFrom(self.graphics_view, graphics_view_pos)
+        return self.viewport_pos_to_image_pixel_coords(viewport_pos)
 
     def center(self):
         print('center')

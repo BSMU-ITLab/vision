@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from bsmu.vision_core.data import Data
+from PySide2.QtCore import Signal
 
 
 class Image(Data):
+    pixels_modified = Signal()
+
     def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
         super().__init__(path)
 
@@ -12,6 +15,9 @@ class Image(Data):
         self.spatial = spatial
 
         self._check_array_palette_matching()
+
+    def emit_pixels_modified(self):
+        self.pixels_modified.emit()
 
     @property
     def palette(self) -> Palette:

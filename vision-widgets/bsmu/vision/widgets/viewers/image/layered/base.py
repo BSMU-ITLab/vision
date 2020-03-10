@@ -46,7 +46,8 @@ class _ImageItemLayer(QObject):
         if self._image != value:
             self._image = value
             self._on_image_updated()
-            self._image.updated.connect(self._on_image_updated)
+            # self._image.updated.connect(self._on_image_updated)
+            self._image.pixels_modified.connect(self._on_image_updated)
 
     @property
     def visible(self) -> bool:

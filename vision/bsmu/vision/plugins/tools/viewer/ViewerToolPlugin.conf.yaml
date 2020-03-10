@@ -1,0 +1,4 @@
+layers:
+  image: images
+  mask: masks
+  tool_mask: tool-mask

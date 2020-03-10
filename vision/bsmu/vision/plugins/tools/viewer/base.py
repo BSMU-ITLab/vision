@@ -7,6 +7,7 @@ from PySide2.QtCore import QObject
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import MenuType
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
+from bsmu.vision_core.image import FlatImage
 
 if TYPE_CHECKING:
     from PySide2.QtCore import Qt
@@ -23,7 +24,9 @@ class ViewerToolPlugin(Plugin):
         self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
         self.mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
 
-        self.mdi_tool = MdiViewerTool(self.mdi, self.tool_cls)
+        print('CLASS name', self.__class__.__name__)
+        print('qualname', self.__class__.__qualname__)
+        self.mdi_tool = MdiViewerTool(self.mdi, self.tool_cls, self.config().data)
 
     def _enable(self):
         if not self.action_name:
@@ -37,11 +40,12 @@ class ViewerToolPlugin(Plugin):
 
 
 class MdiViewerTool(QObject):
-    def __init__(self, mdi: Mdi, tool_cls: Type[ViewerTool]):
+    def __init__(self, mdi: Mdi, tool_cls: Type[ViewerTool], config_data):
         super().__init__()
 
         self.mdi = mdi
         self.tool_csl = tool_cls
+        self.config_data = config_data
 
         self.sub_windows_viewer_tools = {}  # DataViewerSubWindow: ViewerTool
 
@@ -57,21 +61,23 @@ class MdiViewerTool(QObject):
 
         viewer_tool = self.sub_windows_viewer_tools.get(sub_window)
         if viewer_tool is None:
-            viewer_tool = self.tool_csl(sub_window.viewer)
+            viewer_tool = self.tool_csl(sub_window.viewer, self.config_data)
             self.sub_windows_viewer_tools[sub_window] = viewer_tool
         return viewer_tool
 
 
 class ViewerTool(QObject):
-    def __init__(self, viewer: DataViewer):
+    def __init__(self, viewer: DataViewer, config_data):
         super().__init__()
 
         self.viewer = viewer
+        self.config_data = config_data
 
     def activate(self):
-        # self.viewer.viewport().installEventFilter(self)
-        print('aCT type', type(self.viewer))
         self.viewer.viewport.installEventFilter(self)
+        print(self.config_data['layers'])
+
+        # self.viewer.add_layer(FlatImage())
 
     def pos_to_image_pixel_coords(self, viewport_pos: QPoint):
         return self.viewer.viewport_pos_to_image_pixel_coords(viewport_pos)

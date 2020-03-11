@@ -23,6 +23,8 @@ class App(QApplication):
         self.config_uniter = ConfigUniter(child_config_paths)
         self.united_config = self.config_uniter.unite_configs(Path(__file__).parent.resolve(), 'App.conf.yaml')
 
+        self.config_dir = Path(__file__).parent.resolve() / 'configs'
+
         '''
         from skimage.io import imread
         from PySide2.QtCore import Qt

@@ -31,11 +31,11 @@ class ConfigUniter:
         # create a new file with merged yaml
         # yaml.dump(data, file('united.yaml', 'w'))
 
-        united_config = UnitedConfig(self.child_config_paths, config_data, yaml)
+        united_config = UnitedConfigOld(self.child_config_paths, config_data, yaml)
         return united_config
 
 
-class UnitedConfig:
+class UnitedConfigOld:
     def __init__(self, childs, data, yaml):
         self.childs = childs
         self.data = data

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide2.QtCore import QObject, Signal
 
+from bsmu.vision.app.united_config import UnitedConfig
+
 
 class Plugin(QObject):
     # setup_info = None
@@ -13,6 +15,8 @@ class Plugin(QObject):
         super().__init__()
 
         self.app = app
+        self.config = UnitedConfig(self, Plugin, self.app.config_dir)
+        # TODO: plugin can contain |config_path| field (if some plugin use different place or name for config file)
 
         self.print_action('init')
 
@@ -38,7 +42,10 @@ class Plugin(QObject):
     def print_action(self, action_str):
         print(f'{action_str} {self.name()} plugin')
 
-    def config(self, relative_config_dir=''): #relative_config_file_path=''):
+    def config_value(self, key: str):
+        return self.config.value(key)
+
+    def old_config(self, relative_config_dir=''): #relative_config_file_path=''):
         import sys
         from pathlib import Path
         plugin_dir = Path(sys.modules[self.__module__].__file__).parent

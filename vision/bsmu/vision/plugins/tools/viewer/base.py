@@ -24,9 +24,7 @@ class ViewerToolPlugin(Plugin):
         self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
         self.mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
 
-        print('CLASS name', self.__class__.__name__)
-        print('qualname', self.__class__.__qualname__)
-        self.mdi_tool = MdiViewerTool(self.mdi, self.tool_cls, self.config().data)
+        self.mdi_tool = MdiViewerTool(self.mdi, self.tool_cls, self.config)
 
     def _enable(self):
         if not self.action_name:
@@ -40,12 +38,12 @@ class ViewerToolPlugin(Plugin):
 
 
 class MdiViewerTool(QObject):
-    def __init__(self, mdi: Mdi, tool_cls: Type[ViewerTool], config_data):
+    def __init__(self, mdi: Mdi, tool_cls: Type[ViewerTool], config):
         super().__init__()
 
         self.mdi = mdi
         self.tool_csl = tool_cls
-        self.config_data = config_data
+        self.config = config
 
         self.sub_windows_viewer_tools = {}  # DataViewerSubWindow: ViewerTool
 
@@ -61,21 +59,21 @@ class MdiViewerTool(QObject):
 
         viewer_tool = self.sub_windows_viewer_tools.get(sub_window)
         if viewer_tool is None:
-            viewer_tool = self.tool_csl(sub_window.viewer, self.config_data)
+            viewer_tool = self.tool_csl(sub_window.viewer, self.config)
             self.sub_windows_viewer_tools[sub_window] = viewer_tool
         return viewer_tool
 
 
 class ViewerTool(QObject):
-    def __init__(self, viewer: DataViewer, config_data):
+    def __init__(self, viewer: DataViewer, config: UnitedConfig):
         super().__init__()
 
         self.viewer = viewer
-        self.config_data = config_data
+        self.config = config
 
     def activate(self):
         self.viewer.viewport.installEventFilter(self)
-        print(self.config_data['layers'])
+        print(self.config.value('layers'))
 
         # self.viewer.add_layer(FlatImage())
 

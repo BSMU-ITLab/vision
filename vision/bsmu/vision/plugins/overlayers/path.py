@@ -21,7 +21,7 @@ class ImageViewerPathOverlayerPlugin(Plugin):
         file_loading_manager_plugin = app.enable_plugin('bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin')
 
         self.overlayer = ImageViewerPathOverlayer(
-            self.data_visualization_manager, file_loading_manager_plugin.file_loading_manager, self.config().data)
+            self.data_visualization_manager, file_loading_manager_plugin.file_loading_manager, self.old_config().data)
 
     def _enable(self):
         self.data_visualization_manager.data_visualized.connect(self.overlayer.overlay_sibling_dirs_images)

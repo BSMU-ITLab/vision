@@ -15,7 +15,7 @@ class MainWindowPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
-        self.united_config = self.config()
+        self.united_config = self.old_config()
 
         self.main_window = MainWindow(self.united_config.data['title'])
 

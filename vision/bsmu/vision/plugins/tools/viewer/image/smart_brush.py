@@ -13,8 +13,8 @@ class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):
 
 
 class SmartBrushImageViewerTool(ViewerTool):
-    def __init__(self, viewer: LayeredImageViewer):
-        super().__init__(viewer)
+    def __init__(self, viewer: LayeredImageViewer, config: UnitedConfig):
+        super().__init__(viewer, config)
 
         self.radius = 20
 

@@ -8,6 +8,7 @@ from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import MenuType
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision_core.image import FlatImage
+from bsmu.vision_core.palette import Palette
 
 if TYPE_CHECKING:
     from PySide2.QtCore import Qt
@@ -73,9 +74,59 @@ class ViewerTool(QObject):
 
     def activate(self):
         self.viewer.viewport.installEventFilter(self)
-        print(self.config.value('layers'))
+
+
+class LayeredImageViewerTool(ViewerTool):
+    def __init__(self, viewer: LayeredImageViewer, config: UnitedConfig):
+        super().__init__(viewer, config)
+
+        self.image = None
+        self.mask = None
+        self.tool_mask = None
+
+    def activate(self):
+        super().activate()
+
+        layers_properties = self.config.value('layers')
+        print('layers_properties', layers_properties)
+
+        NAME_PROPERTY_KEY = 'name'
+        image_layer = self.viewer.layer(layers_properties['image'][NAME_PROPERTY_KEY])
+        self.image = image_layer and image_layer.image
+
+        mask_layer = self.viewer.layer(layers_properties['mask'][NAME_PROPERTY_KEY])
+        self.mask = mask_layer and mask_layer.image
+
+        tool_mask_layer_properties = layers_properties['tool_mask']
+        tool_mask_layer_name = tool_mask_layer_properties[NAME_PROPERTY_KEY]
+        tool_mask_layer = self.viewer.layer(tool_mask_layer_name)
+        if tool_mask_layer is None:
+            # Create and add tool mask layer
+            tool_mask_palette_property = tool_mask_layer_properties['palette']
+            tool_mask_palette = tool_mask_palette_property and \
+                Palette.from_sparse_index_list(list(tool_mask_palette_property))
+            tool_mask = FlatImage.zeros_like(self.mask, palette=tool_mask_palette)
+            tool_mask_opacity = tool_mask_layer_properties['opacity']
+            tool_mask_layer = self.viewer.add_layer(tool_mask, tool_mask_layer_name, opacity=tool_mask_opacity)
+        self.tool_mask = tool_mask_layer.image
+
+
+
+        for index, layer in enumerate(self.viewer.layers):
+            print(f'layer {index}: {layer.name}')
+
+        image_layer = self.viewer.layer(layers_properties['image'][NAME_PROPERTY_KEY])
+        if image_layer is not None:
+            print('image_layer:', image_layer, image_layer.name)
+        mask_layer = self.viewer.layer(layers_properties['mask'][NAME_PROPERTY_KEY])
+        if mask_layer is not None:
+            print('mask_layer:', mask_layer, mask_layer.name)
+        tool_mask_layer = self.viewer.layer(layers_properties['tool_mask'][NAME_PROPERTY_KEY])
+        if tool_mask_layer is not None:
+            print('tool_mask_layer:', tool_mask_layer, tool_mask_layer.name)
 
         # self.viewer.add_layer(FlatImage())
+
 
     def pos_to_image_pixel_coords(self, viewport_pos: QPoint):
         return self.viewer.viewport_pos_to_image_pixel_coords(viewport_pos)

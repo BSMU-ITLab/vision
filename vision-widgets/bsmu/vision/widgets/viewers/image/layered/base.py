@@ -90,6 +90,7 @@ class _LayeredImageItem(QGraphicsObject):
         super().__init__(parent)
 
         self.layers = []
+        self.names_layers = {}
         self.active_layer = None
 
         self._bounding_rect = QRectF()
@@ -98,9 +99,10 @@ class _LayeredImageItem(QGraphicsObject):
         return self._bounding_rect
 
     def add_layer(self, image: FlatImage = None, name: str = '',
-                  visible: bool = True, opacity: float = 1):
+                  visible: bool = True, opacity: float = 1) -> _ImageItemLayer:
         layer = _ImageItemLayer(image, name, visible, opacity)
         self.layers.append(layer)
+        self.names_layers[name] = layer
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
         layer.image_updated.connect(self._on_layer_image_updated)
@@ -109,7 +111,14 @@ class _LayeredImageItem(QGraphicsObject):
         if len(self.layers) == 1:  # If was added first layer
             self.active_layer = layer
             self.active_layer_changed.emit(None, self.active_layer)
-            self._update_bounding_rect()
+            self._update_bounding_rect()  # self.prepareGeometryChange() will call update() if this is necessary.
+        else:
+            self.update()
+
+        return layer
+
+    def layer(self, name: str) -> _ImageItemLayer:
+        return self.names_layers.get(name)
 
     def _update_bounding_rect(self):
         self.prepareGeometryChange()
@@ -160,8 +169,11 @@ class LayeredImageViewer(DataViewer):
         self.setLayout(grid_layout)
 
     def add_layer(self, image: FlatImage = None, name: str = '',
-                  visible: bool = True, opacity: float = 1):
-        self.layered_image_item.add_layer(image, name, visible, opacity)
+                  visible: bool = True, opacity: float = 1) -> _ImageItemLayer:
+        return self.layered_image_item.add_layer(image, name, visible, opacity)
+
+    def layer(self, name: str) -> _ImageItemLayer:
+        return self.layered_image_item.layer(name)
 
     @property
     def active_layer(self):

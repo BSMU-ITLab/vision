@@ -15,5 +15,9 @@ class Data(QObject):
     def path_name(self):
         return self.path.name
 
+    @property
+    def dir_name(self):
+        return self.path.parent.name
+
     def update(self):
         self.updated.emit()

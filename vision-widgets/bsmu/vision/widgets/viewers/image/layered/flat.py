@@ -9,4 +9,4 @@ class LayeredFlatImageViewer(LayeredImageViewer):
 
         if self.data is not None:
             print('layer shape:', self.data.array.shape)
-            self.add_layer(self.data)
+            self.add_layer(self.data, name=data.dir_name)

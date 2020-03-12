@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from bsmu.vision_core.data import Data
 from PySide2.QtCore import Signal
+import numpy as np
 
 
 class Image(Data):
@@ -15,6 +16,13 @@ class Image(Data):
         self.spatial = spatial
 
         self._check_array_palette_matching()
+
+    @classmethod
+    def zeros_like(cls, other_image: Image, palette: Palette = None):
+        pixels = np.zeros_like(other_image.array)
+        palette = palette or other_image.palette  # TODO: check, maybe we need copy of |other_image.palette|
+        spatial = other_image.spatial  # TODO: check, maybe we need copy of |other_image.spatial|
+        return cls(pixels, palette, spatial=spatial)
 
     def emit_pixels_modified(self):
         self.pixels_modified.emit()

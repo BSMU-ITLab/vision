@@ -1,4 +1,11 @@
 layers:
-  image: images
-  mask: masks
-  tool_mask: tool-mask
+  image:
+    name: images
+  mask:
+    name: masks
+  tool_mask:
+    name: tool-mask
+    palette:
+      - [0, 0, 0, 0, 0]
+      - [1, 127, 127, 255, 255]
+    opacity: 0.3

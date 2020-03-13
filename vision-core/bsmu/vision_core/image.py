@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from bsmu.vision_core.data import Data
-from PySide2.QtCore import Signal
 import numpy as np
+from PySide2.QtCore import Signal
+
+from bsmu.vision_core.data import Data
+
+
+MASK_TYPE = np.uint8
 
 
 class Image(Data):
@@ -18,11 +22,16 @@ class Image(Data):
         self._check_array_palette_matching()
 
     @classmethod
-    def zeros_like(cls, other_image: Image, palette: Palette = None):
-        pixels = np.zeros_like(other_image.array)
+    def zeros_like(cls, other_image: Image, create_mask: bool = False, palette: Palette = None):
+        pixels = np.zeros(other_image.array.shape[:2], dtype=MASK_TYPE) if create_mask \
+            else np.zeros_like(other_image.array)
         palette = palette or other_image.palette  # TODO: check, maybe we need copy of |other_image.palette|
         spatial = other_image.spatial  # TODO: check, maybe we need copy of |other_image.spatial|
         return cls(pixels, palette, spatial=spatial)
+
+    @classmethod
+    def zeros_mask_like(cls, other_image: Image, palette: Palette = None):
+        return cls.zeros_like(other_image, create_mask=True, palette=palette)
 
     def emit_pixels_modified(self):
         self.pixels_modified.emit()

@@ -3,12 +3,15 @@ layers:
     name: images
   mask:
     name: masks
-    palette:  # used, if there is no mask and we have to create one
+    # Next properties will be used, if there is no mask and we have to create one
+    palette:
       - [0, 0, 0, 0, 0]
       - [1, 0, 255, 0, 255]
+    opacity: 0.3
   tool_mask:
     name: tool-mask
-    palette:  # used, if we have to create new tool mask
+    # Next properties will be used, if we have to create new tool mask
+    palette:
       - [0, 0, 0, 0, 0]
       - [1, 127, 127, 255, 255]
     opacity: 0.3

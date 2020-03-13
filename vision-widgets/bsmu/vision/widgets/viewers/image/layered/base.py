@@ -10,6 +10,9 @@ from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
 
 
+DEFAULT_LAYER_OPACITY = 1
+
+
 class _ImageItemLayer(QObject):
     max_id = 0
 
@@ -17,7 +20,7 @@ class _ImageItemLayer(QObject):
     visibility_updated = Signal()
 
     def __init__(self, image: FlatImage = None, name: str = '',
-                 visible: bool = True, opacity: float = 1):
+                 visible: bool = True, opacity: float = DEFAULT_LAYER_OPACITY):
         super().__init__()
         self.id = _ImageItemLayer.max_id
         _ImageItemLayer.max_id += 1
@@ -99,7 +102,7 @@ class _LayeredImageItem(QGraphicsObject):
         return self._bounding_rect
 
     def add_layer(self, image: FlatImage = None, name: str = '',
-                  visible: bool = True, opacity: float = 1) -> _ImageItemLayer:
+                  visible: bool = True, opacity: float = DEFAULT_LAYER_OPACITY) -> _ImageItemLayer:
         layer = _ImageItemLayer(image, name, visible, opacity)
         self.layers.append(layer)
         self.names_layers[name] = layer
@@ -143,6 +146,10 @@ class _LayeredImageItem(QGraphicsObject):
     def _on_layer_image_updated(self, image: FlatImage):
         self.update()
 
+    def print_layers(self):
+        for index, layer in enumerate(self.layers):
+            print(f'Layer {index}: {layer.name}')
+
 
 class LayeredImageViewer(DataViewer):
     # before_image_changed = Signal()
@@ -169,7 +176,7 @@ class LayeredImageViewer(DataViewer):
         self.setLayout(grid_layout)
 
     def add_layer(self, image: FlatImage = None, name: str = '',
-                  visible: bool = True, opacity: float = 1) -> _ImageItemLayer:
+                  visible: bool = True, opacity: float = DEFAULT_LAYER_OPACITY) -> _ImageItemLayer:
         return self.layered_image_item.add_layer(image, name, visible, opacity)
 
     def layer(self, name: str) -> _ImageItemLayer:
@@ -209,3 +216,6 @@ class LayeredImageViewer(DataViewer):
 
     def _on_active_layer_image_updated(self, image: FlatImage):
         self.data_name_changed.emit(image.path.name)
+
+    def print_layers(self):
+        self.layered_image_item.print_layers()

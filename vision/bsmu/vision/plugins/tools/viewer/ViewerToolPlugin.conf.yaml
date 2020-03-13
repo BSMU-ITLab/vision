@@ -12,6 +12,8 @@ layers:
     name: tool-mask
     # Next properties will be used, if we have to create new tool mask
     palette:
-      - [0, 0, 0, 0, 0]
-      - [1, 127, 127, 255, 255]
+      - [0, 0, 0, 0, 0]  # No mask (background)
+      - [1, 127, 127, 255, 255]  # tool foreground
+      - [2, 255, 0, 0, 255]  # eraser
+      - [3, 255, 255, 127, 255]  # background 2 (not connected component)
     opacity: 0.3

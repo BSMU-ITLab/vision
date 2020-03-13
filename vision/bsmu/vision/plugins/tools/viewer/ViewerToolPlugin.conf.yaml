@@ -3,9 +3,12 @@ layers:
     name: images
   mask:
     name: masks
+    palette:  # used, if there is no mask and we have to create one
+      - [0, 0, 0, 0, 0]
+      - [1, 0, 255, 0, 255]
   tool_mask:
     name: tool-mask
-    palette:
+    palette:  # used, if we have to create new tool mask
       - [0, 0, 0, 0, 0]
       - [1, 127, 127, 255, 255]
     opacity: 0.3

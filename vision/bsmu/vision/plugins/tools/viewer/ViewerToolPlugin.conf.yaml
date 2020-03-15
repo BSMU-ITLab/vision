@@ -5,15 +5,15 @@ layers:
     name: masks
     # Next properties will be used, if there is no mask and we have to create one
     palette:
-      - [0, 0, 0, 0, 0]
-      - [1, 0, 255, 0, 255]
-    opacity: 0.3
+      background: [0, 0, 0, 0, 0]
+      foreground: [1, 50, 170, 230, 255]
+    opacity: 0.5
   tool_mask:
     name: tool-mask
     # Next properties will be used, if we have to create new tool mask
     palette:
-      - [0, 0, 0, 0, 0]  # No mask (background)
-      - [1, 127, 127, 255, 255]  # tool foreground
-      - [2, 255, 0, 0, 255]  # eraser
-      - [3, 255, 255, 127, 255]  # background 2 (not connected component)
-    opacity: 0.3
+      background: [0, 0, 0, 0, 0]
+      foreground: [1, 130, 210, 50, 255]
+      eraser: [2, 210, 60, 40, 255]
+      unconnected_component: [3, 210, 130, 50, 255]
+    opacity: 0.5

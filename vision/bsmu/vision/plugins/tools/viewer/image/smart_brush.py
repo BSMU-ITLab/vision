@@ -9,6 +9,7 @@ from PySide2.QtCore import QEvent
 from PySide2.QtCore import Qt
 
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool
+from bsmu.vision_core.palette import Palette
 
 
 class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):
@@ -23,6 +24,7 @@ class Mode(Enum):
 
 
 DEFAULT_RADIUS = 22
+MIN_RADIUS = 2
 
 
 class SmartBrushImageViewerTool(LayeredImageViewerTool):
@@ -38,7 +40,16 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
 
         self.paint_connected_component = True
 
-        self.mask_class = 1
+        layers_properties = self.config.value('layers')
+        self.mask_palette = Palette.from_names_rows_dict(layers_properties['mask']['palette'])
+        self.mask_background_class = self.mask_palette.row_index_by_name('background')
+        self.mask_foreground_class = self.mask_palette.row_index_by_name('foreground')
+
+        self.tool_mask_palette = Palette.from_names_rows_dict(layers_properties['tool_mask']['palette'])
+        self.tool_background_class = self.tool_mask_palette.row_index_by_name('background')
+        self.tool_foreground_class = self.tool_mask_palette.row_index_by_name('foreground')
+        self.tool_eraser_class = self.tool_mask_palette.row_index_by_name('eraser')
+        self.tool_unconnected_component_class = self.tool_mask_palette.row_index_by_name('unconnected_component')
 
     def activate(self):
         super().activate()
@@ -53,7 +64,10 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
             self.draw_brush_event(event)
             return False
         elif event.type() == QEvent.Wheel and event.modifiers() == Qt.ControlModifier:
-            self.radius += event.angleDelta().y() / 40
+            angle_delta_y = event.angleDelta().y()
+            zoom_factor = 1 + np.sign(angle_delta_y) * 0.2 * abs(angle_delta_y) / 110
+            self.radius *= zoom_factor
+            self.radius = max(self.radius, MIN_RADIUS)
             self.draw_brush_event(event)
             return True
         else:
@@ -68,7 +82,7 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
             self.mode = Mode.SHOW
 
     def draw_brush_event(self, event: QEvent):
-        # if not (self.viewer.has_image() and self.viewer.is_over_image(e.pos())):
+        # if not self.viewer.has_image():
         #     return
 
         self.update_mode(event)
@@ -76,7 +90,6 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         self.draw_brush(pixel_coords[0], pixel_coords[1])
 
     def draw_brush(self, row, col):
-        print('draw_brush')
         # Erase old tool mask
         self.tool_mask.array.fill(0)
 
@@ -86,7 +99,9 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
             self.erase_region(rr, cc)
             return
 
-        background_or_mask_class_indexes = np.logical_or(self.mask.array[rr, cc] == 0, self.mask.array[rr, cc] == self.mask_class) ## settings.NO_MASK_CLASS
+        mask_circle_pixels = self.mask.array[rr, cc]
+        background_or_mask_class_indexes = \
+            (mask_circle_pixels == self.mask_background_class) | (mask_circle_pixels == self.mask_foreground_class)
         # Do not use pixels, which already painted to another mask class
         rr = rr[background_or_mask_class_indexes]
         cc = cc[background_or_mask_class_indexes]
@@ -103,7 +118,7 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         centers = centers.ravel()
 
         if self.paint_central_pixel_cluster:
-            center_pixel_indexes = np.where(np.logical_and(rr == row, cc == col))[0]
+            center_pixel_indexes = np.where((rr == row) & (cc == col))[0]
             if center_pixel_indexes.size != 1:  # there are situations, when the center pixel is out of image
                 return
             center_pixel_index = center_pixel_indexes[0]
@@ -115,32 +130,26 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
                 # Swapping 1 with 0 and 0 with 1
                 painted_cluster_label = 1 - painted_cluster_label
 
-        brush_circle = self.tool_mask.array[rr, cc]
-        brush_circle[label == painted_cluster_label] = 1 ## settings.TOOL_FOREGROUND_CLASS
-        brush_circle[label != painted_cluster_label] = 0 ## settings.TOOL_BACKGROUND_CLASS
-        self.tool_mask.array[rr, cc] = brush_circle
+        tool_mask_circle_pixels = self.tool_mask.array[rr, cc]
+        tool_mask_circle_pixels[label == painted_cluster_label] = self.tool_foreground_class
+        tool_mask_circle_pixels[label != painted_cluster_label] = self.tool_background_class
+        self.tool_mask.array[rr, cc] = tool_mask_circle_pixels
 
         if self.paint_central_pixel_cluster and self.paint_connected_component:
-            labeled_tool_mask = skimage.measure.label(self.tool_mask.array, background=0) ## settings.TOOL_NO_COLOR_CLASS)
+            labeled_tool_mask = skimage.measure.label(self.tool_mask.array, background=self.tool_background_class)
             label_under_mouse = labeled_tool_mask[row, col]
-            self.tool_mask.array[(self.tool_mask.array == 1) & ## settings.TOOL_FOREGROUND_CLASS) &
-                                (labeled_tool_mask != label_under_mouse)] = 3 ## settings.TOOL_BACKGROUND_2_CLASS
+            self.tool_mask.array[(self.tool_mask.array == self.tool_foreground_class) &
+                                 (labeled_tool_mask != label_under_mouse)] = self.tool_unconnected_component_class
 
         if self.mode == Mode.DRAW:
-            self.mask.array[self.tool_mask.array == 1] = self.mask_class ## settings.TOOL_FOREGROUND_CLASS
+            self.mask.array[self.tool_mask.array == self.tool_foreground_class] = self.mask_foreground_class
             self.mask.emit_pixels_modified()
-            '''
-            brush_circle = self.viewer.mask().data[rr, cc]
-            brush_circle[label == painted_cluster_label] = self.mask_class
-            self.viewer.mask().data[rr, cc] = brush_circle
-            '''
 
         self.tool_mask.emit_pixels_modified()
 
     def erase_region(self, rr, cc):
-        print('erase_region')
-        self.tool_mask.array[rr, cc] = 2  ## settings.TOOL_ERASER_CLASS
-        self.mask.array[rr, cc] = 0  ## settings.NO_MASK_CLASS
+        self.tool_mask.array[rr, cc] = self.tool_eraser_class
+        self.mask.array[rr, cc] = self.mask_background_class
 
         self.tool_mask.emit_pixels_modified()
         self.mask.emit_pixels_modified()

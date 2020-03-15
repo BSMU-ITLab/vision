@@ -85,16 +85,17 @@ class LayeredImageViewerTool(ViewerTool):
         self.mask = None
         self.tool_mask = None
 
+        self.mask_palette = None
+        self.tool_mask_palette = None
+
     def create_nonexistent_layer_with_zeros_mask(
-            self, layers_properties, layer_key: str, name_property_key: str) -> _ImageItemLayer:
+            self, layers_properties, layer_key: str, name_property_key: str, palette: Palette) -> _ImageItemLayer:
         layer_properties = layers_properties[layer_key]
         layer_name = layer_properties[name_property_key]
         layer = self.viewer.layer(layer_name)
 
         if layer is None:
             # Create and add the layer
-            palette_property = layer_properties.get('palette')
-            palette = palette_property and Palette.from_sparse_index_list(list(palette_property))
             layer_image = FlatImage.zeros_mask_like(self.image, palette=palette)
             layer_opacity = layer_properties.get('opacity', DEFAULT_LAYER_OPACITY)
             layer = self.viewer.add_layer(layer_image, layer_name, opacity=layer_opacity)
@@ -111,11 +112,11 @@ class LayeredImageViewerTool(ViewerTool):
         self.image = image_layer and image_layer.image
 
         mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            layers_properties, 'mask', NAME_PROPERTY_KEY)
+            layers_properties, 'mask', NAME_PROPERTY_KEY, self.mask_palette)
         self.mask = mask_layer.image
 
         tool_mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            layers_properties, 'tool_mask', NAME_PROPERTY_KEY)
+            layers_properties, 'tool_mask', NAME_PROPERTY_KEY, self.tool_mask_palette)
         self.tool_mask = tool_mask_layer.image
 
         self.viewer.print_layers()

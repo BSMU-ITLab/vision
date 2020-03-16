@@ -110,7 +110,9 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         rr = rr[background_or_mask_class_indexes]
         cc = cc[background_or_mask_class_indexes]
 
-        samples = self.image.array[rr, cc][:, 0]  # use only first channel
+        samples = self.image.array[rr, cc]
+        if len(samples.shape) == 2:  # if there is an axis with channels (multichannel image)
+            samples = samples[:, 0]  # use only the first channel
         samples = samples.astype(np.float32)
         number_of_clusters = 2
         if number_of_clusters > samples.size:

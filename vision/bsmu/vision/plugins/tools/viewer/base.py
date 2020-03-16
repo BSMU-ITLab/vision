@@ -108,7 +108,19 @@ class LayeredImageViewerTool(ViewerTool):
         layers_properties = self.config.value('layers')
         NAME_PROPERTY_KEY = 'name'
 
-        image_layer = self.viewer.layer(layers_properties['image'][NAME_PROPERTY_KEY])
+        image_layer_properties = layers_properties['image']
+        if image_layer_properties == 'active_layer':
+            image_layer = self.viewer.active_layer
+        else:
+            image_layer_name = image_layer_properties.get(NAME_PROPERTY_KEY)
+            if image_layer_name is not None:
+                image_layer = self.viewer.layer(image_layer_name)
+            else:
+                image_layer_number = image_layer_properties.get('number')
+                if image_layer_number is not None:
+                    image_layer = self.viewer.layers[image_layer_number]
+                else:
+                    assert False, f'Unknown image layer properties: {image_layer_properties}'
         self.image = image_layer and image_layer.image
 
         mask_layer = self.create_nonexistent_layer_with_zeros_mask(

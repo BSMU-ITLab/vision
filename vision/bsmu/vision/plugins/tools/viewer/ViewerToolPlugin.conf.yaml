@@ -1,6 +1,7 @@
 layers:
-  image:
-    name: images
+  image: active_layer
+#    name: images
+#    number: 0
   mask:
     name: masks
     # Next properties will be used, if there is no mask and we have to create one

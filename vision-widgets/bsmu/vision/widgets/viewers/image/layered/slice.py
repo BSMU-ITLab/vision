@@ -26,7 +26,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
         # Temporary assert
         assert windowed_center_slice_pixels.flags['C_CONTIGUOUS'], 'array of center slice pixels is not CONTIGUOUS'
 
-        self.add_layer(FlatImage(windowed_center_slice_pixels))
+        self.add_layer(FlatImage(windowed_center_slice_pixels), name=data.dir_name)
 
         # self._layered_image_viewer = LayeredImageViewer(FlatImage(windowed_center_slice_pixels), zoomable)
         #

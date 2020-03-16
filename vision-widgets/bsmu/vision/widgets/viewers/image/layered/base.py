@@ -36,6 +36,8 @@ class _ImageItemLayer(QObject):
         # and QImage will crash if it's data buffer will be deleted
         self._displayed_array_data = None
 
+        print('spacing', self.image.spatial.spacing)
+
     @property
     def image_path(self) -> Path:
         return self.image.path
@@ -78,6 +80,12 @@ class _ImageItemLayer(QObject):
                 else QImage.Format_RGBA64_Premultiplied
             self._displayed_image_cache = image_converter.numpy_rgba_image_to_qimage(
                 displayed_rgba_array, displayed_qimage_format)
+
+            w = self._displayed_image_cache.width()
+            h = self._displayed_image_cache.height()
+            spatial_w = self.image.spatial.spacing[1] * w
+            spatial_h = self.image.spatial.spacing[0] * h
+            self._displayed_image_cache = self._displayed_image_cache.smoothScaled(spatial_w, spatial_h) ## scaled
         return self._displayed_image_cache
 
     def _on_image_updated(self):

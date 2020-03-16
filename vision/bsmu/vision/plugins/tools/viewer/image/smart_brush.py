@@ -75,7 +75,11 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
 
     def update_mode(self, event: QEvent):
         if event.buttons() == Qt.LeftButton:
-            self.mode = Mode.DRAW
+            if event.type() != QEvent.Wheel:  # This condition is used only to fix strange bug
+                # after a mouse click on the app title bar, try to change brush radius (using Ctrl + mouse wheel)
+                # event.buttons() shows, that LeftButton is pressed (but it is not pressed)
+                # that leads to draw mode, but we want only change brush radius (in show mode)
+                self.mode = Mode.DRAW
         elif event.buttons() == Qt.RightButton:
             self.mode = Mode.ERASE
         else:

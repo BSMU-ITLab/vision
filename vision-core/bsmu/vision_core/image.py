@@ -9,6 +9,21 @@ from bsmu.vision_core.data import Data
 MASK_TYPE = np.uint8
 
 
+class SpatialAttrs:
+    def __init__(self, origin, spacing, direction):
+        # https://discourse.itk.org/t/images-in-physical-space-in-python/2124/17
+        self.origin = origin
+        self.spacing = spacing
+        self.direction = direction
+
+    @classmethod
+    def default_for_ndim(cls, ndim: int):
+        origin = np.zeros(ndim)
+        spacing = np.ones(ndim)
+        direction = np.identity(ndim)
+        return cls(origin, spacing, direction)
+
+
 class Image(Data):
     pixels_modified = Signal()
 
@@ -59,7 +74,8 @@ class Image(Data):
 
 
 class FlatImage(Image):
-    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
+    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None,
+                 spatial: SpatialAttrs = SpatialAttrs.default_for_ndim(2)):
         super().__init__(array, palette, path, spatial)
 
     def _check_array_palette_matching(self):
@@ -68,17 +84,10 @@ class FlatImage(Image):
 
 
 class VolumeImage(Image):
-    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
+    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None,
+                 spatial: SpatialAttrs = SpatialAttrs.default_for_ndim(3)):
         super().__init__(array, palette, path, spatial)
 
     def _check_array_palette_matching(self):
         assert (self.palette is None) or (len(self.array.shape) == 3), \
             f'Volume indexed image (shape: {self.array.shape}) (with palette) has to contain no channels.'
-
-
-class SpatialAttrs:
-    def __init__(self, origin, spacing, direction):
-        # https://discourse.itk.org/t/images-in-physical-space-in-python/2124/17
-        self.origin = origin
-        self.spacing = spacing
-        self.direction = direction

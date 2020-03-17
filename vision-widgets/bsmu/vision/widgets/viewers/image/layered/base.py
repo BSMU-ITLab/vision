@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import bsmu.vision_core.converters.image as image_converter
-from PySide2.QtCore import QObject, Signal, QRectF
+from PySide2.QtCore import QObject, Qt, Signal, QRectF
 from PySide2.QtGui import QPainter, QImage
 from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
-from bsmu.vision_core.image import FlatImage
 
+import bsmu.vision_core.converters.image as image_converter
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
+from bsmu.vision_core.image import FlatImage
 
 
 DEFAULT_LAYER_OPACITY = 1
@@ -81,11 +81,11 @@ class _ImageItemLayer(QObject):
             self._displayed_image_cache = image_converter.numpy_rgba_image_to_qimage(
                 displayed_rgba_array, displayed_qimage_format)
 
-            w = self._displayed_image_cache.width()
-            h = self._displayed_image_cache.height()
-            spatial_w = self.image.spatial.spacing[1] * w
-            spatial_h = self.image.spatial.spacing[0] * h
-            self._displayed_image_cache = self._displayed_image_cache.smoothScaled(spatial_w, spatial_h) ## scaled
+            # Scale image to take into account spatial attributes (spacings)
+            spatial_width = self.image.spatial.spacing[1] * self._displayed_image_cache.width()
+            spatial_height = self.image.spatial.spacing[0] * self._displayed_image_cache.height()
+            self._displayed_image_cache = self._displayed_image_cache.scaled(
+                spatial_width, spatial_height, mode=Qt.SmoothTransformation)
         return self._displayed_image_cache
 
     def _on_image_updated(self):

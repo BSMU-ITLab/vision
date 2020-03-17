@@ -19,6 +19,17 @@ class NiftiFileLoader(FileLoader):
         print('Load NIfTI DICOM')
 
         nifti_image = nib.load(str(path))
-        # return VolumeImage(nifti_image.get_fdata(), path=path)
-        spatial = SpatialAttrs(origin=np.array([0, 0, 0]), spacing=np.array([1, 3, 1]), direction=None)
-        return VolumeImage(np.asanyarray(nifti_image.dataobj), path=path, spatial=spatial)
+
+        origin = nifti_image.affine[:3, -1]
+        spacing = nifti_image.header.get_zooms()
+        # https://simpleitk.readthedocs.io/en/v1.2.4/Documentation/docs/source/fundamentalConcepts.html
+        # https://nipy.org/nibabel/dicom/dicom_orientation.html
+        direction = nifti_image.affine[:3, :3] / spacing
+
+        print('affine\n', nifti_image.affine)
+        print('origin', origin)
+        print('spacing', spacing)
+        print('direction\n', direction)
+        spatial = SpatialAttrs(origin=origin, spacing=spacing, direction=direction)
+
+        return VolumeImage(np.asanyarray(nifti_image.dataobj), path=path, spatial=spatial)  # nifti_image.get_fdata()

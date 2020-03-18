@@ -90,14 +90,20 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         #     return
 
         self.update_mode(event)
-        image_pixel_indexes = self.pos_to_image_pixel_indexes(event.pos(), self.image)
+        image_pixel_indexes = self.pos_to_image_pixel_indexes(event.pos(), self.tool_mask)
         self.draw_brush(*image_pixel_indexes)
 
-    def draw_brush(self, row, col):
+    def draw_brush(self, row_f: float, col_f: float):
+        row = int(round(row_f))
+        col = int(round(col_f))
+
         # Erase old tool mask
         self.tool_mask.array.fill(0)
 
-        rr, cc = skimage.draw.circle(row, col, self.radius, self.tool_mask.array.shape)
+        rr, cc = skimage.draw.ellipse(  # we can use rounded row, col and radii,
+            # but float values give more precise resulting ellipse indexes
+            row_f, col_f, *self.tool_mask.spatial_size_to_indexed(np.array([self.radius, self.radius])),
+            shape=self.tool_mask.array.shape)
 
         if self.mode == Mode.ERASE:
             self.erase_region(rr, cc)

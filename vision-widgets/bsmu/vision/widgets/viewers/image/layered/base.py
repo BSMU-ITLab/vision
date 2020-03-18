@@ -221,6 +221,10 @@ class LayeredImageViewer(DataViewer):
         layered_image_item_pos = self.viewport_pos_to_layered_image_item_pos(viewport_pos)
         return image.pos_to_pixel_indexes(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()]))
 
+    def viewport_pos_to_image_pixel_indexes_rounded(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+        layered_image_item_pos = self.viewport_pos_to_layered_image_item_pos(viewport_pos)
+        return image.pos_to_pixel_indexes_rounded(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()]))
+
     def viewport_pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
         scene_pos = self.graphics_view.mapToScene(viewport_pos)
         return self.layered_image_item.mapFromScene(scene_pos)

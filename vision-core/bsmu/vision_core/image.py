@@ -52,10 +52,19 @@ class Image(Data):
         self.pixels_modified.emit()
 
     def pos_to_pixel_indexes(self, pos: np.ndarray) -> np.ndarray:
-        return ((pos - self.spatial.origin) / self.spatial.spacing).round().astype(np.int_)
+        return (pos - self.spatial.origin) / self.spatial.spacing
+
+    def pos_to_pixel_indexes_rounded(self, pos: np.ndarray) -> np.ndarray:
+        return self.pos_to_pixel_indexes(pos).round().astype(np.int_)
 
     def pixel_indexes_to_pos(self, pixel_indexes: np.ndarray) -> np.ndarray:
         return pixel_indexes * self.spatial.spacing + self.spatial.origin
+
+    def spatial_size_to_indexed(self, spatial_size: np.ndarray):
+        return spatial_size / self.spatial.spacing
+
+    def spatial_size_to_indexed_rounded(self, spatial_size: np.ndarray):
+        return self.spatial_size_to_indexed(spatial_size).round().astype(np.int_)
 
     @property
     def palette(self) -> Palette:

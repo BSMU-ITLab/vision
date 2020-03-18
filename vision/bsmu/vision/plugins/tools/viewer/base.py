@@ -138,3 +138,6 @@ class LayeredImageViewerTool(ViewerTool):
 
     def pos_to_image_pixel_indexes(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
         return self.viewer.viewport_pos_to_image_pixel_indexes(viewport_pos, image)
+
+    def pos_to_image_pixel_indexes_rounded(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+        return self.viewer.viewport_pos_to_image_pixel_indexes_rounded(viewport_pos, image)

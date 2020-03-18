@@ -51,6 +51,12 @@ class Image(Data):
     def emit_pixels_modified(self):
         self.pixels_modified.emit()
 
+    def pos_to_pixel_indexes(self, pos: np.ndarray) -> np.ndarray:
+        return ((pos - self.spatial.origin) / self.spatial.spacing).round().astype(np.int_)
+
+    def pixel_indexes_to_pos(self, pixel_indexes: np.ndarray) -> np.ndarray:
+        return pixel_indexes * self.spatial.spacing + self.spatial.origin
+
     @property
     def palette(self) -> Palette:
         return self._palette

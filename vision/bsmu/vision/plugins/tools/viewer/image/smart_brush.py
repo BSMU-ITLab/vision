@@ -90,8 +90,8 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         #     return
 
         self.update_mode(event)
-        pixel_coords = self.pos_to_image_pixel_coords(event.pos())
-        self.draw_brush(pixel_coords[0], pixel_coords[1])
+        image_pixel_indexes = self.pos_to_image_pixel_indexes(event.pos(), self.image)
+        self.draw_brush(*image_pixel_indexes)
 
     def draw_brush(self, row, col):
         # Erase old tool mask

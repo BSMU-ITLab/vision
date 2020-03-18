@@ -133,5 +133,8 @@ class LayeredImageViewerTool(ViewerTool):
 
         self.viewer.print_layers()
 
-    def pos_to_image_pixel_coords(self, viewport_pos: QPoint):
-        return self.viewer.viewport_pos_to_image_pixel_coords(viewport_pos)
+    def pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
+        return self.viewer.viewport_pos_to_layered_image_item_pos(viewport_pos)
+
+    def pos_to_image_pixel_indexes(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+        return self.viewer.viewport_pos_to_image_pixel_indexes(viewport_pos, image)

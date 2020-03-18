@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from PySide2.QtCore import QObject, Qt, Signal, QRectF
+import numpy as np
+from PySide2.QtCore import QObject, Qt, Signal, QRectF, QPointF
 from PySide2.QtGui import QPainter, QImage
 from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
 
@@ -135,9 +136,22 @@ class _LayeredImageItem(QGraphicsObject):
         self.prepareGeometryChange()
 
         if self.layers:
-            image = self.layers[0].displayed_image
-            image_rect = image.rect()
-            self._bounding_rect = QRectF(image_rect)  # item position will be in the top left point of image
+            # TODO: images of layers can have different spatial bounding boxes.
+            #  We have to use union of bounding boxes of every layer.
+            #  Now we use only bounding box of first layer.
+            first_layer_image = self.layers[0].image
+            rect_top_left_pixel_indexes = np.array([0, 0])
+            rect_bottom_right_pixel_indexes = first_layer_image.array.shape[:2]
+            rect_top_left_pos = first_layer_image.pixel_indexes_to_pos(rect_top_left_pixel_indexes)
+            rect_bottom_right_pos = first_layer_image.pixel_indexes_to_pos(rect_bottom_right_pixel_indexes)
+            self._bounding_rect = QRectF(QPointF(rect_top_left_pos[1], rect_top_left_pos[0]),
+                                         QPointF(rect_bottom_right_pos[1], rect_bottom_right_pos[0]))
+
+            # The method below does not take into account image origin (spatial attribute)
+            # image = self.layers[0].displayed_image
+            # image_rect = image.rect()
+            # self._bounding_rect = QRectF(image_rect)  # item position will be in the top left point of image
+
             # Item position will be in the center of image
             # self._bounding_rect = QRectF(-image_rect.width() / 2, -image_rect.height() / 2,
             #                              image_rect.width(), image_rect.height())
@@ -149,7 +163,8 @@ class _LayeredImageItem(QGraphicsObject):
         for layer in self.layers:
             if layer.image is not None and layer.visible:
                 painter.setOpacity(layer.opacity)
-                painter.drawImage(self._bounding_rect.topLeft(), layer.displayed_image)
+                image_origin = layer.image.spatial.origin
+                painter.drawImage(QPointF(image_origin[1], image_origin[0]), layer.displayed_image)
 
     def _on_layer_image_updated(self, image: FlatImage):
         self.update()
@@ -202,15 +217,20 @@ class LayeredImageViewer(DataViewer):
     def viewport(self):
         return self.graphics_view.viewport()
 
-    def viewport_pos_to_image_pixel_coords(self, viewport_pos: QPoint):
-        scene_pos = self.graphics_view.mapToScene(viewport_pos)
-        layered_image_item_pos = self.layered_image_item.mapFromScene(scene_pos)
-        return [round(layered_image_item_pos.y()), round(layered_image_item_pos.x())]
+    def viewport_pos_to_image_pixel_indexes(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+        layered_image_item_pos = self.viewport_pos_to_layered_image_item_pos(viewport_pos)
+        return image.pos_to_pixel_indexes(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()]))
 
-    def pos_to_image_pixel_coords(self, pos: QPoint):
+    def viewport_pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
+        scene_pos = self.graphics_view.mapToScene(viewport_pos)
+        return self.layered_image_item.mapFromScene(scene_pos)
+
+    def pos_to_layered_image_item_pos(self, pos: QPoint) -> QPointF:
+        # From viewer pos to |self.graphics_view| pos
         graphics_view_pos = self.graphics_view.mapFrom(self, pos)
+        # From |self.graphics_view| pos to |self.viewport| pos
         viewport_pos = self.viewport.mapFrom(self.graphics_view, graphics_view_pos)
-        return self.viewport_pos_to_image_pixel_coords(viewport_pos)
+        return self.viewport_pos_to_layered_image_item_pos(viewport_pos)
 
     def center(self):
         print('center')

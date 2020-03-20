@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import os
-
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import MenuType
-from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
+from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow
 
 
 class MdiVolumeSliceWalkerPlugin(Plugin):
@@ -37,22 +35,16 @@ class MdiVolumeSliceWalker(QObject):
         self.mdi = mdi
 
     def show_next_slice(self):
-        walker = self._volume_slice_walker()
-
-        if walker is not None:
-            walker.show_next_slice()
-
-
-
-        ...
+        for volume_slice_image_viewer in self._volume_slice_image_viewers():
+            volume_slice_image_viewer.show_next_slice()
 
     def show_previous_slice(self):
-        ...
+        for volume_slice_image_viewer in self._volume_slice_image_viewers():
+            volume_slice_image_viewer.show_previous_slice()
 
-    def _volume_slice_walker(self):
+    def _volume_slice_image_viewers(self):
         active_sub_window = self.mdi.activeSubWindow()
-
-
-
-
-
+        if isinstance(active_sub_window, VolumeSliceImageViewerSubWindow):
+            return [active_sub_window.viewer]
+        else:
+            return []

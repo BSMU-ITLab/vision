@@ -58,3 +58,9 @@ class VolumeSliceImageViewer(LayeredImageViewer):
                 ((slice_pixels - (self.window_level - 0.5)) / (self.window_width - 1) + 0.5) * (255 - 0)])
         slice_pixels = slice_pixels.astype(np.uint8, copy=False)
         return slice_pixels
+
+    def show_next_slice(self):
+        ...
+
+    def show_previous_slice(self):
+        ...

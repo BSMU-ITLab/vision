@@ -4,7 +4,7 @@ from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin, DataVisua
 from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.slice import VolumeSliceImageViewer
 from bsmu.vision_core.constants import PlaneAxis
-from bsmu.vision_core.image import VolumeImage
+from bsmu.vision_core.image.base import VolumeImage
 
 
 class VolumeImageVisualizerPlugin(DataVisualizerPlugin):

@@ -77,7 +77,7 @@ class ImageLayerFileWalker(QObject):
 
     @property
     def active_layer(self):
-        return self.image_viewer.active_layer
+        return self.image_viewer.active_displayed_layer
 
     @property
     def main_layer_image_dir(self):

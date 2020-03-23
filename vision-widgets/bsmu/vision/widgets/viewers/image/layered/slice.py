@@ -6,7 +6,7 @@ import numpy as np
 
 from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 from bsmu.vision_core.constants import PlaneAxis
-from bsmu.vision_core.image import FlatImage, SpatialAttrs
+from bsmu.vision_core.image.base import FlatImage, SpatialAttrs
 
 
 class VolumeSliceImageViewer(LayeredImageViewer):

@@ -42,7 +42,7 @@ class ImageViewerPathOverlayer(QObject):
     def overlay_sibling_dirs_images(self, data_viewer_sub_window: DataViewerSubWindow):
         if isinstance(data_viewer_sub_window, LayeredImageViewerSubWindow):
             layered_image_viewer = data_viewer_sub_window.viewer
-            image_path = layered_image_viewer.active_layer.image_path
+            image_path = layered_image_viewer.active_displayed_layer.image_path
             layers_dir = image_path.parents[1]
             for layer_name, layer_properties in self.config_data['layers'].items():
                 layer_image_path = layers_dir / layer_name / image_path.name

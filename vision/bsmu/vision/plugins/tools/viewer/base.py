@@ -8,7 +8,7 @@ from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import MenuType
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import DEFAULT_LAYER_OPACITY
-from bsmu.vision_core.image import FlatImage
+from bsmu.vision_core.image.base import FlatImage
 from bsmu.vision_core.palette import Palette
 
 if TYPE_CHECKING:
@@ -110,7 +110,7 @@ class LayeredImageViewerTool(ViewerTool):
 
         image_layer_properties = layers_properties['image']
         if image_layer_properties == 'active_layer':
-            image_layer = self.viewer.active_layer
+            image_layer = self.viewer.active_displayed_layer
         else:
             image_layer_name = image_layer_properties.get(NAME_PROPERTY_KEY)
             if image_layer_name is not None:

@@ -72,17 +72,17 @@ class ImageViewerLayerController(QObject):
     def toggle_active_layer_view(self):
         if self._active_layer_view_toggled:
             # Restore initial state
-            for layer in self.image_viewer.layers:
-                initial_layer_visibility = self._initial_layers_visibilities.get(layer)
+            for layer_view in self.image_viewer.layer_views:
+                initial_layer_visibility = self._initial_layers_visibilities.get(layer_view)
                 if initial_layer_visibility is not None:
-                    layer.visible = initial_layer_visibility
+                    layer_view.visible = initial_layer_visibility
         else:
             self._initial_layers_visibilities.clear()
 
-            for layer in self.image_viewer.layers:
+            for layer_view in self.image_viewer.layer_views:
                 # Save initial state
-                self._initial_layers_visibilities[layer] = layer.visible
-                layer.visible = False
-            self.image_viewer.active_displayed_layer.visible = True
+                self._initial_layers_visibilities[layer_view] = layer_view.visible
+                layer_view.visible = False
+            self.image_viewer.active_layer_view.visible = True
 
         self._active_layer_view_toggled = not self._active_layer_view_toggled

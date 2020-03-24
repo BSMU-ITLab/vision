@@ -77,7 +77,7 @@ class ImageLayerFileWalker(QObject):
 
     @property
     def active_layer(self):
-        return self.image_viewer.active_displayed_layer
+        return self.image_viewer.active_layer_view
 
     @property
     def main_layer_image_dir(self):
@@ -116,4 +116,4 @@ class ImageLayerFileWalker(QObject):
             layer_image_dir = layer.image_path.parent
             # Load new image, but use palette of old image (so, if palette is not None, image will be loaded as gray)
             layer.image = self.file_loading_manager.load_file(
-                layer_image_dir / next_file_name, palette=layer.image.palette)
+                layer_image_dir / next_file_name, palette=layer.image_palette)

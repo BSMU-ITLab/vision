@@ -14,22 +14,29 @@ from bsmu.vision_core.image.layered import ImageLayer, LayeredImage
 DEFAULT_LAYER_OPACITY = 1
 
 
-class _DisplayedImageLayer(QObject):
+class _ImageLayerView(QObject):
     image_updated = Signal(FlatImage)
     visibility_updated = Signal()
+    opacity_updated = Signal()
 
-    def __init__(self, image_layer: ImageLayer, visible: bool = True, opacity: float = DEFAULT_LAYER_OPACITY):
+    def __init__(self, image_layer: ImageLayer, image_view: np.ndarray = None, visible: bool = True,
+                 opacity: float = DEFAULT_LAYER_OPACITY):
         super().__init__()
 
         self._image_layer = image_layer
-        self._image_layer.image_updated.connect(self.image_updated)
+        self._image_layer.image_updated.connect(self._on_layer_image_updated)
         self._visible = visible
         self._opacity = opacity
 
+        self._image_view = image_view or image_layer.image
         self._displayed_qimage_cache = None
         # Store numpy array's data, because QImage uses it without copying,
         # and QImage will crash if it's data buffer will be deleted
         self._displayed_pixels_data = None
+
+    @property
+    def image_layer(self) -> ImageLayer:
+        return self._image_layer
 
     @property
     def visible(self) -> bool:
@@ -44,6 +51,12 @@ class _DisplayedImageLayer(QObject):
     @property
     def opacity(self) -> float:
         return self._opacity
+
+    @opacity.setter
+    def opacity(self, value: float):
+        if self._opacity != value:
+            self._opacity = value
+            self.opacity_updated.emit()
 
     @property
     def image(self) -> FlatImage:
@@ -76,9 +89,9 @@ class _DisplayedImageLayer(QObject):
                 # displayed_rgba_pixels = image_converter.converted_to_normalized_uint8(self.image.array)
                 # displayed_rgba_pixels = image_converter.converted_to_rgba(displayed_rgba_pixels)
 
-                displayed_rgba_pixels = image_converter.converted_to_rgba(self.image_pixels)
+                displayed_rgba_pixels = image_converter.converted_to_rgba(self._image_view.array)
             else:
-                displayed_rgba_pixels = self.image.colored_premultiplied_array
+                displayed_rgba_pixels = self._image_view.colored_premultiplied_array
 
             self._displayed_pixels_data = displayed_rgba_pixels.data
             displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied if displayed_rgba_pixels.itemsize == 1 \
@@ -87,38 +100,56 @@ class _DisplayedImageLayer(QObject):
                 displayed_rgba_pixels, displayed_qimage_format)
 
             # Scale image to take into account spatial attributes (spacings)
-            spatial_width = self.image.spatial.spacing[1] * self._displayed_qimage_cache.width()
-            spatial_height = self.image.spatial.spacing[0] * self._displayed_qimage_cache.height()
+            spatial_width = self._image_view.spatial.spacing[1] * self._displayed_qimage_cache.width()
+            spatial_height = self._image_view.spatial.spacing[0] * self._displayed_qimage_cache.height()
             self._displayed_qimage_cache = self._displayed_qimage_cache.scaled(
                 spatial_width, spatial_height, mode=Qt.SmoothTransformation)
         return self._displayed_qimage_cache
 
+    def _on_layer_image_updated(self, Image):
+        print('_ImageLayerView _on_layer_image_updated (image array updated or layer image changed)')
+        self._image_view = self.image_layer.image
 
-class _LayeredDisplayedImage(QObject):
-    def __init__(self, layered_image: LayeredImage = None):
+        self._displayed_qimage_cache = None
+        self.image_updated.emit(self._image_view)
+
+
+class _LayeredImageView(QObject):
+    def __init__(self):
         super().__init__()
 
-        self._displayed_layers = [_DisplayedImageLayer(image_layer) for image_layer in layered_image.layers] \
-            if layered_image is not None else []
-        self._names_displayed_layers = \
-            {displayed_layer.name: displayed_layer for displayed_layer in self._displayed_layers}
+        ### self.layered_image = layered_image
+
+        self._layer_views = []  ####
+        self._names_layer_views = {}
+
+        self._layers_views = {}
+
+        # self._displayed_layers = [_ImageLayerView(image_layer) for image_layer in layered_image.layers] \
+        #     if layered_image is not None else []
+        # self._names_displayed_layers = \
+        #     {displayed_layer.name: displayed_layer for displayed_layer in self._displayed_layers}
 
     @property
-    def displayed_layers(self):
-        return self._displayed_layers
+    def layer_views(self):
+        return self._layer_views
 
-    def displayed_layer(self, name: str) -> _DisplayedImageLayer:
-        return self._names_displayed_layers.get(name)
+    def displayed_layer(self, name: str) -> _ImageLayerView:
+        return self._names_layer_views.get(name)
 
-    def add_displayed_layer(self, displayed_layer: _DisplayedImageLayer):
-        self._displayed_layers.append(displayed_layer)
-        self._names_displayed_layers[displayed_layer.name] = displayed_layer
+    def add_layer_view(self, layer_view: _ImageLayerView):
+        self._layer_views.append(layer_view)
+        self._names_layer_views[layer_view.name] = layer_view
+        self._layers_views[layer_view.image_layer] = layer_view
 
     def add_displayed_layer_from_layer(self, image_layer: ImageLayer, visible: bool = True,
-                                       opacity: float = DEFAULT_LAYER_OPACITY) -> _DisplayedImageLayer:
-        displayed_layer = _DisplayedImageLayer(image_layer, visible, opacity)
-        self.add_displayed_layer(displayed_layer)
+                                       opacity: float = DEFAULT_LAYER_OPACITY) -> _ImageLayerView:
+        displayed_layer = _ImageLayerView(image_layer, visible, opacity)
+        self.add_layer_view(displayed_layer)
         return displayed_layer
+
+    def layer_view_by_model(self, image_layer: ImageLayer) -> _ImageLayerView:
+        return self._layers_views.get(image_layer)
 
 
 class _LayeredImageGraphicsObject(QGraphicsObject):
@@ -127,21 +158,24 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
     def __init__(self, parent: QGraphicsItem = None):
         super().__init__(parent)
 
-        self._layered_displayed_image = _LayeredDisplayedImage()
-        self._active_displayed_layer = None
+        self._layered_image_view = _LayeredImageView()
+        self._active_layer_view = None
 
         self._bounding_rect = QRectF()
 
     @property
-    def displayed_layers(self):
-        return self._layered_displayed_image.displayed_layers
+    def layer_views(self):
+        return self._layered_image_view.layer_views
 
-    def displayed_layer(self, name: str) -> _DisplayedImageLayer:
-        return self._layered_displayed_image.displayed_layer(name)
+    def displayed_layer(self, name: str) -> _ImageLayerView:
+        return self._layered_image_view.displayed_layer(name)
 
     @property
-    def active_displayed_layer(self):
-        return self._active_displayed_layer
+    def active_layer_view(self):
+        return self._active_layer_view
+
+    def layer_view_by_model(self, image_layer: ImageLayer) -> _ImageLayerView:
+        return self._layered_image_view.layer_view_by_model(image_layer)
 
     # def add_layer(self, image: FlatImage = None, name: str = '',
     #               visible: bool = True, opacity: float = DEFAULT_LAYER_OPACITY) -> _ImageItemLayer:
@@ -162,23 +196,24 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
     #
     #     return layer
 
-    def add_displayed_layer_from_layer(self, image_layer: ImageLayer, visible: bool = True,
-                                       opacity: float = DEFAULT_LAYER_OPACITY) -> _DisplayedImageLayer:
-        displayed_layer = self._layered_displayed_image.add_displayed_layer_from_layer(image_layer, visible, opacity)
+    # def add_displayed_layer_from_layer(self, image_layer: ImageLayer, visible: bool = True,
+    #                                    opacity: float = DEFAULT_LAYER_OPACITY) -> _DisplayedImageLayer:
+    #     displayed_layer = self._layered_displayed_image.add_displayed_layer_from_layer(image_layer, visible, opacity)
+
+    def add_layer_view(self, layer_view: _ImageLayerView):
+        self._layered_image_view.add_layer_view(layer_view)
 
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
-        displayed_layer.image_updated.connect(self._on_displayed_layer_image_updated)
-        displayed_layer.visibility_updated.connect(self.update)
+        layer_view.image_updated.connect(self._on_layer_view_image_updated)
+        layer_view.visibility_updated.connect(self.update)
 
-        if len(self.displayed_layers) == 1:  # If was added first layer
-            self._active_displayed_layer = displayed_layer
-            self.active_displayed_layer_changed.emit(None, self.active_displayed_layer)
+        if len(self.layer_views) == 1:  # If was added first layer
+            self._active_layer_view = layer_view
+            self.active_displayed_layer_changed.emit(None, self.active_layer_view)
             self._update_bounding_rect()  # self.prepareGeometryChange() will call update() if this is necessary.
         else:
             self.update()
-
-        return displayed_layer
 
     def boundingRect(self):
         return self._bounding_rect
@@ -186,11 +221,11 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
     def _update_bounding_rect(self):
         self.prepareGeometryChange()
 
-        if self.displayed_layers:
+        if self.layer_views:
             # TODO: images of layers can have different spatial bounding boxes.
             #  We have to use union of bounding boxes of every layer.
             #  Now we use only bounding box of first layer.
-            first_layer_image = self._layered_displayed_image.displayed_layers[0].image
+            first_layer_image = self._layered_image_view.layer_views[0].image
             rect_top_left_pixel_indexes = np.array([0, 0])
             rect_bottom_right_pixel_indexes = first_layer_image.array.shape[:2]
             rect_top_left_pos = first_layer_image.pixel_indexes_to_pos(rect_top_left_pixel_indexes)
@@ -211,18 +246,14 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
-        for displayed_layer in self.displayed_layers:
-            if displayed_layer.image is not None and displayed_layer.visible:
-                painter.setOpacity(displayed_layer.opacity)
-                image_origin = displayed_layer.image.spatial.origin
-                painter.drawImage(QPointF(image_origin[1], image_origin[0]), displayed_layer.displayed_image)
+        for layer_view in self.layer_views:
+            if layer_view.image is not None and layer_view.visible:
+                painter.setOpacity(layer_view.opacity)
+                image_origin = layer_view.image.spatial.origin
+                painter.drawImage(QPointF(image_origin[1], image_origin[0]), layer_view.displayed_image)
 
-    def _on_displayed_layer_image_updated(self, image: FlatImage):
+    def _on_layer_view_image_updated(self, image: FlatImage):
         self.update()
-
-    def print_layers(self):
-        for index, layer in enumerate(self.displayed_layers):
-            print(f'Layer {index}: {layer.name}')
 
 
 class LayeredImageViewer(DataViewer):
@@ -250,23 +281,46 @@ class LayeredImageViewer(DataViewer):
         grid_layout.addWidget(self.graphics_view)
         self.setLayout(grid_layout)
 
-    def add_layer(self, layer: ImageLayer):
-        self.data.add_layer(layer)
-
-    def add_displayed_layer_from_layer(self, image_layer: ImageLayer, visible: bool = True,
-                                       opacity: float = DEFAULT_LAYER_OPACITY) -> _DisplayedImageLayer:
-        return self.layered_image_graphics_object.add_displayed_layer_from_layer(image_layer, visible, opacity)
-
-    def displayed_layer(self, name: str) -> _DisplayedImageLayer:
-        return self.layered_image_graphics_object.displayed_layer(name)
-
-    @property
-    def active_displayed_layer(self):
-        return self.layered_image_graphics_object.active_displayed_layer
+        self.data.layer_added.connect(self._add_layer_view_from_layer)
 
     @property
     def layers(self):
-        return self.layered_image_graphics_object.layers
+        return self.data.layers
+
+    def add_layer(self, layer: ImageLayer):
+        self.data.add_layer(layer)
+
+    def add_layer_from_image(self, image: Image, name: str = ''):
+        layer = ImageLayer(image, name)
+        self.add_layer(layer)
+        return layer
+
+    def _add_layer_view_from_layer(self, image_layer: ImageLayer) -> _ImageLayerView:
+        pass
+
+    def _add_layer_view(self, layer_view: _ImageLayerView):
+        self.layered_image_graphics_object.add_layer_view(layer_view)
+
+    def layer_view_by_model(self, image_layer: ImageLayer) -> _ImageLayerView:
+        return self.layered_image_graphics_object.layer_view_by_model(image_layer)
+
+    # def _add_displayed_layer_from_layer(self, image_layer: ImageLayer) -> _ImageLayerView:
+    #     return self.layered_image_graphics_object.add_displayed_layer_from_layer(image_layer)
+
+    # def add_displayed_layer_from_layer(self, image_layer: ImageLayer, visible: bool = True,
+    #                                    opacity: float = DEFAULT_LAYER_OPACITY) -> _DisplayedImageLayer:
+    #     return self.layered_image_graphics_object.add_displayed_layer_from_layer(image_layer, visible, opacity)
+
+    def displayed_layer(self, name: str) -> _ImageLayerView:
+        return self.layered_image_graphics_object.displayed_layer(name)
+
+    @property
+    def active_layer_view(self):
+        return self.layered_image_graphics_object.active_layer_view
+
+    @property
+    def layer_views(self):
+        return self.layered_image_graphics_object.layer_views
 
     @property
     def viewport(self):
@@ -305,4 +359,4 @@ class LayeredImageViewer(DataViewer):
         self.data_name_changed.emit(image.path.name)
 
     def print_layers(self):
-        self.layered_image_graphics_object.print_layers()
+        self.data.print_layers()

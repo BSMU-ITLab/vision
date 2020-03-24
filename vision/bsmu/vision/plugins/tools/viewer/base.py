@@ -110,7 +110,7 @@ class LayeredImageViewerTool(ViewerTool):
 
         image_layer_properties = layers_properties['image']
         if image_layer_properties == 'active_layer':
-            image_layer = self.viewer.active_displayed_layer
+            image_layer = self.viewer.active_layer_view
         else:
             image_layer_name = image_layer_properties.get(NAME_PROPERTY_KEY)
             if image_layer_name is not None:

@@ -8,7 +8,7 @@ class LayeredImageViewerSubWindow(DataViewerSubWindow):
         super().__init__(viewer)
 
     def update_window_title(self):
-        title = self.viewer.active_displayed_layer.image_path_name if self.viewer.data.path is None \
+        title = self.viewer.active_layer_view.image_path_name if self.viewer.data.path is None \
             else self.viewer.data_path_name
         self.setWindowTitle(title)
 

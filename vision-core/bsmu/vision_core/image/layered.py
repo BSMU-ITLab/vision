@@ -45,16 +45,16 @@ class ImageLayer(QObject):
         if self._image != value:
             self._image = value
             self._on_image_updated()
-            # self._image.updated.connect(self._on_image_updated)
             self._image.pixels_modified.connect(self._on_image_updated)
 
     def _on_image_updated(self):
-        print('_ImageItemLayer _on_image_updated (image array updated or layer image changed)')
-        self._displayed_image_cache = None
         self.image_updated.emit(self.image)
 
 
 class LayeredImage(Data):
+    layer_added = Signal(ImageLayer)
+    layer_removed = Signal(ImageLayer)
+
     def __init__(self, path: Path = None):
         super().__init__(path)
 
@@ -71,8 +71,13 @@ class LayeredImage(Data):
     def add_layer(self, layer: ImageLayer):
         self._layers.append(layer)
         self._names_layers[layer.name] = layer
+        self.layer_added.emit(layer)
 
     def add_layer_from_image(self, image: Image, name: str = '') -> ImageLayer:
         image_layer = ImageLayer(image, name)
         self.add_layer(image_layer)
         return image_layer
+
+    def print_layers(self):
+        for index, layer in enumerate(self.layers):
+            print(f'Layer {index}: {layer.name}')

@@ -5,6 +5,7 @@ from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewer
 from bsmu.vision.widgets.viewers.image.layered.slice import VolumeSliceImageViewer
 from bsmu.vision_core.constants import PlaneAxis
 from bsmu.vision_core.image.base import VolumeImage
+from bsmu.vision_core.image.layered import LayeredImage
 
 
 class VolumeImageVisualizerPlugin(DataVisualizerPlugin):
@@ -19,7 +20,9 @@ class VolumeImageVisualizer(DataVisualizer):
         print('visualize volume image')
 
         for plane_axis in PlaneAxis:
-            image_viewer = VolumeSliceImageViewer(plane_axis, data)
+            layered_image = LayeredImage()
+            layered_image.add_layer_from_image(data, name=data.dir_name)
+            image_viewer = VolumeSliceImageViewer(plane_axis, None, layered_image)
             sub_window = VolumeSliceImageViewerSubWindow(image_viewer)
             self.mdi.addSubWindow(sub_window)
             sub_window.show()

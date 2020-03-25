@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from PySide2.QtCore import Signal
 
@@ -27,12 +29,14 @@ class SpatialAttrs:
 class Image(Data):
     pixels_modified = Signal()
 
-    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
+    def __init__(self, n_dims: int, array: ndarray = None, palette: Palette = None, path: Path = None,
+                 spatial: SpatialAttrs = None):
         super().__init__(path)
 
+        self.n_dims = n_dims  # Number of dimensions excluding channel dimension (2 for FlatImage, 3 for VolumeImage)
         self.array = array
         self._palette = palette
-        self.spatial = spatial
+        self.spatial = spatial or SpatialAttrs.default_for_ndim(self.n_dims)
 
         self._check_array_palette_matching()
 
@@ -70,6 +74,10 @@ class Image(Data):
     def palette(self) -> Palette:
         return self._palette
 
+    @property
+    def is_indexed(self) -> bool:
+        return self.palette is not None
+
     @palette.setter
     def palette(self, palette):
         if self._palette != palette:
@@ -84,25 +92,29 @@ class Image(Data):
     def colored_premultiplied_array(self) -> ndarray:
         return self.palette.premultiplied_array[self.array]
 
+    @property
+    def n_channels(self) -> int:
+        return 1 if len(self.array.shape) == self.n_dims else self.array.shape[self.n_dims]
+
     def _check_array_palette_matching(self):
-        pass
+        assert (not self.is_indexed) or self.n_channels == 1, \
+            f'Indexed image (shape: {self.array.shape}) (with palette) has to contain only one channel'
 
 
 class FlatImage(Image):
-    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None,
-                 spatial: SpatialAttrs = SpatialAttrs.default_for_ndim(2)):
-        super().__init__(array, palette, path, spatial)
-
-    def _check_array_palette_matching(self):
-        assert (self.palette is None) or (len(self.array.shape) == 2), \
-            f'Flat indexed image (shape: {self.array.shape}) (with palette) has to contain no channels'
+    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
+        super().__init__(2, array, palette, path, spatial)
 
 
 class VolumeImage(Image):
-    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None,
-                 spatial: SpatialAttrs = SpatialAttrs.default_for_ndim(3)):
-        super().__init__(array, palette, path, spatial)
+    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
+        super().__init__(3, array, palette, path, spatial)
 
-    def _check_array_palette_matching(self):
-        assert (self.palette is None) or (len(self.array.shape) == 3), \
-            f'Volume indexed image (shape: {self.array.shape}) (with palette) has to contain no channels.'
+    def slice_pixels(self, plane_axis: PlaneAxis, slice_number: int):
+        # Do not use np.take, because that will copy data
+        plane_slice_indexing = [slice(None)] * 3
+        plane_slice_indexing[plane_axis] = slice_number
+        return self.array[tuple(plane_slice_indexing)]
+
+    def center_slice_number(self, plane_axis: PlaneAxis):
+        return math.floor(self.array.shape[plane_axis] / 2)

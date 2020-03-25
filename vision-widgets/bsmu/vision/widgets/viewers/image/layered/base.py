@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 import numpy as np
 from PySide2.QtCore import QObject, Qt, Signal, QRectF, QPointF
 from PySide2.QtGui import QPainter, QImage
@@ -12,6 +14,26 @@ from bsmu.vision_core.image.base import FlatImage
 from bsmu.vision_core.image.layered import ImageLayer, LayeredImage
 
 
+class IntensityWindowing:
+    def __init__(self, pixels: np.ndarray, window_width: Optional[float] = None, window_level: Optional[float] = None):
+        self.pixels = pixels
+        self.window_width = window_width if window_width is not None else \
+            self.pixels.max() - self.pixels.min() + 1
+        self.window_level = window_level if window_level is not None else \
+            (self.pixels.max() + self.pixels.min() + 1) / 2
+
+    def windowing_applied(self) -> np.ndarray:
+        #  https://github.com/dicompyler/dicompyler-core/blob/master/dicompylercore/dicomparser.py
+        windowed_pixels = np.piecewise(
+            self.pixels,
+            [self.pixels <= (self.window_level - 0.5 - (self.window_width - 1) / 2),
+             self.pixels > (self.window_level - 0.5 + (self.window_width - 1) / 2)],
+            [0, 255, lambda pixels:
+                ((pixels - (self.window_level - 0.5)) / (self.window_width - 1) + 0.5) * (255 - 0)])
+        windowed_pixels = windowed_pixels.astype(np.uint8, copy=False)
+        return windowed_pixels
+
+
 class _ImageLayerView(QObject):
     DEFAULT_LAYER_OPACITY = 1
 
@@ -19,7 +41,7 @@ class _ImageLayerView(QObject):
     visibility_updated = Signal()
     opacity_updated = Signal()
 
-    def __init__(self, image_layer: ImageLayer, image_view: np.ndarray = None, visible: bool = True,
+    def __init__(self, image_layer: ImageLayer, visible: bool = True,
                  opacity: float = DEFAULT_LAYER_OPACITY):
         super().__init__()
 
@@ -28,7 +50,11 @@ class _ImageLayerView(QObject):
         self._visible = visible
         self._opacity = opacity
 
-        self._image_view = image_view or image_layer.image
+        self._image_view = self._create_image_view()
+        if self._image_view.n_channels == 1 and not self._image_view.is_indexed:
+            self.intensity_windowing = IntensityWindowing(self._image_view.array)
+            self._image_view.array = self.intensity_windowing.windowing_applied()
+
         self._displayed_qimage_cache = None
         # Store numpy array's data, because QImage uses it without copying,
         # and QImage will crash if it's data buffer will be deleted
@@ -105,6 +131,9 @@ class _ImageLayerView(QObject):
             self._displayed_qimage_cache = self._displayed_qimage_cache.scaled(
                 spatial_width, spatial_height, mode=Qt.SmoothTransformation)
         return self._displayed_qimage_cache
+
+    def _create_image_view(self) -> FlatImage:
+        pass
 
     def _on_layer_image_updated(self, image: Image):
         print('_ImageLayerView _on_layer_image_updated (image array updated or layer image changed)')
@@ -223,7 +252,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
             # TODO: images of layers can have different spatial bounding boxes.
             #  We have to use union of bounding boxes of every layer.
             #  Now we use only bounding box of first layer.
-            first_layer_image = self._layered_image_view.layer_views[0].image
+            first_layer_image = self._layered_image_view.layer_views[0]._image_view
             rect_top_left_pixel_indexes = np.array([0, 0])
             rect_bottom_right_pixel_indexes = first_layer_image.array.shape[:2]
             rect_top_left_pos = first_layer_image.pixel_indexes_to_pos(rect_top_left_pixel_indexes)
@@ -268,6 +297,10 @@ class LayeredImageViewer(DataViewer):
         self.layered_image_graphics_object = _LayeredImageGraphicsObject()
         self.layered_image_graphics_object.active_displayed_layer_changed.connect(
             self._on_active_displayed_layer_changed)
+
+        if self.data is not None:
+            for layer in data.layers:
+                self._add_layer_view_from_layer(layer)
 
         self.graphics_scene = QGraphicsScene()
         self.graphics_scene.addItem(self.layered_image_graphics_object)

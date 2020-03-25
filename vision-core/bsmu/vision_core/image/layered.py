@@ -16,6 +16,9 @@ class ImageLayer(QObject):
         self.id = ImageLayer.max_id
         ImageLayer.max_id += 1
 
+        self.path = None
+        self.palette = None
+
         self._image = None
         self.image = image  # if image is not None else Image()
         self.name = name if name else 'Layer ' + str(self.id)
@@ -45,7 +48,10 @@ class ImageLayer(QObject):
         if self._image != value:
             self._image = value
             self._on_image_updated()
-            self._image.pixels_modified.connect(self._on_image_updated)
+            if self._image is not None:
+                self.path = self._image.path.parent
+                self.palette = self._image.palette
+                self._image.pixels_modified.connect(self._on_image_updated)
 
     def _on_image_updated(self):
         self.image_updated.emit(self.image)

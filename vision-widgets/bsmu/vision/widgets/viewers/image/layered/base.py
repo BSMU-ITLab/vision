@@ -11,10 +11,10 @@ from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
 from bsmu.vision_core.image.base import FlatImage
 from bsmu.vision_core.image.layered import ImageLayer, LayeredImage
 
-DEFAULT_LAYER_OPACITY = 1
-
 
 class _ImageLayerView(QObject):
+    DEFAULT_LAYER_OPACITY = 1
+
     image_updated = Signal(FlatImage)
     visibility_updated = Signal()
     opacity_updated = Signal()
@@ -106,10 +106,8 @@ class _ImageLayerView(QObject):
                 spatial_width, spatial_height, mode=Qt.SmoothTransformation)
         return self._displayed_qimage_cache
 
-    def _on_layer_image_updated(self, Image):
+    def _on_layer_image_updated(self, image: Image):
         print('_ImageLayerView _on_layer_image_updated (image array updated or layer image changed)')
-        self._image_view = self.image_layer.image
-
         self._displayed_qimage_cache = None
         self.image_updated.emit(self._image_view)
 
@@ -142,11 +140,11 @@ class _LayeredImageView(QObject):
         self._names_layer_views[layer_view.name] = layer_view
         self._layers_views[layer_view.image_layer] = layer_view
 
-    def add_displayed_layer_from_layer(self, image_layer: ImageLayer, visible: bool = True,
-                                       opacity: float = DEFAULT_LAYER_OPACITY) -> _ImageLayerView:
-        displayed_layer = _ImageLayerView(image_layer, visible, opacity)
-        self.add_layer_view(displayed_layer)
-        return displayed_layer
+    # def add_displayed_layer_from_layer(self, image_layer: ImageLayer, visible: bool = True,
+    #                                    opacity: float = DEFAULT_LAYER_OPACITY) -> _ImageLayerView:
+    #     displayed_layer = _ImageLayerView(image_layer, visible, opacity)
+    #     self.add_layer_view(displayed_layer)
+    #     return displayed_layer
 
     def layer_view_by_model(self, image_layer: ImageLayer) -> _ImageLayerView:
         return self._layers_views.get(image_layer)

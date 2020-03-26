@@ -114,5 +114,6 @@ class ImageLayerFileWalker(QObject):
         # update images of all layers
         for layer in self.image_viewer.layers:
             # Load new image, but use palette of old image (so, if palette is not None, image will be loaded as gray)
-            file_path = layer.path / next_file_name
-            layer.image = self.file_loading_manager.load_file(file_path, palette=layer.palette)
+            if layer.path is not None:
+                file_path = layer.path / next_file_name
+                layer.image = self.file_loading_manager.load_file(file_path, palette=layer.palette)

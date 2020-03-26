@@ -49,7 +49,8 @@ class ImageLayer(QObject):
             self._image = value
             self._on_image_updated()
             if self._image is not None:
-                self.path = self._image.path.parent
+                if self._image.path is not None:
+                    self.path = self._image.path.parent
                 self.palette = self._image.palette
                 self._image.pixels_modified.connect(self._on_image_updated)
 
@@ -71,7 +72,7 @@ class LayeredImage(Data):
     def layers(self):
         return self._layers
 
-    def layer(self, name: str) -> ImageLayer:
+    def layer_by_name(self, name: str) -> ImageLayer:
         return self._names_layers.get(name)
 
     def add_layer(self, layer: ImageLayer):

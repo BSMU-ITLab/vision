@@ -176,7 +176,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         self._bounding_rect = QRectF()
 
     @property
-    def active_layer_view(self):
+    def active_layer_view(self) -> ImageLayerView:
         return self._active_layer_view
 
     @property
@@ -270,8 +270,12 @@ class LayeredImageViewer(DataViewer):
         self.data.layer_added.connect(self._add_layer_view_from_model)
 
     @property
-    def active_layer_view(self):
+    def active_layer_view(self) -> ImageLayerView:
         return self.layered_image_graphics_object.active_layer_view
+
+    @property
+    def active_layer(self) -> ImageLayer:
+        return self.active_layer_view.image_layer
 
     @property
     def layers(self):
@@ -280,6 +284,15 @@ class LayeredImageViewer(DataViewer):
     @property
     def layer_views(self):
         return self.layered_image_graphics_object.layer_views
+
+    def layer_view_by_name(self, name: str) -> ImageLayerView:
+        return self.layered_image_graphics_object.layer_view_by_name(name)
+
+    def layer_view_by_model(self, image_layer: ImageLayer) -> ImageLayerView:
+        return self.layered_image_graphics_object.layer_view_by_model(image_layer)
+
+    def layer_by_name(self, name: str) -> ImageLayer:
+        return self.data.layer_by_name(name)
 
     def add_layer(self, layer: ImageLayer):
         self.data.add_layer(layer)
@@ -299,12 +312,6 @@ class LayeredImageViewer(DataViewer):
         if self.data is not None:
             for layer in self.data.layers:
                 self._add_layer_view_from_model(layer)
-
-    def layer_view_by_model(self, image_layer: ImageLayer) -> ImageLayerView:
-        return self.layered_image_graphics_object.layer_view_by_model(image_layer)
-
-    def layer_view_by_name(self, name: str) -> ImageLayerView:
-        return self.layered_image_graphics_object.layer_view_by_name(name)
 
     @property
     def viewport(self):

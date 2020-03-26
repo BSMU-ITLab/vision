@@ -7,7 +7,7 @@ from PySide2.QtCore import QObject
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import MenuType
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
-from bsmu.vision.widgets.viewers.image.layered.base import _ImageLayerView
+from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
 from bsmu.vision_core.image.base import FlatImage
 from bsmu.vision_core.palette import Palette
 
@@ -97,7 +97,7 @@ class LayeredImageViewerTool(ViewerTool):
         if layer is None:
             # Create and add the layer
             layer_image = FlatImage.zeros_mask_like(self.image, palette=palette)
-            layer_opacity = layer_properties.get('opacity', _ImageLayerView.DEFAULT_LAYER_OPACITY)
+            layer_opacity = layer_properties.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
             layer = self.viewer.add_layer(layer_image, layer_name, opacity=layer_opacity)
 
         return layer

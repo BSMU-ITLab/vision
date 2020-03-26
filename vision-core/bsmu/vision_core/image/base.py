@@ -110,7 +110,7 @@ class VolumeImage(Image):
     def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
         super().__init__(3, array, palette, path, spatial)
 
-    def slice_pixels(self, plane_axis: PlaneAxis, slice_number: int):
+    def slice_pixels(self, plane_axis: PlaneAxis, slice_number: int) -> np.ndarray:
         # Do not use np.take, because that will copy data
         plane_slice_indexing = [slice(None)] * 3
         plane_slice_indexing[plane_axis] = slice_number

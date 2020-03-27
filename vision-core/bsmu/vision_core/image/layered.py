@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import List
+
 from PySide2.QtCore import QObject, Signal
 
 from bsmu.vision_core.data import Data
@@ -88,3 +90,30 @@ class LayeredImage(Data):
     def print_layers(self):
         for index, layer in enumerate(self.layers):
             print(f'Layer {index}: {layer.name}')
+
+'''
+class LayerImageDependencyController(QObject):
+    def __init__(self, master_layer: ImageLayer, slave_layers: List[ImageLayer]):
+        super().__init__()
+
+        self.master_layer = master_layer
+        self.slave_layers = slave_layers
+
+        self.master_layer.image_updated(self._update_slave_layers)
+
+    def is_corresponding_layer_image(self, slave_layer: ImageLayer):
+        return self.master_layer.path /
+        return file_path = layer.path
+        ...
+
+    def corresponding_layer_image(self, slave_layer: ImageLayer):
+        file_path = layer.path / next_file_name
+        layer.image = self.file_loading_manager.load_file(file_path, palette=layer.palette)
+
+    def _update_slave_layer_image(self, slave_layer: ImageLayer):
+
+
+    def _update_slave_layers(self):
+        for slave_layer in self.slave_layers:
+            self._update_slave_layer_image(slave_layer)
+'''

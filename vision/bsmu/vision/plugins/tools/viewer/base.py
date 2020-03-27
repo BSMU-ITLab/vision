@@ -141,7 +141,10 @@ class LayeredImageViewerTool(ViewerTool):
 
     def _on_layer_image_updated(self):
         self.image = self.image_layer.image
+        if self.mask_layer.image is None:
+            self.mask = FlatImage.zeros_mask_like(self.image, palette=self.mask_palette)
         self.tool_mask = FlatImage.zeros_mask_like(self.image, palette=self.tool_mask_layer.palette)
+        self.tool_mask_layer.image = self.tool_mask
 
     def pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
         return self.viewer.viewport_pos_to_layered_image_item_pos(viewport_pos)

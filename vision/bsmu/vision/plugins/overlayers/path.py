@@ -6,7 +6,6 @@ from PySide2.QtCore import QObject
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
-from bsmu.vision_core.image.layered import ImageLayer
 from bsmu.vision_core.palette import Palette
 
 if TYPE_CHECKING:

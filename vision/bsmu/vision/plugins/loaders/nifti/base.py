@@ -15,7 +15,7 @@ class NiftiFileLoaderPlugin(FileLoaderPlugin):
 class NiftiFileLoader(FileLoader):
     _FORMATS = ('nii.gz',)
 
-    def _load_file(self, path: Path, **kwargs) -> VolumeImage:
+    def _load_file(self, path: Path, palette=None, **kwargs) -> VolumeImage:
         print('Load NIfTI DICOM')
 
         nifti_image = nib.load(str(path))
@@ -32,4 +32,4 @@ class NiftiFileLoader(FileLoader):
         print('direction\n', direction)
         spatial = SpatialAttrs(origin=origin, spacing=spacing, direction=direction)
 
-        return VolumeImage(np.asanyarray(nifti_image.dataobj), path=path, spatial=spatial)  # nifti_image.get_fdata()
+        return VolumeImage(np.asanyarray(nifti_image.dataobj), palette=palette, path=path, spatial=spatial)  # nifti_image.get_fdata()

@@ -21,7 +21,7 @@ class MdiVolumeSliceWalkerPlugin(Plugin):
                                          self.mdi_volume_slice_walker.show_next_slice,
                                          Qt.CTRL + Qt.Key_Up)
         self.main_window.add_menu_action(MenuType.VIEW, 'Previous Slice',
-                                         self.mdi_volume_slice_walker.show_previous_slice,
+                                         self.mdi_volume_slice_walker.show_prev_slice,
                                          Qt.CTRL + Qt.Key_Down)
 
     def _disable(self):
@@ -38,9 +38,9 @@ class MdiVolumeSliceWalker(QObject):
         for volume_slice_image_viewer in self._volume_slice_image_viewers():
             volume_slice_image_viewer.show_next_slice()
 
-    def show_previous_slice(self):
+    def show_prev_slice(self):
         for volume_slice_image_viewer in self._volume_slice_image_viewers():
-            volume_slice_image_viewer.show_previous_slice()
+            volume_slice_image_viewer.show_prev_slice()
 
     def _volume_slice_image_viewers(self):
         active_sub_window = self.mdi.activeSubWindow()

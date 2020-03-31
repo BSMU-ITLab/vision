@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import abc
+from typing import List
 
 from PySide2.QtCore import QObject, Signal
 
-from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 
 
 class DataVisualizerPlugin(Plugin):
@@ -24,9 +25,7 @@ class DataVisualizerMeta(abc.ABCMeta, type(QObject)):
 
 
 class DataVisualizer(QObject, metaclass=DataVisualizerMeta):
-    #% _DATA_TYPES = ()
-
-    data_visualized = Signal(DataViewerSubWindow)
+    data_visualized = Signal(list)  # List[DataViewerSubWindow]
 
     def __init__(self, mdi):
         super().__init__()
@@ -37,11 +36,11 @@ class DataVisualizer(QObject, metaclass=DataVisualizerMeta):
     def data_types(self):
         return type(self).data_types
 
-    def visualize_data(self, data: Data):
-        data_viewer_sub_window = self._visualize_data(data)
-        self.data_visualized.emit(data_viewer_sub_window)
-        return data_viewer_sub_window
+    def visualize_data(self, data: Data) -> List[DataViewerSubWindow]:
+        data_viewer_sub_windows = self._visualize_data(data)
+        self.data_visualized.emit(data_viewer_sub_windows)
+        return data_viewer_sub_windows
 
     @abc.abstractmethod
-    def _visualize_data(self, data: Data):
+    def _visualize_data(self, data: Data) -> List[DataViewerSubWindow]:
         pass

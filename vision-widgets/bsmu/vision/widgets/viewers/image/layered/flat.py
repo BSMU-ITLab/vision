@@ -8,16 +8,14 @@ class FlatImageLayerView(ImageLayerView):
                  opacity: float = ImageLayerView.DEFAULT_LAYER_OPACITY):
         super().__init__(image_layer, visible, opacity)
 
-        self._image_view = self._create_image_view()
+        self._update_image_view()
 
-    def _create_image_view(self) -> FlatImage:
+    @property
+    def flat_image(self) -> FlatImage:
         return self.image_layer.image
 
-    def _on_layer_image_updated(self, image: Image):
-        print('FlatImageLayerView _on_layer_image_updated (image array updated or layer image changed)')
-        self._image_view = self._create_image_view()
-
-        super()._on_layer_image_updated(image)
+    def _create_image_view(self) -> FlatImage:
+        return self.flat_image
 
 
 class LayeredFlatImageViewer(LayeredImageViewer):

@@ -81,7 +81,7 @@ class LayeredImageViewerTool(ViewerTool):
     def __init__(self, viewer: LayeredImageViewer, config: UnitedConfig):
         super().__init__(viewer, config)
 
-        self.image_layer = None
+        self.image_layer_view = None
         self.mask_layer = None
         self.tool_mask_layer = None
 
@@ -100,6 +100,7 @@ class LayeredImageViewerTool(ViewerTool):
 
         if layer is None:
             # Create and add the layer
+            print('CREATE', layer_name)
             layer_image = FlatImage.zeros_mask_like(self.image, palette=palette)
             layer_opacity = layer_properties.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
             layer = self.viewer.add_layer_from_image(layer_image, layer_name)
@@ -115,23 +116,24 @@ class LayeredImageViewerTool(ViewerTool):
 
         image_layer_properties = layers_properties['image']
         if image_layer_properties == 'active_layer':
-            self.image_layer = self.viewer.active_layer
+            self.image_layer_view = self.viewer.active_layer_view
         else:
             image_layer_name = image_layer_properties.get(NAME_PROPERTY_KEY)
             if image_layer_name is not None:
-                self.image_layer = self.viewer.layer_by_name(image_layer_name)
+                self.image_layer_view = self.viewer.layer_view_by_name(image_layer_name)
             else:
                 image_layer_number = image_layer_properties.get('number')
                 if image_layer_number is not None:
-                    self.image_layer = self.viewer.layers[image_layer_number]
+                    self.image_layer_view = self.viewer.layer_views[image_layer_number]
                 else:
                     assert False, f'Unknown image layer properties: {image_layer_properties}'
-        self.image = self.image_layer and self.image_layer.image
-        self.image_layer.image_updated.connect(self._on_layer_image_updated)
+        self.image = self.image_layer_view and self.image_layer_view.flat_image
+        self.image_layer_view.image_layer.image_updated.connect(self._on_layer_image_updated)
 
         self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
             layers_properties, 'mask', NAME_PROPERTY_KEY, self.mask_palette)
-        self.mask = self.mask_layer.image
+        self.mask = self.viewer.layer_view_by_model(self.mask_layer).flat_image
+        self.mask_layer.image_updated.connect(self._update_masks)
 
         self.tool_mask_layer = self.create_nonexistent_layer_with_zeros_mask(
             layers_properties, 'tool_mask', NAME_PROPERTY_KEY, self.tool_mask_palette)
@@ -140,11 +142,16 @@ class LayeredImageViewerTool(ViewerTool):
         self.viewer.print_layers()
 
     def _on_layer_image_updated(self):
-        self.image = self.image_layer.image
+        self.image = self.image_layer_view.image
+        self._update_masks()
+
+    def _update_masks(self):
         if self.mask_layer.image is None:
-            self.mask = FlatImage.zeros_mask_like(self.image, palette=self.mask_palette)
-        self.tool_mask = FlatImage.zeros_mask_like(self.image, palette=self.tool_mask_layer.palette)
-        self.tool_mask_layer.image = self.tool_mask
+            self.mask_layer.image = FlatImage.zeros_mask_like(self.image, palette=self.mask_palette)
+        self.mask = self.viewer.layer_view_by_model(self.mask_layer).flat_image
+
+        self.tool_mask = self.tool_mask_layer.image = \
+            FlatImage.zeros_mask_like(self.image, palette=self.tool_mask_layer.palette)
 
     def pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
         return self.viewer.viewport_pos_to_layered_image_item_pos(viewport_pos)

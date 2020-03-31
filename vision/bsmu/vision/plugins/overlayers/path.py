@@ -39,17 +39,18 @@ class ImageViewerPathOverlayer(QObject):
         self.loading_manager = loading_manager
         self.config_data = config_data
 
-    def overlay_sibling_dirs_images(self, data_viewer_sub_window: DataViewerSubWindow):
-        if isinstance(data_viewer_sub_window, LayeredImageViewerSubWindow):
-            layered_image_viewer = data_viewer_sub_window.viewer
-            image_path = layered_image_viewer.active_layer_view.image_path
-            layers_dir = image_path.parents[1]
-            for layer_name, layer_properties in self.config_data['layers'].items():
-                layer_image_path = layers_dir / layer_name / image_path.name
-                if layer_image_path.exists():
-                    palette_property = layer_properties.get('palette')
-                    palette = palette_property and Palette.from_sparse_index_list(list(palette_property))
-                    image = self.loading_manager.load_file(layer_image_path, palette=palette)
-                    layer_opacity = layer_properties['opacity']
-                    image_layer = layered_image_viewer.add_layer_from_image(image, layer_name)
-                    layered_image_viewer.layer_view_by_model(image_layer).opacity = layer_opacity
+    def overlay_sibling_dirs_images(self, data_viewer_sub_windows: DataViewerSubWindow):
+        for data_viewer_sub_window in data_viewer_sub_windows:
+            if isinstance(data_viewer_sub_window, LayeredImageViewerSubWindow):
+                layered_image_viewer = data_viewer_sub_window.viewer
+                image_path = layered_image_viewer.active_layer_view.image_path
+                layers_dir = image_path.parents[1]
+                for layer_name, layer_properties in self.config_data['layers'].items():
+                    layer_image_path = layers_dir / layer_name / image_path.name
+                    if layer_image_path.exists():
+                        palette_property = layer_properties.get('palette')
+                        palette = palette_property and Palette.from_sparse_index_list(list(palette_property))
+                        image = self.loading_manager.load_file(layer_image_path, palette=palette)
+                        layer_opacity = layer_properties['opacity']
+                        image_layer = layered_image_viewer.add_layer_from_image(image, layer_name)
+                        layered_image_viewer.layer_view_by_model(image_layer).opacity = layer_opacity

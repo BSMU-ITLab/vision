@@ -86,7 +86,7 @@ class ImageLayerView(QObject):
             self.opacity_updated.emit()
 
     @property
-    def image(self) -> FlatImage:
+    def image(self) -> Image:
         return self._image_layer.image
 
     @property
@@ -113,7 +113,7 @@ class ImageLayerView(QObject):
     def displayed_image(self):
         if self._displayed_qimage_cache is None:
             if self.image_view.is_indexed:
-                displayed_rgba_pixels = self._image_view.colored_premultiplied_array
+                displayed_rgba_pixels = self.image_view.colored_premultiplied_array
             else:
                 # displayed_rgba_pixels = image_converter.converted_to_normalized_uint8(self.image.array)
                 # displayed_rgba_pixels = image_converter.converted_to_rgba(displayed_rgba_pixels)
@@ -135,7 +135,14 @@ class ImageLayerView(QObject):
 
     def _on_layer_image_updated(self, image: Image):
         print('ImageLayerView _on_layer_image_updated (image array updated or layer image changed)')
+        self._update_image_view()
+
+    def _update_image_view(self):
         self._displayed_qimage_cache = None
+        self._image_view = self._create_image_view()
+        if self._image_view.n_channels == 1 and not self._image_view.is_indexed:
+            self.intensity_windowing = IntensityWindowing(self._image_view.array)
+            self._image_view.array = self.intensity_windowing.windowing_applied()
         self.image_view_updated.emit(self.image_view)
 
 
@@ -250,8 +257,6 @@ class LayeredImageViewer(DataViewer):
 
     def __init__(self, data: LayeredImage = None, zoomable: bool = True):
         super().__init__(data)
-
-        print('FlatImageViewer __init__')
 
         self.layered_image_graphics_object = _LayeredImageGraphicsObject()
         self.layered_image_graphics_object.active_layer_view_changed.connect(

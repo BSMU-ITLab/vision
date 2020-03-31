@@ -29,11 +29,14 @@ class FileLoadingManager(QObject):
 
     def load_file(self, path: Path, **kwargs) -> Optional[Data]:
         print('File loader: load_file')
-        format_loader_cls = self._loader_cls(path)
-        if format_loader_cls is None:
-            return None
-        format_loader = format_loader_cls()
-        data = format_loader.load_file(path, **kwargs)
+        if path.exists():
+            format_loader_cls = self._loader_cls(path)
+            if format_loader_cls is None:
+                return None
+            format_loader = format_loader_cls()
+            data = format_loader.load_file(path, **kwargs)
+        else:
+            data = None
         self.file_loaded.emit(data)
         return data
 

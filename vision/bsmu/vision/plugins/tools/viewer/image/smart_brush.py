@@ -98,7 +98,7 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         col = int(round(col_f))
 
         # Erase old tool mask
-        self.tool_mask.array.fill(0)
+        self.tool_mask.array.fill(self.tool_background_class)
 
         rr, cc = skimage.draw.ellipse(  # we can use rounded row, col and radii,
             # but float values give more precise resulting ellipse indexes
@@ -144,7 +144,6 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
 
         tool_mask_circle_pixels = self.tool_mask.array[rr, cc]
         tool_mask_circle_pixels[label == painted_cluster_label] = self.tool_foreground_class
-        tool_mask_circle_pixels[label != painted_cluster_label] = self.tool_background_class
         self.tool_mask.array[rr, cc] = tool_mask_circle_pixels
 
         if self.paint_central_pixel_cluster and self.paint_connected_component:

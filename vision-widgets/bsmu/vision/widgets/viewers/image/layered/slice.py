@@ -93,8 +93,10 @@ class VolumeSliceImageViewer(LayeredImageViewer):
 
     def show_next_slice(self):
         for layer_view in self.layer_views:
-            layer_view.show_next_slice()
+            if isinstance(layer_view, VolumeSliceImageLayerView):
+                layer_view.show_next_slice()
 
     def show_prev_slice(self):
         for layer_view in self.layer_views:
-            layer_view.show_prev_slice()
+            if isinstance(layer_view, VolumeSliceImageLayerView):
+                layer_view.show_prev_slice()

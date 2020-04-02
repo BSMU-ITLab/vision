@@ -17,10 +17,13 @@ from bsmu.vision_core.image.layered import ImageLayer, LayeredImage
 class IntensityWindowing:
     def __init__(self, pixels: np.ndarray, window_width: Optional[float] = None, window_level: Optional[float] = None):
         self.pixels = pixels
+        # Use explicit conversion from numpy type (e.g. np.uint8) to int, to prevent possible overflow
+        pixels_min = int(pixels.min())
+        pixels_max = int(pixels.max())
         self.window_width = window_width if window_width is not None else \
-            self.pixels.max() - self.pixels.min() + 1
+            pixels_max - pixels_min + 1
         self.window_level = window_level if window_level is not None else \
-            (self.pixels.max() + self.pixels.min() + 1) / 2
+            (pixels_max + pixels_min + 1) / 2
 
     def windowing_applied(self) -> np.ndarray:
         #  https://github.com/dicompyler/dicompyler-core/blob/master/dicompylercore/dicomparser.py

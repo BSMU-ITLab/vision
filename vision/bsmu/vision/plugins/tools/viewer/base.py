@@ -92,8 +92,8 @@ class LayeredImageViewerTool(ViewerTool):
         self.mask_palette = None
         self.tool_mask_palette = None
 
-    def create_nonexistent_layer_with_zeros_mask(
-            self, layers_properties, layer_key: str, name_property_key: str, palette: Palette) -> _ImageItemLayer:
+    def create_nonexistent_layer_with_zeros_mask(self, layers_properties, layer_key: str, name_property_key: str,
+                                                 image: Image, palette: Palette) -> _ImageItemLayer:
         layer_properties = layers_properties[layer_key]
         layer_name = layer_properties[name_property_key]
         layer = self.viewer.layer_by_name(layer_name)
@@ -101,7 +101,7 @@ class LayeredImageViewerTool(ViewerTool):
         if layer is None:
             # Create and add the layer
             print('CREATE', layer_name)
-            layer_image = FlatImage.zeros_mask_like(self.image, palette=palette)
+            layer_image = image.zeros_mask(palette=palette)
             layer_opacity = layer_properties.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
             layer = self.viewer.add_layer_from_image(layer_image, layer_name)
             self.viewer.layer_view_by_model(layer).opacity = layer_opacity
@@ -131,12 +131,12 @@ class LayeredImageViewerTool(ViewerTool):
         self.image_layer_view.image_layer.image_updated.connect(self._on_layer_image_updated)
 
         self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            layers_properties, 'mask', NAME_PROPERTY_KEY, self.mask_palette)
+            layers_properties, 'mask', NAME_PROPERTY_KEY, self.image_layer_view.image, self.mask_palette)
         self.mask = self.viewer.layer_view_by_model(self.mask_layer).flat_image
         self.mask_layer.image_updated.connect(self._update_masks)
 
         self.tool_mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            layers_properties, 'tool_mask', NAME_PROPERTY_KEY, self.tool_mask_palette)
+            layers_properties, 'tool_mask', NAME_PROPERTY_KEY, self.image, self.tool_mask_palette)
         self.tool_mask = self.tool_mask_layer.image
 
         self.viewer.print_layers()

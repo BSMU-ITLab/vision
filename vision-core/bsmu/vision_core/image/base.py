@@ -27,13 +27,14 @@ class SpatialAttrs:
 
 
 class Image(Data):
+    n_dims = None  # Number of dimensions excluding channel dimension (2 for FlatImage, 3 for VolumeImage)
+
     pixels_modified = Signal()
 
-    def __init__(self, n_dims: int, array: ndarray = None, palette: Palette = None, path: Path = None,
+    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None,
                  spatial: SpatialAttrs = None):
         super().__init__(path)
 
-        self.n_dims = n_dims  # Number of dimensions excluding channel dimension (2 for FlatImage, 3 for VolumeImage)
         self.array = array
         self._palette = palette
         self.spatial = spatial or SpatialAttrs.default_for_ndim(self.n_dims)
@@ -41,16 +42,19 @@ class Image(Data):
         self._check_array_palette_matching()
 
     @classmethod
-    def zeros_like(cls, other_image: Image, create_mask: bool = False, palette: Palette = None):
-        pixels = np.zeros(other_image.array.shape[:2], dtype=MASK_TYPE) if create_mask \
+    def zeros_like(cls, other_image: Image, create_mask: bool = False, palette: Palette = None) -> Image:
+        pixels = np.zeros(other_image.array.shape[:cls.n_dims], dtype=MASK_TYPE) if create_mask \
             else np.zeros_like(other_image.array)
         palette = palette or other_image.palette  # TODO: check, maybe we need copy of |other_image.palette|
         spatial = other_image.spatial  # TODO: check, maybe we need copy of |other_image.spatial|
         return cls(pixels, palette, spatial=spatial)
 
     @classmethod
-    def zeros_mask_like(cls, other_image: Image, palette: Palette = None):
+    def zeros_mask_like(cls, other_image: Image, palette: Palette = None) -> Image:
         return cls.zeros_like(other_image, create_mask=True, palette=palette)
+
+    def zeros_mask(self, palette: Palette = None) -> Image:
+        return self.zeros_mask_like(self, palette=palette)
 
     def emit_pixels_modified(self):
         self.pixels_modified.emit()
@@ -102,13 +106,17 @@ class Image(Data):
 
 
 class FlatImage(Image):
+    n_dims = 2
+
     def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
-        super().__init__(2, array, palette, path, spatial)
+        super().__init__(array, palette, path, spatial)
 
 
 class VolumeImage(Image):
+    n_dims = 3
+
     def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
-        super().__init__(3, array, palette, path, spatial)
+        super().__init__(array, palette, path, spatial)
 
     def slice_pixels(self, plane_axis: PlaneAxis, slice_number: int) -> np.ndarray:
         # Do not use np.take, because that will copy data

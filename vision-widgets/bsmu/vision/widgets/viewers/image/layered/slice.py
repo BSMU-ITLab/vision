@@ -18,19 +18,28 @@ class VolumeSliceImageLayerView(ImageLayerView):
         super().__init__(image_layer, visible, opacity)
 
         self.plane_axis = plane_axis
-        self.slice_number = slice_number
+        self._slice_number = slice_number
 
         self._flat_image_cache = None
 
         self._update_image_view()
 
+    @property
+    def slice_number(self) -> int:
+        return self._slice_number
+
+    @slice_number.setter
+    def slice_number(self, value: int):
+        if self._slice_number != value:
+            self._slice_number = value
+            self._update_image_view()
+
     def show_next_slice(self):
-        self.slice_number += 1
-        self._update_image_view()
+        max_slice_number = self.image.array.shape[self.plane_axis] - 1
+        self.slice_number = min(max_slice_number, self.slice_number + 1)
 
     def show_prev_slice(self):
-        self.slice_number -= 1
-        self._update_image_view()
+        self.slice_number = max(0, self.slice_number - 1)
 
     @property
     def flat_image(self) -> FlatImage:

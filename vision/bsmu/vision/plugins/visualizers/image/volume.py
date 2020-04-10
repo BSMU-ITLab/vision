@@ -19,10 +19,11 @@ class VolumeImageVisualizer(DataVisualizer):
     def _visualize_data(self, data: VolumeImage):
         print('visualize volume image')
 
+        layered_image = LayeredImage()
+        layered_image.add_layer_from_image(data, name=data.dir_name)
+
         viewer_sub_windows = []
         for plane_axis in PlaneAxis:
-            layered_image = LayeredImage()
-            layered_image.add_layer_from_image(data, name=data.dir_name)
             image_viewer = VolumeSliceImageViewer(plane_axis, None, layered_image)
             sub_window = VolumeSliceImageViewerSubWindow(image_viewer)
             self.mdi.addSubWindow(sub_window)

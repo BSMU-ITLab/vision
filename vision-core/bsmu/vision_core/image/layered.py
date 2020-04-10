@@ -12,6 +12,7 @@ class ImageLayer(QObject):
     max_id = 0
 
     image_updated = Signal(Image)
+    image_pixels_modified = Signal()
 
     def __init__(self, image: Image, name: str = ''):
         super().__init__()
@@ -54,7 +55,7 @@ class ImageLayer(QObject):
                 if self._image.path is not None:
                     self.path = self._image.path.parent
                 self.palette = self._image.palette
-                self._image.pixels_modified.connect(self._on_image_updated)
+                self._image.pixels_modified.connect(self.image_pixels_modified)
 
     def _on_image_updated(self):
         self.image_updated.emit(self.image)

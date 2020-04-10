@@ -15,8 +15,12 @@ class FileDropperPlugin(Plugin):
         file_loading_manager_plugin = app.enable_plugin('bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin')
         data_visualization_manager_plugin = app.enable_plugin(
             'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin')
+        post_load_conversion_manager = app.enable_plugin(
+            'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin')\
+            .post_load_conversion_manager
 
         self.file_dropper = FileDropper(file_loading_manager_plugin.file_loading_manager,
+                                        post_load_conversion_manager,
                                         data_visualization_manager_plugin.data_visualization_manager)
 
     def _enable(self):
@@ -28,10 +32,13 @@ class FileDropperPlugin(Plugin):
 
 
 class FileDropper(QObject):
-    def __init__(self, file_loading_manager: FileLoadingManager, visualization_manager: DataVisualizationManager):
+    def __init__(self, file_loading_manager: FileLoadingManager,
+                 post_load_conversion_manager: PostLoadConversionManager,
+                 visualization_manager: DataVisualizationManager):
         super().__init__()
 
         self.file_loading_manager = file_loading_manager
+        self.post_load_conversion_manager = post_load_conversion_manager
         self.visualization_manager = visualization_manager
 
         self.dragged_loadable_file_paths = []
@@ -61,4 +68,5 @@ class FileDropper(QObject):
         print('drop', self.dragged_loadable_file_paths)
         for file_path in self.dragged_loadable_file_paths:
             data = self.file_loading_manager.load_file(file_path)
+            data = self.post_load_conversion_manager.convert_data(data)
             self.visualization_manager.visualize_data(data)

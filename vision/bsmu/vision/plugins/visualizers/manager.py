@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide2.QtCore import QObject, Signal
 
 from bsmu.vision.app.plugin import Plugin
+from bsmu.vision_core.data import Data
 
 
 class DataVisualizationManagerPlugin(Plugin):
@@ -18,7 +19,7 @@ class DataVisualizationManagerPlugin(Plugin):
 
 
 class DataVisualizationManager(QObject):
-    data_visualized = Signal(list)  # List[DataViewerSubWindow]
+    data_visualized = Signal(Data, list)  # (Data, List[DataViewerSubWindow])
 
     def __init__(self, data_visualizer_registry: DataVisualizerRegistry, mdi: Mdi):
         super().__init__()
@@ -35,4 +36,4 @@ class DataVisualizationManager(QObject):
         if visualizer_cls is not None:
             visualizer = visualizer_cls(self.mdi)
             data_viewer_sub_windows = visualizer.visualize_data(data)
-            self.data_visualized.emit(data_viewer_sub_windows)
+            self.data_visualized.emit(data, data_viewer_sub_windows)

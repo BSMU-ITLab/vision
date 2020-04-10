@@ -43,7 +43,7 @@ class VolumeSliceImageLayerView(ImageLayerView):
 
     @property
     def flat_image(self) -> FlatImage:
-        if self._flat_image_cache is None:
+        if self._flat_image_cache is None and self.image is not None:
             slice_pixels = self.slice_pixels()
 
             # slice_pixels = np.ascontiguousarray(slice_pixels, dtype=np.uint8)
@@ -65,6 +65,12 @@ class VolumeSliceImageLayerView(ImageLayerView):
 
     def _create_image_view(self) -> FlatImage:
         return self.flat_image
+
+    def _on_layer_image_updated(self, image: Image):
+        print('layer lll', self.image_layer.name)
+        if self.image is not None:
+            self._slice_number = self.image.center_slice_number(self.plane_axis)
+        super()._on_layer_image_updated(image)
 
     def _update_image_view(self):
         self._flat_image_cache = None

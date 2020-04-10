@@ -50,6 +50,7 @@ class ImageLayerView(QObject):
 
         self._image_layer = image_layer
         self._image_layer.image_updated.connect(self._on_layer_image_updated)
+        self._image_layer.image_pixels_modified.connect(self._update_image_view)
         self._visible = visible
         self._opacity = opacity
 
@@ -143,7 +144,7 @@ class ImageLayerView(QObject):
     def _update_image_view(self):
         self._displayed_qimage_cache = None
         self._image_view = self._create_image_view()
-        if self._image_view.n_channels == 1 and not self._image_view.is_indexed:
+        if self._image_view is not None and self._image_view.n_channels == 1 and not self._image_view.is_indexed:
             self.intensity_windowing = IntensityWindowing(self._image_view.array)
             self._image_view.array = self.intensity_windowing.windowing_applied()
         self.image_view_updated.emit(self.image_view)
@@ -252,6 +253,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
                 painter.drawImage(QPointF(image_view_origin[1], image_view_origin[0]), layer_view.displayed_image)
 
     def _on_layer_image_view_updated(self, image_view: FlatImage):
+        print('UPDATE', image_view)
         self.update()
 
 
@@ -360,3 +362,7 @@ class LayeredImageViewer(DataViewer):
 
     def print_layers(self):
         self.data.print_layers()
+
+    def print_layer_views(self):
+        for index, layer_view in enumerate(self.layer_views):
+            print(f'Layer {index}: {layer_view.name} opacity={layer_view.opacity}')

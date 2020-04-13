@@ -35,8 +35,10 @@ class VolumeSliceImageLayerView(ImageLayerView):
             self._update_image_view()
 
     def show_next_slice(self):
+        print('prev', self.slice_number)
         max_slice_number = self.image.array.shape[self.plane_axis] - 1
         self.slice_number = min(max_slice_number, self.slice_number + 1)
+        print('show_next_slice', self.name, self.slice_number)
 
     def show_prev_slice(self):
         self.slice_number = max(0, self.slice_number - 1)
@@ -44,6 +46,7 @@ class VolumeSliceImageLayerView(ImageLayerView):
     @property
     def flat_image(self) -> FlatImage:
         if self._flat_image_cache is None and self.image is not None:
+            print('update flat_image', self.plane_axis, self.name, self.slice_number)
             slice_pixels = self.slice_pixels()
 
             # slice_pixels = np.ascontiguousarray(slice_pixels, dtype=np.uint8)
@@ -61,18 +64,21 @@ class VolumeSliceImageLayerView(ImageLayerView):
             # |flat_image| contains pixel array view (not a copy),
             # so if we change its pixels, the pixels of image will be changed too
             self._flat_image_cache.pixels_modified.connect(self.image.pixels_modified)
+        print('www', self.name, self._flat_image_cache)
         return self._flat_image_cache
 
     def _create_image_view(self) -> FlatImage:
         return self.flat_image
 
     def _on_layer_image_updated(self, image: Image):
-        print('layer lll', self.image_layer.name)
+        print('layer lll', self.image_layer.name, self.plane_axis)
         if self.image is not None:
             self._slice_number = self.image.center_slice_number(self.plane_axis)
+            print('SET NEW SLICE NUMBER', self._slice_number)
         super()._on_layer_image_updated(image)
 
     def _update_image_view(self):
+        print('self._flat_image_cache = None')
         self._flat_image_cache = None
         super()._update_image_view()
 

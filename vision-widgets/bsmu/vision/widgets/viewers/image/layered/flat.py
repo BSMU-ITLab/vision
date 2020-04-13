@@ -10,6 +10,8 @@ class FlatImageLayerView(ImageLayerView):
 
         self._update_image_view()
 
+        self.slice_number = None
+
     @property
     def flat_image(self) -> FlatImage:
         return self.image_layer.image

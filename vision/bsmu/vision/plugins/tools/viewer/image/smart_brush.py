@@ -98,7 +98,7 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         col = int(round(col_f))
 
         # Erase old tool mask
-        print('DRAW')
+        print('DRAW', self.tool_mask.array.shape, self.mask.array.shape)
         self.tool_mask.array.fill(self.tool_background_class)
 
         rr, cc = skimage.draw.ellipse(  # we can use rounded row, col and radii,
@@ -159,7 +159,7 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
             self.mask.emit_pixels_modified()
 
         self.tool_mask.emit_pixels_modified()
-        print('EMIT')
+        print('EMIT', np.unique(self.tool_mask.array), self.tool_mask)
 
     def erase_region(self, rr, cc):
         self.tool_mask.array[rr, cc] = self.tool_eraser_class

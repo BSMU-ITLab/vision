@@ -138,15 +138,18 @@ class ImageLayerView(QObject):
         return self._displayed_qimage_cache
 
     def _on_layer_image_updated(self, image: Image):
+        print('ON_LAYER_IMAGE_UPDATED')
         print('ImageLayerView _on_layer_image_updated (image array updated or layer image changed)')
         self._update_image_view()
 
     def _update_image_view(self):
+        print('view __update_image_view')
         self._displayed_qimage_cache = None
         self._image_view = self._create_image_view()
         if self._image_view is not None and self._image_view.n_channels == 1 and not self._image_view.is_indexed:
             self.intensity_windowing = IntensityWindowing(self._image_view.array)
             self._image_view.array = self.intensity_windowing.windowing_applied()
+        print('LLLLLLLLL', self.name, np.unique(self._image_view.array))
         self.image_view_updated.emit(self.image_view)
 
 

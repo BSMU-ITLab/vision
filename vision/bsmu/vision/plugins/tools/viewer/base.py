@@ -131,25 +131,22 @@ class LayeredImageViewerTool(ViewerTool):
                     self.image_layer_view = self.viewer.layer_views[image_layer_number]
                 else:
                     assert False, f'Unknown image layer properties: {image_layer_properties}'
-###        self.image = self.image_layer_view and self.image_layer_view.flat_image
+
         self.image_layer_view.image_layer.image_updated.connect(self._on_layer_image_updated)
+        self.image_layer_view.image_view_updated.connect(self._on_layer_image_updated)
 
         self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
             layers_properties, 'mask', NAME_PROPERTY_KEY, self.image_layer_view.image, self.mask_palette)
-###        self.mask = self.viewer.layer_view_by_model(self.mask_layer).flat_image
         self.mask_layer.image_updated.connect(self._update_masks)
 
         self.tool_mask_layer = self.create_nonexistent_layer_with_zeros_mask(
             layers_properties, 'tool_mask', NAME_PROPERTY_KEY, self.image_layer_view.image, self.tool_mask_palette)
-        # self.tool_mask = self.tool_mask_layer.image
-###        self.tool_mask = self.viewer.layer_view_by_model(self.tool_mask_layer).flat_image
 
         self._on_layer_image_updated()
 
         self.viewer.print_layer_views()
 
     def _on_layer_image_updated(self):
-###        self.image = self.image_layer_view.image
         self.image = self.image_layer_view and self.image_layer_view.flat_image
         self._update_masks()
 
@@ -159,7 +156,8 @@ class LayeredImageViewerTool(ViewerTool):
             self.mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self.mask_palette)
         self.mask = self.viewer.layer_view_by_model(self.mask_layer).flat_image
 
-        self.tool_mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self.tool_mask_layer.palette)
+        if self.tool_mask_layer.image is None:
+            self.tool_mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self.tool_mask_layer.palette)
         self.tool_mask = self.viewer.layer_view_by_model(self.tool_mask_layer).flat_image
 
     def pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:

@@ -53,7 +53,6 @@ class MdiImageLayerFileWalker(QObject):
 
     def _image_layer_file_walker(self):
         active_sub_window = self.mdi.activeSubWindow()
-        print(active_sub_window, type(active_sub_window))
         if not isinstance(active_sub_window, LayeredImageViewerSubWindow):
             return None
 
@@ -116,5 +115,4 @@ class ImageLayerFileWalker(QObject):
             # Load new image, but use palette of old image (so, if palette is not None, image will be loaded as gray)
             if layer.path is not None:
                 file_path = layer.path / next_file_name
-                print('file_path', file_path, layer.name)
                 layer.image = self.file_loading_manager.load_file(file_path, palette=layer.palette)

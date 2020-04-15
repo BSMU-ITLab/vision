@@ -21,8 +21,6 @@ class FileLoaderMeta(abc.ABCMeta, type(QObject)):
     _FORMATS = ()
 
     def __new__(mcls, name, bases, namespace):
-        print('Meta new')  #%
-        print(type(QObject))  #%
         cls = super().__new__(mcls, name, bases, namespace)
 
         if not inspect.isabstract(cls) and not cls.formats:

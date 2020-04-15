@@ -117,10 +117,7 @@ class LayeredImageViewerTool(ViewerTool):
 
         if layer is None:
             # Create and add the layer
-            print('CREATE', layer_name)
-            print('iii', type(image))
             layer_image = image.zeros_mask(palette=palette)
-            print('yyy', type(layer_image))
             layer = self.viewer.add_layer_from_image(layer_image, layer_name)
 
         layer_opacity = layer_properties.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
@@ -129,7 +126,6 @@ class LayeredImageViewerTool(ViewerTool):
         return layer
 
     def activate(self):
-        print('activate', self.viewer)
         super().activate()
 
         self.layers_properties = self.config.value('layers')
@@ -156,9 +152,6 @@ class LayeredImageViewerTool(ViewerTool):
         self.viewer.print_layer_views()
 
     def _on_layer_image_updated(self):
-        print('yyyyyyyyyy')
-###        self.image = self.image_layer_view and self.image_layer_view.flat_image
-
         self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
             self.layers_properties, 'mask', LAYER_NAME_PROPERTY_KEY,
             self.image_layer_view.image, self.mask_palette)
@@ -171,20 +164,13 @@ class LayeredImageViewerTool(ViewerTool):
         self._update_masks()
 
     def _update_masks(self):
-#        print('_UPDATE MMASKS', self.viewer.plane_axis)
         if self.mask_layer.image is None:
-            print('NNNN')
             self.mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self.mask_palette)
             self.viewer.layer_view_by_model(self.mask_layer).slice_number = self.image_layer_view.slice_number
-###        self.mask = self.viewer.layer_view_by_model(self.mask_layer).flat_image
 
-        # if self.tool_mask_layer.image is None:
-        #     print('NNNN 222')
         self.tool_mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self.tool_mask_layer.palette)
-        self.viewer.layer_view_by_model(self.tool_mask_layer).slice_number = self.viewer.layer_view_by_model(self.mask_layer).slice_number
-###        self.viewer.layer_view_by_model(self.tool_mask_layer).slice_number = self.image_layer_view.slice_number
-        print('tool_mask_layer.image changedd')
-###        self.tool_mask = self.viewer.layer_view_by_model(self.tool_mask_layer).flat_image
+        self.viewer.layer_view_by_model(self.tool_mask_layer).slice_number = \
+            self.viewer.layer_view_by_model(self.mask_layer).slice_number
 
     def pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
         return self.viewer.viewport_pos_to_layered_image_item_pos(viewport_pos)

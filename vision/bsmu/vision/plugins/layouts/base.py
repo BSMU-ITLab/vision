@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import List
 
-from PySide2.QtCore import QObject, QRect
+import numpy as np
+from PySide2.QtCore import QObject
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
@@ -47,25 +48,14 @@ class MdiLayout(QObject):
             other_sub_windows = [sub_window for sub_window in sub_windows
                                  if sub_window.viewer != best_resolution_viewer]
 
-            best_resolution_sub_window_rect = QRect(mdi_rect)
-            best_resolution_sub_window_rect.setWidth(mdi_rect.width() * 0.65)
-            best_resolution_sub_window.setGeometry(best_resolution_sub_window_rect)
+            x_border_anchor = 0.65
+            y_border_anchor = 0.5
+            best_resolution_sub_window.layout_anchors = np.array([[0, 0], [x_border_anchor, 1]])
+            other_sub_windows[0].layout_anchors = np.array([[x_border_anchor, 0], [1, y_border_anchor]])
+            other_sub_windows[1].layout_anchors = np.array([[x_border_anchor, y_border_anchor], [1, 1]])
 
-            top_right_sub_window = other_sub_windows[0]
-            bottom_right_sub_window = other_sub_windows[1]
-
-            right_sub_windows_x = best_resolution_sub_window_rect.width()
-            right_sub_windows_width = mdi_rect.width() - right_sub_windows_x
-            top_right_sub_window_rect = QRect(right_sub_windows_x, mdi_rect.y(),
-                                              right_sub_windows_width, mdi_rect.height() * 0.5)
-            top_right_sub_window.setGeometry(top_right_sub_window_rect)
-
-            bottom_right_sub_window_y = top_right_sub_window.height()
-            bottom_right_sub_window_height = mdi_rect.height() - bottom_right_sub_window_y
-            bottom_right_sub_window_rect = QRect(right_sub_windows_x, bottom_right_sub_window_y,
-                                                 right_sub_windows_width, bottom_right_sub_window_height)
-            bottom_right_sub_window.setGeometry(bottom_right_sub_window_rect)
-
+            for sub_window in sub_windows:
+                sub_window.lay_out_to_anchors()
 
     def find_best_resolution_viewer(self, layered_image_viewers: List[LayeredImageViewer]):
         best_resolution_viewer = None

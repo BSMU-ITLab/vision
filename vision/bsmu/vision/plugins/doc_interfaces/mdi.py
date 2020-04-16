@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from PySide2.QtCore import Signal
+from PySide2.QtGui import QResizeEvent
 from PySide2.QtWidgets import QMdiArea
 
 from bsmu.vision.app.plugin import Plugin
@@ -21,5 +23,11 @@ class MdiPlugin(Plugin):
 
 
 class Mdi(QMdiArea):
+    resized = Signal(QResizeEvent)
+
     def __init__(self):
         super().__init__()
+
+    def resizeEvent(self, resize_event: QResizeEvent):
+        super().resizeEvent(resize_event)
+        self.resized.emit(resize_event)

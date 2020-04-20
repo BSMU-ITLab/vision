@@ -8,6 +8,8 @@ from PySide2.QtCore import QObject, Qt
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import MenuType
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
+from bsmu.vision.widgets.viewers.transfer_functions.color import ColorTransferFunctionViewer
+from bsmu.vision_core.transfer_functions.color import ColorTransferFunction, ColorTransferFunctionPoint
 from bsmu.vision_core.image.base import VolumeImage
 from bsmu.vision_core.palette import Palette
 
@@ -30,8 +32,19 @@ class ColorContrastPlugin(Plugin):
             MenuType.ALGORITHMS, 'Color Contrast', self.color_contrast.create_colored_image,
             Qt.CTRL + Qt.Key_H)
 
+        self.show_chart()
+
     def _disable(self):
         raise NotImplementedError
+
+    def show_chart(self):
+        color_transfer_function = ColorTransferFunction()
+        color_transfer_function.add_point_from_x_color(0, np.array([255, 0, 0, 255]))
+        color_transfer_function.add_point_from_x_color(5, np.array([0, 255, 0, 255]))
+        color_transfer_function.add_point_from_x_color(10, np.array([0, 0, 255, 255]))
+        self.w = ColorTransferFunctionViewer(color_transfer_function)
+        self.w.show()
+        self.w.setGeometry(800, 500, 700, 500)
 
 
 class ColorContrast(QObject):

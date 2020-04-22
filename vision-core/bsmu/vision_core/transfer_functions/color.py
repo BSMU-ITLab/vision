@@ -1,15 +1,47 @@
 from __future__ import annotations
 
 import numpy as np
-from PySide2.QtCore import QObject
+from PySide2.QtCore import QObject, Signal
+from PySide2.QtGui import QColor
 
 
 class ColorTransferFunctionPoint(QObject):
+    x_changed = Signal(float)
+    color_array_changed = Signal(np.ndarray)
+
     def __init__(self, x: float, color_array: np.ndarray):
         super().__init__()
 
-        self.x = x
-        self.color_array = color_array
+        self._x = x
+        self._color_array = color_array
+
+    @property
+    def x(self) -> float:
+        return self._x
+
+    @x.setter
+    def x(self, value: float):
+        if self._x != value:
+            self._x = value
+            self.x_changed.emit(self._x)
+
+    @property
+    def color_array(self) -> np.ndarray:
+        return self._color_array
+
+    @color_array.setter
+    def color_array(self, value: np.ndarray):
+        if (self._color_array != value).any():
+            self._color_array = value
+            self.color_array_changed.emit(self._color_array)
+
+    @property
+    def color(self) -> QColor:
+        return QColor(*self.color_array)
+
+    @color.setter
+    def color(self, value: QColor):
+        self.color_array = np.array([value.red(), value.green(), value.blue(), value.alpha()])
 
 
 class ColorTransferFunction(QObject):

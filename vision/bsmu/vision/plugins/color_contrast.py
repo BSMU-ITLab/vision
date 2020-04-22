@@ -40,8 +40,9 @@ class ColorContrastPlugin(Plugin):
     def show_chart(self):
         color_transfer_function = ColorTransferFunction()
         color_transfer_function.add_point_from_x_color(0, np.array([255, 0, 0, 255]))
-        color_transfer_function.add_point_from_x_color(5, np.array([0, 255, 0, 255]))
-        color_transfer_function.add_point_from_x_color(10, np.array([0, 0, 255, 255]))
+        color_transfer_function.add_point_from_x_color(5, np.array([0, 255, 0, 50]))
+        color_transfer_function.add_point_from_x_color(15, np.array([0, 255, 0, 255]))
+        color_transfer_function.add_point_from_x_color(20, np.array([0, 0, 255, 255]))
         self.w = ColorTransferFunctionViewer(color_transfer_function)
         self.w.show()
         self.w.setGeometry(800, 500, 900, 300)

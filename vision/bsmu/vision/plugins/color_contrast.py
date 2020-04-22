@@ -44,7 +44,7 @@ class ColorContrastPlugin(Plugin):
         color_transfer_function.add_point_from_x_color(10, np.array([0, 0, 255, 255]))
         self.w = ColorTransferFunctionViewer(color_transfer_function)
         self.w.show()
-        self.w.setGeometry(800, 500, 700, 500)
+        self.w.setGeometry(800, 500, 900, 300)
 
 
 class ColorContrast(QObject):

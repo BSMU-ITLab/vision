@@ -60,7 +60,7 @@ class ColorTransferFunction(QObject):
         self.points.add(point)
         self.point_added.emit(point)
 
-    def add_point_from_x_color(self, x: float, color_array: np.ndarray = np.array([0, 0, 0, 255])):
+    def add_point_from_x_color(self, x: float, color_array: np.ndarray = np.full((4,), 255)):
         self.add_point(ColorTransferFunctionPoint(x, color_array))
 
     def point_before(self, point: ColorTransferFunctionPoint) -> ColorTransferFunctionPoint:

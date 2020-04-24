@@ -9,6 +9,7 @@ from PySide2.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGridLayo
 
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision_core.transfer_functions.color import ColorTransferFunction
+from sortedcontainers import SortedList
 
 
 def pairwise(iterable):
@@ -16,6 +17,9 @@ def pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
     return zip(a, b)
+
+
+MAX_POINT_VIEW_RADIUS = 15
 
 
 class ColorTransferFunctionPointView(QGraphicsEllipseItem):
@@ -52,7 +56,8 @@ class ColorTransferFunctionPointView(QGraphicsEllipseItem):
         self.setBrush(self.point.color)
 
     def update_size(self):
-        self.radius = min(self.viewer.chart_rect_f.width() / 20, self.viewer.chart_rect_f.height() / 4)
+        self.radius = min(self.viewer.chart_rect_f.width() / 20, self.viewer.chart_rect_f.height() / 4,
+                          MAX_POINT_VIEW_RADIUS)
         radius_point = QPointF(self.radius, self.radius)
         self.setRect(QRectF(-radius_point, radius_point))
 
@@ -164,6 +169,9 @@ class ColorTransferFunctionIntervalView(QGraphicsRectItem):
         bottom_right_interval_pos = self.chart.mapToPosition(QPointF(self.end_point.x, 0))
         self.setRect(QRectF(top_left_interval_pos, bottom_right_interval_pos))
 
+    def __lt__(self, other):
+        return self.begin_point.x < other.begin_point.x
+
 
 class ColorTransferFunctionChart(QtCharts.QChart):
     def __init__(self, data: ColorTransferFunction = None):
@@ -209,7 +217,7 @@ class ColorTransferFunctionViewer(DataViewer):
 
         self.scene = self.chart_view.scene()
 
-        self._interval_views = []
+        self._interval_views = SortedList()
         self._point_views = []
         if self.data is not None:
             self._add_interval_views()
@@ -233,7 +241,7 @@ class ColorTransferFunctionViewer(DataViewer):
         interval_view = ColorTransferFunctionIntervalView(self, begin_point, end_point, self.chart)
         interval_view.setZValue(10)  # To display item on top of chart grid
         self.scene.addItem(interval_view)
-        self._interval_views.append(interval_view)
+        self._interval_views.add(interval_view)
         return interval_view
 
     def _add_point_views(self):
@@ -255,15 +263,22 @@ class ColorTransferFunctionViewer(DataViewer):
     def _on_point_added(self, point: ColorTransferFunctionPoint):
         self._add_point_view(point)
 
-        # Update interval views
-        before_point_index = self.data.points.index(point) - 1
-        before_point_interval = self._interval_views[before_point_index]
-        before_point_interval.end_point = point
-        before_point_interval.update()
-        print('bef', self.data.points[before_point_index].x)
+        # Update existed interval views
+        point_index = self.data.points.index(point)
+        if 0 < point_index < len(self.data.points) - 1:  # Only if point was added between other existed points
+            # Exclude cases, where point was added before first and after last points
+            before_point_index = point_index - 1
+            before_point_interval = self._interval_views[before_point_index]
+            before_point_interval.end_point = point
+            before_point_interval.update()
+
         # Add new interval view
-        new_interval_view = self._add_interval_view(point, self.data.point_after(point))
-        new_interval_view.update()
+        if point_index == len(self.data.points) - 1:  # If was added last point (point after last interval)
+            new_interval_view = self._add_interval_view(self.data.point_before(point), point)
+            new_interval_view.update()
+        else:
+            new_interval_view = self._add_interval_view(point, self.data.point_after(point))
+            new_interval_view.update()
 
     def resizeEvent(self, resize_event: QResizeEvent):
         self._update_chart_size()

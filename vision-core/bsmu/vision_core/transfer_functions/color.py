@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 from PySide2.QtCore import QObject, Signal
 from PySide2.QtGui import QColor
+from sortedcontainers import SortedList
 
 
 class ColorTransferFunctionPoint(QObject):
@@ -43,15 +44,27 @@ class ColorTransferFunctionPoint(QObject):
     def color(self, value: QColor):
         self.color_array = np.array([value.red(), value.green(), value.blue(), value.alpha()])
 
+    def __lt__(self, other):
+        return self.x < other.x
+
 
 class ColorTransferFunction(QObject):
+    point_added = Signal(ColorTransferFunctionPoint)
+
     def __init__(self):
         super().__init__()
 
-        self.points = []
+        self.points = SortedList()
 
     def add_point(self, point: ColorTransferFunctionPoint):
-        self.points.append(point)
+        self.points.add(point)
+        self.point_added.emit(point)
 
-    def add_point_from_x_color(self, x: float, color_array: np.ndarray):
+    def add_point_from_x_color(self, x: float, color_array: np.ndarray = np.array([0, 0, 0, 255])):
         self.add_point(ColorTransferFunctionPoint(x, color_array))
+
+    def point_before(self, point: ColorTransferFunctionPoint) -> ColorTransferFunctionPoint:
+        return self.points[self.points.index(point) - 1]
+
+    def point_after(self, point: ColorTransferFunctionPoint) -> ColorTransferFunctionPoint:
+        return self.points[self.points.index(point) + 1]

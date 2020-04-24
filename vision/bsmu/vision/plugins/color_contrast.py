@@ -32,7 +32,7 @@ class ColorContrastPlugin(Plugin):
             MenuType.ALGORITHMS, 'Color Contrast', self.color_contrast.create_colored_image,
             Qt.CTRL + Qt.Key_H)
 
-        self.show_chart()
+        # self.show_chart()
 
     def _disable(self):
         raise NotImplementedError
@@ -46,6 +46,19 @@ class ColorContrastPlugin(Plugin):
         self.w = ColorTransferFunctionViewer(color_transfer_function)
         self.w.show()
         self.w.setGeometry(800, 500, 900, 300)
+
+        # Create Palette from ColorTransferFunction
+        from scipy import interpolate
+
+        xp = [point.x for point in color_transfer_function.points]
+        fp = [point.color_array for point in color_transfer_function.points]
+        interpolator = interpolate.interp1d(xp, fp, axis=0, assume_sorted=True)
+        result = interpolator(np.linspace(0, 20))
+        print('res', result.shape, '\n', result)
+
+        palette_array = np.array(result.round(), dtype=np.uint8)
+        print('rounded', palette_array)
+        palette = Palette(palette_array)
 
 
 class ColorContrast(QObject):
@@ -124,7 +137,7 @@ class ColorContrast(QObject):
 
         # print('rgb stat', rgb.shape, rgb.min(), rgb.max(), rgb.dtype)
 
-    def create_colored_image(self):
+    def create_colored_image_3(self):
         active_sub_window = self.mdi.activeSubWindow()
         if not isinstance(active_sub_window, LayeredImageViewerSubWindow):
             return
@@ -167,6 +180,56 @@ class ColorContrast(QObject):
             print('res conv', palette_array[i])
 
         palette = Palette(palette_array)
+        indexed_image = VolumeImage(norm, palette, spatial=image.spatial)
+
+        layered_image.add_layer_from_image(indexed_image, 'colored')
+
+        # print('rgb stat', rgb.shape, rgb.min(), rgb.max(), rgb.dtype)
+
+    def create_colored_image(self):
+        active_sub_window = self.mdi.activeSubWindow()
+        if not isinstance(active_sub_window, LayeredImageViewerSubWindow):
+            return
+
+        layered_image = active_sub_window.viewer.data
+        layered_image.print_layers()
+        image = layered_image.layer_by_name('series').image
+        print('stat', image.array.shape, image.array.min(), image.array.max(), image.array.dtype)
+        print(np.unique(image.array))
+
+        discrete_color_len = 2000
+        norm = (image.array / image.array.max() * (discrete_color_len - 1)).astype(np.int)
+        print('norm stat', norm.shape, norm.min(), norm.max(), norm.dtype)
+
+        color_transfer_function = ColorTransferFunction()
+        # color_transfer_function.add_point_from_x_color(0, np.array([255, 76, 76, 255]))
+        color_transfer_function.add_point_from_x_color(0, np.array([0, 0, 0, 255]))
+        color_transfer_function.add_point_from_x_color(0.128 * discrete_color_len, np.array([255, 211, 98, 255]))
+        color_transfer_function.add_point_from_x_color(0.16 * discrete_color_len, np.array([152, 255, 108, 255]))
+        color_transfer_function.add_point_from_x_color(0.20 * discrete_color_len, np.array([8, 255, 144, 255]))
+        color_transfer_function.add_point_from_x_color(0.23 * discrete_color_len, np.array([221, 235, 255, 255]))
+        color_transfer_function.add_point_from_x_color(0.25 * discrete_color_len, np.array([119, 196, 255, 255]))
+        color_transfer_function.add_point_from_x_color(0.32 * discrete_color_len, np.array([225, 135, 255, 255]))
+        color_transfer_function.add_point_from_x_color(0.5 * discrete_color_len, np.array([120, 120, 255, 255]))
+        color_transfer_function.add_point_from_x_color(discrete_color_len - 1, np.array([0, 0, 255, 255]))
+
+        self.w = ColorTransferFunctionViewer(color_transfer_function)
+        self.w.show()
+        self.w.setGeometry(800, 500, 900, 300)
+
+        # Create Palette from ColorTransferFunction
+        from scipy import interpolate
+
+        xp = [point.x for point in color_transfer_function.points]
+        fp = [point.color_array for point in color_transfer_function.points]
+        interpolator = interpolate.interp1d(xp, fp, axis=0, assume_sorted=True)
+        result = interpolator(np.arange(discrete_color_len))
+        print('res', result.shape, '\n', result)
+
+        palette_array = np.array(result.round(), dtype=np.uint8)
+        print('rounded', palette_array)
+        palette = Palette(palette_array)
+
         indexed_image = VolumeImage(norm, palette, spatial=image.spatial)
 
         layered_image.add_layer_from_image(indexed_image, 'colored')

@@ -62,7 +62,6 @@ class ColorTransferFunctionPointView(QGraphicsEllipseItem):
         self.setRect(QRectF(-radius_point, radius_point))
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
-        print('paint', self.point.x)
         painter.setBackgroundMode(Qt.OpaqueMode)
         # painter.setBackground(Qt.white)
         painter.setBrush(self._background_brush)
@@ -237,7 +236,6 @@ class ColorTransferFunctionViewer(DataViewer):
 
     def _add_interval_view(self, begin_point: ColorTransferFunctionPoint, end_point: ColorTransferFunctionPoint) \
             -> ColorTransferFunctionIntervalView:
-        print('p:', begin_point.x, begin_point.color_array, '         --- next_p:', end_point.x, end_point.color_array)
         interval_view = ColorTransferFunctionIntervalView(self, begin_point, end_point, self.chart)
         interval_view.setZValue(10)  # To display item on top of chart grid
         self.scene.addItem(interval_view)

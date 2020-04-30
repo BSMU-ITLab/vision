@@ -14,3 +14,5 @@ plugins:
   - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
   - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
   - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
+
+  - bsmu.vision.plugins.bone_age.table_visualizer.TableVisualizerPlugin

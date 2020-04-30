@@ -13,7 +13,7 @@ class Data(QObject):
 
     @property
     def path_name(self):
-        return self.path.name
+        return '' if self.path is None else self.path.name
 
     @property
     def dir_name(self):

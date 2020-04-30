@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from PySide2.QtWidgets import QMainWindow, QMenuBar
+from enum import IntEnum
+from typing import Optional
+
+from PySide2.QtWidgets import QMainWindow, QMenuBar, QMenu
+from sortedcontainers import SortedDict
 
 from bsmu.vision.app.plugin import Plugin
-
-from enum import Enum
 
 
 class MainWindowPlugin(Plugin):
@@ -41,7 +43,7 @@ class MainWindow(QMainWindow):
         return self.menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
 
 
-class MenuType(Enum):
+class MenuType(IntEnum):
     FILE = 1
     VIEW = 2
     TOOLS = 3
@@ -53,24 +55,28 @@ class MenuBar(QMenuBar):
     def __init__(self):
         super().__init__()
 
-        self._menus = {}
+        self._menus = SortedDict()
 
-        self.add_menu(MenuType.FILE)
-        self.add_menu(MenuType.VIEW)
-        self.add_menu(MenuType.TOOLS)
-        self.add_menu(MenuType.ALGORITHMS)
-        self.add_menu(MenuType.HELP)
-        # TODO: It's better to add menus at runtime (if they needed), but we have to keep correct menus order,
-        #  using self.insertMenu instead of self.addMenu
-
-    def add_menu(self, menu_type: MenuType):
-        menu = self.addMenu(menu_type.name.title())
-        # menu.menuAction().setVisible(False) # to hide menu (while no actions)
+    def add_menu(self, menu_type: MenuType) -> QMenu:
+        menu = QMenu(menu_type.name.title())
         self._menus[menu_type] = menu
+
+        menu_index = self._menus.index(menu_type)
+        # If the menu is the last one
+        if menu_index == len(self._menus) - 1:
+            self.addMenu(menu)
+        else:
+            next_menu_index = menu_index + 1
+            next_menu = self._menus.peekitem(next_menu_index)[1]
+            self.insertMenu(next_menu.menuAction(), menu)
+
         return menu
 
-    def menu(self, menu_type: MenuType):
-        return self._menus[menu_type]
+    def menu(self, menu_type: MenuType, add_nonexistent: bool = True) -> Optional[QMenu]:
+        menu = self._menus.get(menu_type)
+        if menu is None and add_nonexistent:
+            menu = self.add_menu(menu_type)
+        return menu
 
-    def add_menu_action(self, menu_type: MenuType, action_name, method, shortcut):
+    def add_menu_action(self, menu_type: MenuType, action_name, method, shortcut) -> QAction:
         return self.menu(menu_type).addAction(action_name, method, shortcut)

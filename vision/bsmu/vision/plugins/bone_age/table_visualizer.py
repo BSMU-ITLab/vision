@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Qt, QSysInfo, Signal
-from PySide2.QtGui import QPalette, QPixmap
+from PySide2.QtCore import QObject, Qt, QSysInfo, Signal, QSize
+from PySide2.QtGui import QPalette, QPixmap, QIcon
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QCheckBox, QWidget, \
-    QHBoxLayout, QHeaderView, QLabel, QFrame, QSizePolicy
+    QHBoxLayout, QHeaderView, QLabel, QFrame, QSizePolicy, QGraphicsColorizeEffect, QPushButton, QToolButton, QVBoxLayout, QSpinBox, QSlider
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
+from bsmu.vision.widgets.combo_slider import ComboSlider, SliderBar
 from bsmu.vision_core.data import Data
 from bsmu.vision_core.image.layered import LayeredImage
 
@@ -69,25 +70,25 @@ class PatientBoneAgeJournalTable(QTableWidget):
 
         self.data = data
 
-        self.setColumnCount(4)
+        self.setColumnCount(5)
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setHorizontalHeaderLabels(['Name', 'Male', 'Age', 'Bone Age'])
+        self.setHorizontalHeaderLabels(['Name', 'Male', 'Age', 'Bone Age', 'Activation Map'])
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         if QSysInfo.windowsVersion() == QSysInfo.WV_WINDOWS10:
             # Add border under the header
             self.setStyleSheet(
                 'QHeaderView::section { '
-                'border-top:0px solid #D8D8D8; '
-                'border-left:0px solid #D8D8D8; '
-                'border-right:1px solid #D8D8D8; '
+                'border-top: 0px solid #D8D8D8; '
+                'border-left: 0px solid #D8D8D8; '
+                'border-right: 1px solid #D8D8D8; '
                 'border-bottom: 1px solid #D8D8D8; '
                 '}'
                 'QTableCornerButton::section { '
-                'border-top:0px solid #D8D8D8; '
-                'border-left:0px solid #D8D8D8; '
-                'border-right:1px solid #D8D8D8; '
+                'border-top: 0px solid #D8D8D8; '
+                'border-left: 0px solid #D8D8D8; '
+                'border-right: 1px solid #D8D8D8; '
                 'border-bottom: 1px solid #D8D8D8; '
                 '}')
             self.verticalHeader().setStyleSheet('QHeaderView::section { padding-left: 4px; }')
@@ -128,6 +129,41 @@ class PatientBoneAgeJournalTable(QTableWidget):
         self.setItem(row, 3, bone_age_item)
 
 
+        activation_map_cell_widget = QWidget()
+        # self.icon_label_2 = QLabel()
+        # self.icon_label_2.setMaximumSize(QSize(24, 32))
+        # self.icon_label_2.setScaledContents(True)
+        self.icon_pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\no-eye.svg')  # './../eye.svg')
+        # self.icon_label_2.setPixmap(self.icon_pixmap)
+
+        self.button = QPushButton(QIcon(self.icon_pixmap), '')
+        row_height = self.rowHeight(row)
+        self.button.setIconSize(QSize(row_height, row_height))
+        # self.button.setStyleSheet(
+        #     'QPushButton:pressed { '
+        #     'background-color: transparent; '
+        #     '}'
+        #     'QPushButton:checked { '
+        #     'border: 0px solid transparent; '
+        #     '}')
+        self.button.setFlat(True)
+        self.button.setCheckable(True)
+        self.button.toggled.connect(self.change_button_icon)
+
+        activation_map_cell_widget_layout = QHBoxLayout(activation_map_cell_widget)
+        activation_map_cell_widget_layout.setContentsMargins(0, 0, 0, 0)
+        # activation_map_cell_widget_layout.addWidget(self.icon_label_2)
+        activation_map_cell_widget_layout.addWidget(self.button)
+        self.setCellWidget(row, 4, activation_map_cell_widget)
+
+    def change_button_icon(self, checked: bool):
+        if checked:
+            pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\eye.svg')  # './../eye.svg')
+        else:
+            pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\no-eye.svg')  # './../eye.svg')
+        self.button.setIcon(QIcon(pixmap))
+
+
 class PatientBoneAgeJournalViewer(DataViewer):
     def __init__(self, data: PatientBoneAgeJournal = None):
         super().__init__(data)
@@ -139,6 +175,15 @@ class PatientBoneAgeJournalViewer(DataViewer):
         self.setLayout(grid_layout)
 
 
+class TestSpin(QSpinBox):
+    def __init__(self):
+        super().__init__()
+
+    def focusInEvent(self, event: QFocusEvent):
+        print("FFFFFFFFFFFFFFFFFFFFFFFFFFFOOOOCUS")
+        super().focusInEvent(event)
+
+
 class TableVisualizer(QObject):
     def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi):
         super().__init__()
@@ -147,30 +192,58 @@ class TableVisualizer(QObject):
         self.mdi = mdi
 
         self.journal = PatientBoneAgeJournal()
-        # self.journal.add_record(PatientBoneAgeRecord(None, True, 120, 125))
-        # self.journal.add_record(PatientBoneAgeRecord(None, False, 100, 110))
-        # self.journal.add_record(PatientBoneAgeRecord(None, False, 50, 51))
+        self.journal.add_record(PatientBoneAgeRecord(None, True, 120, 125))
+        self.journal.add_record(PatientBoneAgeRecord(None, False, 100, 110))
+        self.journal.add_record(PatientBoneAgeRecord(None, False, 50, 51))
 
         self.viewer = PatientBoneAgeJournalViewer(self.journal)
 
         sub_window = DataViewerSubWindow(self.viewer)
         self.mdi.addSubWindow(sub_window)
+        sub_window.setGeometry(0, 0, 600, 500)   #######
         sub_window.show()
 
-        self.icon_label = QLabel()
-        self.icon_label.setAlignment(Qt.AlignCenter)
-        self.icon_label.setFrameShape(QFrame.Box)
-        self.icon_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.icon_label.setBackgroundRole(QPalette.Base)
-        self.icon_label.setAutoFillBackground(True)
-        self.icon_label.setMinimumSize(132, 132)
-        self.icon_pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\eye.svg') #'./../eye.svg')
-        self.icon_label.setPixmap(self.icon_pixmap)
-        self.icon_label.show()
+        # self.icon_label = QLabel()
+        # self.icon_label.setAlignment(Qt.AlignCenter)
+        # self.icon_label.setFrameShape(QFrame.Box)
+        # self.icon_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # self.icon_label.setBackgroundRole(QPalette.Base)
+        # self.icon_label.setAutoFillBackground(True)
+        # self.icon_label.setMinimumSize(132, 132)
+        # self.icon_pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\eye.svg') #'./../eye.svg')
+        # self.icon_label.setPixmap(self.icon_pixmap)
+        # self.icon_label.show()
+        #
+        # self.icon_label_2 = QLabel()
+        # self.icon_label_2.setPixmap(self.icon_pixmap)
+        # self.icon_label_2.show()
 
-        self.icon_label_2 = QLabel()
-        self.icon_label_2.setPixmap(self.icon_pixmap)
-        self.icon_label_2.show()
+        self.test_widget = QWidget()
+        l = QVBoxLayout(self.test_widget)
+
+        test_w = QFrame()
+        test_w.setFrameStyle(QFrame.Box)
+        test_h_box = QHBoxLayout(test_w)
+        test_h_box.addWidget(QLabel('TEST'))
+        # test_h_box.addWidget(QPushButton('PUSH'))
+        test_h_box.addWidget(TestSpin())
+
+        spin = QSpinBox()
+        # spin.setFocusPolicy(Qt.TabFocus)
+
+        self.combo_slider = ComboSlider('Opacity', 50)
+
+        l.addWidget(test_w)
+        l.addWidget(self.combo_slider)
+        l.addWidget(spin)
+        l.addWidget(QSlider(Qt.Horizontal))
+
+        self.test_widget.show()
+        print('HHH', spin.height(), self.combo_slider.height())
+
+        # self.combo_slider.show()
+        # self.slider_bar = SliderBar()
+        # self.slider_bar.show()
 
     def visualize_bone_age_table(self, data: Data, data_viewer_sub_windows: DataViewerSubWindow):
         print('visualize_bone_age_table', type(data))

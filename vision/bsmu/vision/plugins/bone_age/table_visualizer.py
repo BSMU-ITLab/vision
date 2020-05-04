@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, Qt, QSysInfo, Signal, QSize
-from PySide2.QtGui import QPalette, QPixmap, QIcon
+from PySide2.QtGui import QPalette, QPixmap, QIcon, QColor
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QCheckBox, QWidget, \
-    QHBoxLayout, QHeaderView, QLabel, QFrame, QSizePolicy, QGraphicsColorizeEffect, QPushButton, QToolButton, QVBoxLayout, QSpinBox, QSlider
+    QHBoxLayout, QHeaderView, QLabel, QFrame, QSizePolicy, QGraphicsColorizeEffect, QPushButton, QToolButton, QVBoxLayout, QSpinBox, QSlider, QLayout
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
@@ -73,8 +73,9 @@ class PatientBoneAgeJournalTable(QTableWidget):
         self.setColumnCount(5)
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setHorizontalHeaderLabels(['Name', 'Male', 'Age', 'Bone Age', 'Activation Map'])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.setHorizontalHeaderLabels(['Name', 'Male', 'Age', 'Bone Age', 'Activation Map Visibility'])
+        # self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         if QSysInfo.windowsVersion() == QSysInfo.WV_WINDOWS10:
             # Add border under the header
@@ -130,6 +131,9 @@ class PatientBoneAgeJournalTable(QTableWidget):
 
 
         activation_map_cell_widget = QWidget()
+        # Set minimum width, else widget will go beyond the cell width (if column width is small)
+        activation_map_cell_widget.setMinimumWidth(1)
+        # activation_map_cell_widget.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Preferred)
         # self.icon_label_2 = QLabel()
         # self.icon_label_2.setMaximumSize(QSize(24, 32))
         # self.icon_label_2.setScaledContents(True)
@@ -137,8 +141,15 @@ class PatientBoneAgeJournalTable(QTableWidget):
         # self.icon_label_2.setPixmap(self.icon_pixmap)
 
         self.button = QPushButton(QIcon(self.icon_pixmap), '')
-        row_height = self.rowHeight(row)
+        row_height = self.rowHeight(row) - self.rowSpan(row, 5)
         self.button.setIconSize(QSize(row_height, row_height))
+        self.button.setStyleSheet(
+            'QPushButton { '
+            'border: 0px solid transparent; '
+            '}'
+            'QPushButton:checked { '
+            'background-color: rgb(204, 228, 247); '
+            '}')
         # self.button.setStyleSheet(
         #     'QPushButton:pressed { '
         #     'background-color: transparent; '
@@ -152,9 +163,47 @@ class PatientBoneAgeJournalTable(QTableWidget):
 
         activation_map_cell_widget_layout = QHBoxLayout(activation_map_cell_widget)
         activation_map_cell_widget_layout.setContentsMargins(0, 0, 0, 0)
+        activation_map_cell_widget_layout.setSpacing(0)
         # activation_map_cell_widget_layout.addWidget(self.icon_label_2)
-        activation_map_cell_widget_layout.addWidget(self.button)
+
+
+        combo_slider = ComboSlider('Opacity', 50)
+        combo_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        # combo_slider.setMinimumWidth(1)
+        combo_slider.setFixedHeight(row_height)
+        combo_slider.setFrameStyle(QFrame.NoFrame)
+        # combo_slider.setStyleSheet('ComboSlider { border: 0px solid rgb(128, 128, 128); } ')
+        # combo_slider.setStyleSheet('ComboSlider { border: 0px solid rgb(128, 128, 128); border-left: 1px solid rgb(216, 216, 216); }')
+        combo_slider.setStyleSheet(
+            'ComboSlider { border: 0px solid rgb(128, 128, 128); border-left: 1px solid gainsboro; }')
+        # combo_slider.frame_color = QColor(Qt.red)
+        combo_slider.bar_color = QColor(204, 228, 247)
+
+
+        activation_map_cell_widget_layout.addWidget(self.button, 0, Qt.AlignRight)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.VLine)
+        line.setFrameShadow(QFrame.Sunken)
+
+        # activation_map_cell_widget_layout.addWidget(line)
+        activation_map_cell_widget_layout.addWidget(combo_slider)
+
+
         self.setCellWidget(row, 4, activation_map_cell_widget)
+
+
+        # test_w = QWidget()
+        # test_h_l = QHBoxLayout(test_w)
+        # test_h_l.setContentsMargins(0, 0, 0, 0)
+        # test_h_l.setSpacing(0)
+        # test_h_l.addWidget(QSpinBox())
+        # test_h_l.addWidget(QSpinBox())
+        # self.setCellWidget(row, 5, test_w)
+
+        # test_item = QTableWidgetItem('TEST')
+        # self.setItem(row, 5, test_item)
+
 
     def change_button_icon(self, checked: bool):
         if checked:

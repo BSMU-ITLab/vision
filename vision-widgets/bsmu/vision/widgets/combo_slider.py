@@ -11,7 +11,9 @@ if TYPE_CHECKING:
     from PySide2.QtGui import QMouseEvent, QKeyEvent, QWheelEvent
 
 
-BORDER_WIDTH = 1
+DEFAULT_FRAME_WIDTH = 1
+DEFAULT_FRAME_COLOR = QColor(128, 128, 128)
+DEFAULT_BAR_COLOR = QColor(240, 206, 164)
 
 
 class ComboSlider(QFrame):
@@ -29,8 +31,8 @@ class ComboSlider(QFrame):
         self._buttons_layout.setSpacing(0)
 
         icons_path = Path(__file__).parent / 'images' / 'icons'
-        self._add_spin_button(str(icons_path / 'up-arrow.svg'), self._on_up_button_clicked)
-        self._add_spin_button(str(icons_path / 'down-arrow.svg'), self._on_down_button_clicked)
+        self.up_button = self._add_spin_button(str(icons_path / 'up-arrow.svg'), self._on_up_button_clicked)
+        self.down_button = self._add_spin_button(str(icons_path / 'down-arrow.svg'), self._on_down_button_clicked)
 
         h_layout = QHBoxLayout(self)
         h_layout.setContentsMargins(0, 0, 0, 0)
@@ -39,12 +41,46 @@ class ComboSlider(QFrame):
         h_layout.addWidget(self._slider_bar)
         h_layout.addLayout(self._buttons_layout)
 
-        self.setFrameStyle(QFrame.Box)
-        self.setLineWidth(BORDER_WIDTH)
-
         self.setMaximumHeight(self._slider_bar.font_height + 9)
 
-    def _add_spin_button(self, icon_path_str: str, on_button_clicked_callback):
+        self.setFrameStyle(QFrame.Box)
+
+        self._frame_width = DEFAULT_FRAME_WIDTH
+        self._frame_color = DEFAULT_FRAME_COLOR
+        self._update_style()
+
+    @property
+    def frame_width(self) -> int:
+        return self._frame_width
+
+    @frame_width.setter
+    def frame_width(self, value: int):
+        if self._frame_width != value:
+            self._frame_width = value
+            self._update_style()
+
+    @property
+    def frame_color(self) -> QColor:
+        return self._frame_color
+
+    @frame_color.setter
+    def frame_color(self, value: QColor):
+        if self._frame_color != value:
+            self._frame_color = value
+            self._update_style()
+
+    @property
+    def bar_color(self) -> QColor:
+        return self._slider_bar.color
+
+    @bar_color.setter
+    def bar_color(self, value: QColor):
+        self._slider_bar.color = value
+
+    def _update_style(self):
+        self.setStyleSheet(f'ComboSlider {{ border: {self.frame_width}px solid {self.frame_color.name()}; }}')
+
+    def _add_spin_button(self, icon_path_str: str, on_button_clicked_callback) -> QPushButton:
         button = QPushButton(QIcon(icon_path_str), '')
         button.setAutoRepeat(True)
         button.setFocusPolicy(Qt.NoFocus)
@@ -56,6 +92,7 @@ class ComboSlider(QFrame):
 
         button.clicked.connect(on_button_clicked_callback)
         self._buttons_layout.addWidget(button)
+        return button
 
     def increase_value(self, factor: float = 1):
         self._slider_bar.increase_value(factor)
@@ -109,11 +146,9 @@ class SliderValueLineEdit(QLineEdit):
         super().__init__(parent)
 
         self.setAlignment(Qt.AlignRight)
-        self.setFrame(False)
         self.setCursor(Qt.ArrowCursor)
+        self.setFrame(False)
         self.setStyleSheet('QLineEdit { background-color: transparent; }')
-
-        self.textChanged.connect(self._on_text_changed)
 
     def mousePressEvent(self, event: QMouseEvent):
         event.ignore()
@@ -129,15 +164,6 @@ class SliderValueLineEdit(QLineEdit):
 
         event.accept()
 
-    def _resize_to_content(self):
-        font_metrics = self.fontMetrics()
-        min_width = font_metrics.width(self.text())
-        # min_width = font_metrics.boundingRect(self.text()).width()
-        self.setFixedWidth(6 + min_width)
-
-    def _on_text_changed(self, text: str):
-        self._resize_to_content()
-
 
 class SliderBar(QWidget):
     value_changed = Signal(float)
@@ -152,6 +178,8 @@ class SliderBar(QWidget):
 
         self._title_label = QLabel(title)
 
+        self._color = DEFAULT_BAR_COLOR
+
         self._locale = QLocale(QLocale.English)
         self._locale.setNumberOptions(self._locale.numberOptions() | QLocale.RejectGroupSeparator)
 
@@ -161,11 +189,13 @@ class SliderBar(QWidget):
 
         self._value_line_edit = SliderValueLineEdit()
         self._value_line_edit.setValidator(validator)
+        max_label_width = self._value_line_edit.fontMetrics().width(self._value_to_str(self.max_value))
+        self._value_line_edit.setFixedWidth(6 + max_label_width)
         self._value_line_edit.editingFinished.connect(self._on_value_line_edit_editing_finished)
 
         h_layout = QHBoxLayout(self)
         h_layout.setContentsMargins(4, 0, 4, 0)
-        h_layout.setSpacing(0)
+        # h_layout.setSpacing(0)
 
         h_layout.addWidget(self._title_label, 0, Qt.AlignLeft)
         h_layout.addWidget(self._value_line_edit, 0, Qt.AlignRight)
@@ -224,6 +254,16 @@ class SliderBar(QWidget):
                 self.update()
 
     @property
+    def color(self) -> QColor:
+        return self._color
+
+    @color.setter
+    def color(self, value: QColor):
+        if self._color != value:
+            self._color = value
+            self.update()
+
+    @property
     def font_height(self):
         return self._title_label.fontMetrics().height()
 
@@ -245,7 +285,7 @@ class SliderBar(QWidget):
 
         painter = QPainter(self)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(240, 206, 164))
+        painter.setBrush(self.color)
         painter.drawRect(0, 0,
                          round((self._value - self._min_value) / (self._max_value - self._min_value) * self.width()),
                          self.height())
@@ -281,6 +321,7 @@ class SliderBar(QWidget):
         value_delta = event.angleDelta().y() / 120
         if event.modifiers() & Qt.ControlModifier:
             value_delta *= 10
+        self.set_focus()
         self.increase_value(value_delta)
 
         event.accept()
@@ -292,4 +333,7 @@ class SliderBar(QWidget):
         self.value = (self.max_value - self.min_value) * x / self.width() + self.min_value
 
     def _update_value_line_edit(self):
-        self._value_line_edit.setText(self._locale.toString(float(self._value), 'f', 2))
+        self._value_line_edit.setText(self._value_to_str(self.value))
+
+    def _value_to_str(self, value: float) -> str:
+        return self._locale.toString(float(value), 'f', 2)

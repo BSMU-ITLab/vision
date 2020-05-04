@@ -11,6 +11,7 @@ from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.combo_slider import ComboSlider, SliderBar
+from bsmu.vision.widgets.visibility import VisibilityWidget
 from bsmu.vision_core.data import Data
 from bsmu.vision_core.image.layered import LayeredImage
 
@@ -130,67 +131,8 @@ class PatientBoneAgeJournalTable(QTableWidget):
         self.setItem(row, 3, bone_age_item)
 
 
-        activation_map_cell_widget = QWidget()
-        # Set minimum width, else widget will go beyond the cell width (if column width is small)
-        activation_map_cell_widget.setMinimumWidth(1)
-        # activation_map_cell_widget.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Preferred)
-        # self.icon_label_2 = QLabel()
-        # self.icon_label_2.setMaximumSize(QSize(24, 32))
-        # self.icon_label_2.setScaledContents(True)
-        self.icon_pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\no-eye.svg')  # './../eye.svg')
-        # self.icon_label_2.setPixmap(self.icon_pixmap)
 
-        self.button = QPushButton(QIcon(self.icon_pixmap), '')
-        row_height = self.rowHeight(row) - self.rowSpan(row, 5)
-        self.button.setIconSize(QSize(row_height, row_height))
-        self.button.setStyleSheet(
-            'QPushButton { '
-            'border: 0px solid transparent; '
-            '}'
-            'QPushButton:checked { '
-            'background-color: rgb(204, 228, 247); '
-            '}')
-        # self.button.setStyleSheet(
-        #     'QPushButton:pressed { '
-        #     'background-color: transparent; '
-        #     '}'
-        #     'QPushButton:checked { '
-        #     'border: 0px solid transparent; '
-        #     '}')
-        self.button.setFlat(True)
-        self.button.setCheckable(True)
-        self.button.toggled.connect(self.change_button_icon)
-
-        activation_map_cell_widget_layout = QHBoxLayout(activation_map_cell_widget)
-        activation_map_cell_widget_layout.setContentsMargins(0, 0, 0, 0)
-        activation_map_cell_widget_layout.setSpacing(0)
-        # activation_map_cell_widget_layout.addWidget(self.icon_label_2)
-
-
-        combo_slider = ComboSlider('Opacity', 50)
-        combo_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        # combo_slider.setMinimumWidth(1)
-        combo_slider.setFixedHeight(row_height)
-        combo_slider.setFrameStyle(QFrame.NoFrame)
-        # combo_slider.setStyleSheet('ComboSlider { border: 0px solid rgb(128, 128, 128); } ')
-        # combo_slider.setStyleSheet('ComboSlider { border: 0px solid rgb(128, 128, 128); border-left: 1px solid rgb(216, 216, 216); }')
-        combo_slider.setStyleSheet(
-            'ComboSlider { border: 0px solid rgb(128, 128, 128); border-left: 1px solid gainsboro; }')
-        # combo_slider.frame_color = QColor(Qt.red)
-        combo_slider.bar_color = QColor(204, 228, 247)
-
-
-        activation_map_cell_widget_layout.addWidget(self.button, 0, Qt.AlignRight)
-
-        line = QFrame()
-        line.setFrameShape(QFrame.VLine)
-        line.setFrameShadow(QFrame.Sunken)
-
-        # activation_map_cell_widget_layout.addWidget(line)
-        activation_map_cell_widget_layout.addWidget(combo_slider)
-
-
-        self.setCellWidget(row, 4, activation_map_cell_widget)
+        self.setCellWidget(row, 4, VisibilityWidget())
 
 
         # test_w = QWidget()
@@ -203,14 +145,6 @@ class PatientBoneAgeJournalTable(QTableWidget):
 
         # test_item = QTableWidgetItem('TEST')
         # self.setItem(row, 5, test_item)
-
-
-    def change_button_icon(self, checked: bool):
-        if checked:
-            pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\eye.svg')  # './../eye.svg')
-        else:
-            pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\no-eye.svg')  # './../eye.svg')
-        self.button.setIcon(QIcon(pixmap))
 
 
 class PatientBoneAgeJournalViewer(DataViewer):

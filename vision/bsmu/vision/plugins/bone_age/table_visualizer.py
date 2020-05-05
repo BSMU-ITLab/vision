@@ -130,9 +130,10 @@ class PatientBoneAgeJournalTable(QTableWidget):
         bone_age_item.setTextAlignment(Qt.AlignCenter)
         self.setItem(row, 3, bone_age_item)
 
-
-
-        self.setCellWidget(row, 4, VisibilityWidget())
+        visibility_widget = VisibilityWidget(50, embedded=True)
+        # visibility_widget.slider_bar_color = QColor(240, 206, 164)
+        # visibility_widget.toggle_button_checked_color = QColor(240, 206, 164)
+        self.setCellWidget(row, 4, visibility_widget)
 
 
         # test_w = QWidget()
@@ -220,6 +221,7 @@ class TableVisualizer(QObject):
         l.addWidget(self.combo_slider)
         l.addWidget(spin)
         l.addWidget(QSlider(Qt.Horizontal))
+        l.addWidget(VisibilityWidget())
 
         self.test_widget.show()
         print('HHH', spin.height(), self.combo_slider.height())

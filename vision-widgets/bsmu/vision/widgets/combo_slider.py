@@ -14,14 +14,17 @@ if TYPE_CHECKING:
 DEFAULT_FRAME_WIDTH = 1
 DEFAULT_FRAME_COLOR = QColor(128, 128, 128)
 DEFAULT_BAR_COLOR = QColor(240, 206, 164)
+DEFAULT_BUTTON_COLOR = QColor('gainsboro')
 
 
 class ComboSlider(QFrame):
     value_changed = Signal(float)
 
     def __init__(self, title: str = '', value: float = 0, min_value: float = 0, max_value: float = 100,
-                 parent: QWidget = None):
+                 embedded: bool = False, parent: QWidget = None):
         super().__init__(parent)
+
+        self._embedded = embedded
 
         self._slider_bar = SliderBar(title, value, min_value, max_value)
         self._slider_bar.value_changed.connect(self.value_changed)
@@ -30,9 +33,11 @@ class ComboSlider(QFrame):
         self._buttons_layout.setContentsMargins(0, 0, 0, 0)
         self._buttons_layout.setSpacing(0)
 
+        self._button_color = DEFAULT_BUTTON_COLOR
+
         icons_path = Path(__file__).parent / 'images' / 'icons'
-        self.up_button = self._add_spin_button(str(icons_path / 'up-arrow.svg'), self._on_up_button_clicked)
-        self.down_button = self._add_spin_button(str(icons_path / 'down-arrow.svg'), self._on_down_button_clicked)
+        self._up_button = self._add_spin_button(str(icons_path / 'up-arrow.svg'), self._on_up_button_clicked)
+        self._down_button = self._add_spin_button(str(icons_path / 'down-arrow.svg'), self._on_down_button_clicked)
 
         h_layout = QHBoxLayout(self)
         h_layout.setContentsMargins(0, 0, 0, 0)
@@ -41,9 +46,9 @@ class ComboSlider(QFrame):
         h_layout.addWidget(self._slider_bar)
         h_layout.addLayout(self._buttons_layout)
 
-        self.setMaximumHeight(self._slider_bar.font_height + 9)
-
-        self.setFrameStyle(QFrame.Box)
+        if not self._embedded:
+            self.setMaximumHeight(self._slider_bar.font_height + 9)
+            self.setFrameStyle(QFrame.Box)
 
         self._frame_width = DEFAULT_FRAME_WIDTH
         self._frame_color = DEFAULT_FRAME_COLOR
@@ -77,6 +82,18 @@ class ComboSlider(QFrame):
     def bar_color(self, value: QColor):
         self._slider_bar.color = value
 
+    @property
+    def button_color(self) -> QColor:
+        return self._button_color
+
+    @button_color.setter
+    def button_color(self, value: QColor):
+        if self._button_color != value:
+            self._button_color = value
+
+            self._up_button.setPalette(self._button_color)
+            self._down_button.setPalette(self._button_color)
+
     def _update_style(self):
         self.setStyleSheet(f'ComboSlider {{ border: {self.frame_width}px solid {self.frame_color.name()}; }}')
 
@@ -88,7 +105,7 @@ class ComboSlider(QFrame):
         # button.setMaximumHeight(15)
         button.setFlat(True)
         button.setAutoFillBackground(True)
-        button.setPalette(QPalette('gainsboro'))
+        button.setPalette(self._button_color)
 
         button.clicked.connect(on_button_clicked_callback)
         self._buttons_layout.addWidget(button)

@@ -10,7 +10,7 @@ from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGra
 import bsmu.vision_core.converters.image as image_converter
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
-from bsmu.vision_core.image.base import FlatImage
+from bsmu.vision_core.image.base import Image, FlatImage
 from bsmu.vision_core.image.layered import ImageLayer, LayeredImage
 
 
@@ -40,6 +40,7 @@ class IntensityWindowing:
 class ImageLayerView(QObject):
     DEFAULT_LAYER_OPACITY = 1
 
+    image_changed = Signal(Image)
     image_view_updated = Signal(FlatImage)
     visibility_updated = Signal()
     opacity_updated = Signal()
@@ -138,6 +139,7 @@ class ImageLayerView(QObject):
         return self._displayed_qimage_cache
 
     def _on_layer_image_updated(self, image: Image):
+        self.image_changed.emit(image)
         self._update_image_view()
 
     def _update_image_view(self):
@@ -183,7 +185,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         self._layered_image_view = _LayeredImageView()
         self._active_layer_view = None
 
-        self._bounding_rect = QRectF()
+        self._bounding_rect_cache = None
 
     @property
     def active_layer_view(self) -> ImageLayerView:
@@ -204,22 +206,22 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
+        layer_view.image_changed.connect(self._on_layer_image_changed)
         layer_view.image_view_updated.connect(self._on_layer_image_view_updated)
         layer_view.visibility_updated.connect(self.update)
 
         if len(self.layer_views) == 1:  # If was added first layer view
             self._active_layer_view = layer_view
             self.active_layer_view_changed.emit(None, self.active_layer_view)
-            self._update_bounding_rect()  # self.prepareGeometryChange() will call update() if this is necessary.
-        else:
-            self.update()
+
+        self._reset_bounding_rect_cache()  # self.prepareGeometryChange() will call update() if this is necessary.
 
     def boundingRect(self):
-        return self._bounding_rect
+        if self._bounding_rect_cache is None:
+            self._bounding_rect_cache = self._calculate_bounding_rect()
+        return self._bounding_rect_cache
 
-    def _update_bounding_rect(self):
-        self.prepareGeometryChange()
-
+    def _calculate_bounding_rect(self) -> QRectF:
         if self.layer_views:
             # TODO: images of layers can have different spatial bounding boxes.
             #  We have to use union of bounding boxes of every layer.
@@ -229,8 +231,8 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
             rect_bottom_right_pixel_indexes = first_layer_image_view.array.shape[:2]
             rect_top_left_pos = first_layer_image_view.pixel_indexes_to_pos(rect_top_left_pixel_indexes)
             rect_bottom_right_pos = first_layer_image_view.pixel_indexes_to_pos(rect_bottom_right_pixel_indexes)
-            self._bounding_rect = QRectF(QPointF(rect_top_left_pos[1], rect_top_left_pos[0]),
-                                         QPointF(rect_bottom_right_pos[1], rect_bottom_right_pos[0]))
+            bounding_rect = QRectF(QPointF(rect_top_left_pos[1], rect_top_left_pos[0]),
+                                   QPointF(rect_bottom_right_pos[1], rect_bottom_right_pos[0]))
 
             # The method below does not take into account image origin (spatial attribute)
             # image = self.layer_views[0].displayed_image
@@ -241,7 +243,9 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
             # self._bounding_rect = QRectF(-image_rect.width() / 2, -image_rect.height() / 2,
             #                              image_rect.width(), image_rect.height())
         else:
-            self._bounding_rect = QRectF()
+            bounding_rect = QRectF()
+
+        return bounding_rect
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
@@ -250,6 +254,14 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
                 painter.setOpacity(layer_view.opacity)
                 image_view_origin = layer_view.image_view.spatial.origin
                 painter.drawImage(QPointF(image_view_origin[1], image_view_origin[0]), layer_view.displayed_image)
+
+    def _on_layer_image_changed(self, image: Image):
+        self._reset_bounding_rect_cache()
+
+    def _reset_bounding_rect_cache(self):
+        if self._bounding_rect_cache is not None:
+            self.prepareGeometryChange()
+            self._bounding_rect_cache = None
 
     def _on_layer_image_view_updated(self, image_view: FlatImage):
         self.update()

@@ -6,7 +6,7 @@ import numpy as np
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.windows.main import MenuType
+from bsmu.vision.plugins.windows.main import AlgorithmsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.transfer_functions.color import ColorTransferFunctionViewer
 from bsmu.vision_core.transfer_functions.color import ColorTransferFunction, ColorTransferFunctionPoint
@@ -29,7 +29,7 @@ class ColorContrastPlugin(Plugin):
 
     def _enable(self):
         menu_action = self.main_window.add_menu_action(
-            MenuType.ALGORITHMS, 'Color Contrast', self.color_contrast.create_colored_image,
+            AlgorithmsMenu, 'Color Contrast', self.color_contrast.create_colored_image,
             Qt.CTRL + Qt.Key_H)
 
         # self.show_chart()

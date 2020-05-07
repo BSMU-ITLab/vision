@@ -5,7 +5,7 @@ import os
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.windows.main import MenuType
+from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 
 
@@ -21,10 +21,10 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
         self.mdi_image_layer_file_walker = MdiImageLayerFileWalker(mdi, file_loading_manager)
 
     def _enable(self):
-        self.main_window.add_menu_action(MenuType.VIEW, 'Next Image',
+        self.main_window.add_menu_action(ViewMenu, 'Next Image',
                                          self.mdi_image_layer_file_walker.show_next_image,
                                          Qt.CTRL + Qt.Key_Right)
-        self.main_window.add_menu_action(MenuType.VIEW, 'Previous Image',
+        self.main_window.add_menu_action(ViewMenu, 'Previous Image',
                                          self.mdi_image_layer_file_walker.show_previous_image,
                                          Qt.CTRL + Qt.Key_Left)
 

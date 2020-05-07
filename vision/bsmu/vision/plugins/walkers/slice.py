@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.windows.main import MenuType
+from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow
 
 
@@ -17,10 +17,10 @@ class MdiVolumeSliceWalkerPlugin(Plugin):
         self.mdi_volume_slice_walker = MdiVolumeSliceWalker(mdi)
 
     def _enable(self):
-        self.main_window.add_menu_action(MenuType.VIEW, 'Next Slice',
+        self.main_window.add_menu_action(ViewMenu, 'Next Slice',
                                          self.mdi_volume_slice_walker.show_next_slice,
                                          Qt.CTRL + Qt.Key_Up)
-        self.main_window.add_menu_action(MenuType.VIEW, 'Previous Slice',
+        self.main_window.add_menu_action(ViewMenu, 'Previous Slice',
                                          self.mdi_volume_slice_walker.show_prev_slice,
                                          Qt.CTRL + Qt.Key_Down)
 

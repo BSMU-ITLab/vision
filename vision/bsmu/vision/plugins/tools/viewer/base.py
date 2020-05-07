@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from PySide2.QtCore import QObject
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.windows.main import MenuType
+from bsmu.vision.plugins.windows.main import ToolsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
 from bsmu.vision_core.image.base import FlatImage
@@ -35,7 +35,7 @@ class ViewerToolPlugin(Plugin):
         if not self.action_name:
             return
 
-        self.main_window.add_menu_action(MenuType.TOOLS, self.action_name,
+        self.main_window.add_menu_action(ToolsMenu, self.action_name,
                                          self.mdi_tool.activate, self.action_shortcut)
 
     def _disable(self):

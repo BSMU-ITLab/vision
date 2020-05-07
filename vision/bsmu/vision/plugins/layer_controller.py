@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.windows.main import MenuType
+from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ class MdiImageViewerLayerControllerPlugin(Plugin):
 
     def _enable(self):
         menu_action = self.main_window.add_menu_action(
-            MenuType.VIEW, 'Active Layer View', self.mdi_layer_controller.toggle_active_layer_view,
+            ViewMenu, 'Active Layer View', self.mdi_layer_controller.toggle_active_layer_view,
             Qt.CTRL + Qt.Key_I)
         # menu_action.setCheckable(True)
         menu_action.setWhatsThis('Show active layer and hide other layers / Restore')

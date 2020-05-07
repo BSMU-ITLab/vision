@@ -178,6 +178,7 @@ class _LayeredImageView(QObject):
 
 class _LayeredImageGraphicsObject(QGraphicsObject):
     active_layer_view_changed = Signal(ImageLayerView, ImageLayerView)
+    bounding_rect_changed = Signal(QRectF)
 
     def __init__(self, parent: QGraphicsItem = None):
         super().__init__(parent)
@@ -219,6 +220,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
     def boundingRect(self):
         if self._bounding_rect_cache is None:
             self._bounding_rect_cache = self._calculate_bounding_rect()
+            self.bounding_rect_changed.emit(self._bounding_rect_cache)
         return self._bounding_rect_cache
 
     def _calculate_bounding_rect(self) -> QRectF:
@@ -273,14 +275,17 @@ class LayeredImageViewer(DataViewer):
     def __init__(self, data: LayeredImage = None, zoomable: bool = True):
         super().__init__(data)
 
+        self.graphics_scene = QGraphicsScene()
+
+        self.graphics_view = GraphicsView(self.graphics_scene, zoomable)
+
         self.layered_image_graphics_object = _LayeredImageGraphicsObject()
         self.layered_image_graphics_object.active_layer_view_changed.connect(
             self._on_active_layer_view_changed)
+        self.layered_image_graphics_object.bounding_rect_changed.connect(
+            self.graphics_view.setSceneRect)
 
-        self.graphics_scene = QGraphicsScene()
         self.graphics_scene.addItem(self.layered_image_graphics_object)
-
-        self.graphics_view = GraphicsView(self.graphics_scene, zoomable)
 
         grid_layout = QGridLayout()
         grid_layout.setContentsMargins(0, 0, 0, 0)

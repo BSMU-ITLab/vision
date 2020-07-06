@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Union
+
 from PySide2.QtCore import Signal
 from PySide2.QtGui import QResizeEvent
 from PySide2.QtWidgets import QMdiArea
@@ -8,10 +10,11 @@ from bsmu.vision.app.plugin import Plugin
 
 
 class MdiPlugin(Plugin):
-    def __init__(self, app: App):
+    def __init__(self, app: App,
+                 main_window_plugin: Union[str, Plugin] = 'bsmu.vision.plugins.windows.main.MainWindowPlugin'):
         super().__init__(app)
 
-        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
+        self.main_window = app.enable_plugin(main_window_plugin).main_window
 
         self.mdi = Mdi()
 

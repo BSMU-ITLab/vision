@@ -20,6 +20,11 @@ class MainWindowPlugin(Plugin):
 
         self.main_window = MainWindow(self.united_config.data['title'])
 
+        # self.main_window.add_menu_action(FileMenu, 'Load', None, None)
+        # self.main_window.add_menu_action(FileMenu, 'Export Results', None, None)
+        # self.main_window.add_menu_action(AtlasMenu, 'Male', None, None)
+        # self.main_window.add_menu_action(AtlasMenu, 'Female', None, None)
+
     def _enable(self):
         self.main_window.show()
 
@@ -64,6 +69,10 @@ class ToolsMenu(MainMenu):
 class AlgorithmsMenu(MainMenu):
     name = 'Algorithms'
 
+
+# class AtlasMenu(MainMenu):
+#     name = 'Atlas'
+#
 
 class HelpMenu(MainMenu):
     name = 'Help'

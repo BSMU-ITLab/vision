@@ -72,3 +72,7 @@ class Plugin(QObject):
     @classmethod
     def name(cls):
         return cls.__name__
+
+    @classmethod
+    def full_name(cls):
+        return f'{cls.__module__}.{cls.__qualname__}'

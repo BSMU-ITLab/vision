@@ -1,3 +1,31 @@
+#plugins:
+#  - file_dropper = bsmu.vision.plugins.file_dropper.FileDropperPlugin(p1, p2)
+#  - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
+
+#plugins:
+#  - bsmu.vision.plugin1
+#  - common_plugin: bsmu.vision.plugins.file_dropper.FileDropperPlugin
+#  - bsmu.vision.plugin5(common_plugin)
+#  - bsmu.vision.plugin6(common_plugin, key_arg=common_plugin)
+
+
+
+#plugins:
+#  - plugin1
+#  - plugin2
+#  - plugin3
+#
+#  - common_plugin: plugin4
+#
+#  - plugin8:
+#    - name: tt
+#    - common_plugin
+#    - name: www
+#  - plugin9
+#    - common_plugin
+#
+
+
 plugins:
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
@@ -7,12 +35,13 @@ plugins:
   - bsmu.vision.plugins.visualizers.image.volume.VolumeImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin
   - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
-  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
+#  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
   - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
-  - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
+#  - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
   - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
   - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
-  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
+#  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
 
   - bsmu.vision.plugins.bone_age.table_visualizer.TableVisualizerPlugin
+#  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin

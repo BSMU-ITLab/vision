@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+from typing import Union
+
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QApplication
 
@@ -77,11 +79,11 @@ class App(QApplication):
 
         # self.aboutToQuit.connect(self.config.config)
 
-    def enable_plugin(self, full_name: str):
+    def enable_plugin(self, full_name: Union[str, Plugin]):
         return self.plugin_manager.enable_plugin(full_name)
 
     def enabled_plugins(self):
-        return self.plugin_manager.enabled_plugins
+        return self.plugin_manager._enabled_plugins
 
     def run(self):
         sys.exit(self.exec_())

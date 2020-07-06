@@ -176,9 +176,9 @@ class TableVisualizer(QObject):
         self.mdi = mdi
 
         self.journal = PatientBoneAgeJournal()
-        self.journal.add_record(PatientBoneAgeRecord(None, True, 120, 125))
-        self.journal.add_record(PatientBoneAgeRecord(None, False, 100, 110))
-        self.journal.add_record(PatientBoneAgeRecord(None, False, 50, 51))
+        # self.journal.add_record(PatientBoneAgeRecord(None, True, 120, 125))
+        # self.journal.add_record(PatientBoneAgeRecord(None, False, 100, 110))
+        # self.journal.add_record(PatientBoneAgeRecord(None, False, 50, 51))
 
         self.viewer = PatientBoneAgeJournalViewer(self.journal)
 

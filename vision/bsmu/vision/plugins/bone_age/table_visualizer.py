@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide2.QtCore import QObject, Qt, QSysInfo, Signal
-from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QCheckBox, QWidget, \
-    QHBoxLayout, QHeaderView, QMenu, QActionGroup
+from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
+    QActionGroup
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.predictor import Predictor
+from bsmu.vision.widgets.gender import GenderWidget
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.visibility import VisibilityWidget
@@ -241,16 +242,11 @@ class PatientBoneAgeJournalTable(QTableWidget):
         name_item.setData(self.RECORD_REF_ROLE, record)
         self.setItem(row, self.column_number(TableNameColumn), name_item)
 
-        male_cell_widget = QWidget()
-        male_check_box = QCheckBox()
-        male_check_box.setChecked(record.male)
-        male_check_box.stateChanged.connect(partial(self._on_male_check_box_state_changed, record))
-        record.male_changed.connect(male_check_box.setChecked)
-        male_cell_widget_layout = QHBoxLayout(male_cell_widget)
-        male_cell_widget_layout.addWidget(male_check_box)
-        male_cell_widget_layout.setAlignment(Qt.AlignCenter)
-        male_cell_widget_layout.setContentsMargins(0, 0, 0, 0)
-        self.setCellWidget(row, self.column_number(TableGenderColumn), male_cell_widget)
+        gender_widget = GenderWidget(embedded=True)
+        gender_widget.man = record.male
+        gender_widget.gender_changed.connect(partial(self._on_gender_changed, record))
+        record.male_changed.connect(partial(self._on_record_male_changed, gender_widget))
+        self.setCellWidget(row, self.column_number(TableGenderColumn), gender_widget)
 
         age_item = QTableWidgetItem(str(record.age))
         age_item.setFlags(age_item.flags() & ~Qt.ItemIsEditable)
@@ -276,8 +272,11 @@ class PatientBoneAgeJournalTable(QTableWidget):
             selected_record = self._row_record(bottom_selected_row)
             self.record_selected.emit(selected_record)
 
-    def _on_male_check_box_state_changed(self, record: PatientBoneAgeRecord, state: int):
-        record.male = bool(state)
+    def _on_gender_changed(self, record: PatientBoneAgeRecord, man: bool):
+        record.male = man
+
+    def _on_record_male_changed(self, gender_widget: GenderWidget, male: bool):
+        gender_widget.man = male
 
     def _set_bone_age_to_table_item(self, bone_age_table_item: QTableWidgetItem, bone_age: float):
         bone_age_table_item.setText(self._bone_age_format.format(bone_age))

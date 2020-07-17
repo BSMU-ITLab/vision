@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from functools import partial
+from pathlib import Path
+from typing import List, Type
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Qt, QSysInfo, Signal, QSize
-from PySide2.QtGui import QPalette, QPixmap, QIcon, QColor
+import numpy as np
+from PySide2.QtCore import QObject, Qt, QSysInfo, Signal
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QCheckBox, QWidget, \
-    QHBoxLayout, QHeaderView, QLabel, QFrame, QSizePolicy, QGraphicsColorizeEffect, QPushButton, QToolButton, QVBoxLayout, QSpinBox, QSlider, QLayout
+    QHBoxLayout, QHeaderView, QMenu, QActionGroup
 
 from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.plugins.bone_age.predictor import Predictor
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision.widgets.combo_slider import ComboSlider, SliderBar
 from bsmu.vision.widgets.visibility import VisibilityWidget
 from bsmu.vision_core.data import Data
 from bsmu.vision_core.image.layered import LayeredImage
@@ -29,20 +33,43 @@ class TableVisualizerPlugin(Plugin):
         self.table_visualizer = TableVisualizer(self.data_visualization_manager, mdi)
 
     def _enable(self):
-        self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_bone_age_table)
+        self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_bone_age_data)
 
     def _disable(self):
-        self.data_visualization_manager.data_visualized.disconnect(self.table_visualizer.visualize_bone_age_table)
+        self.data_visualization_manager.data_visualized.disconnect(self.table_visualizer.visualize_bone_age_data)
 
 
 class PatientBoneAgeRecord(QObject):
-    def __init__(self, image: FlatImage, male, age: float, bone_age: float):
+    male_changed = Signal(bool)
+    bone_age_changed = Signal(float)
+
+    def __init__(self, image: FlatImage, male: bool, age: float, bone_age: float):
         super().__init__()
 
         self.image = image
-        self.male = male
+        self._male = male
         self.age = age
-        self.bone_age = bone_age
+        self._bone_age = bone_age  # in months
+
+    @property
+    def male(self) -> bool:
+        return self._male
+
+    @male.setter
+    def male(self, value: bool):
+        if self._male != value:
+            self._male = value
+            self.male_changed.emit(self._male)
+
+    @property
+    def bone_age(self) -> float:
+        return self._bone_age
+
+    @bone_age.setter
+    def bone_age(self, value: float):
+        if self._bone_age != value:
+            self._bone_age = value
+            self.bone_age_changed.emit(self._bone_age)
 
 
 class PatientBoneAgeJournal(Data):
@@ -65,16 +92,89 @@ class PatientBoneAgeJournalTableRecord(QObject):
         self.record = record
 
 
+class BoneAgeFormat(ABC):
+    NAME = ''
+    ABBR = ''
+
+    bone_age_decimals = 2
+
+    @classmethod
+    @abstractmethod
+    def format(cls, bone_age: float) -> str:
+        pass
+
+
+class MonthsBoneAgeFormat(BoneAgeFormat):
+    NAME = 'Months'
+    ABBR = 'M'
+
+    @classmethod
+    def format(cls, bone_age: float) -> str:
+        return f'{bone_age:.{cls.bone_age_decimals}f}'
+
+
+class YearsMonthsBoneAgeFormat(BoneAgeFormat):
+    NAME = 'Years / Months'
+    ABBR = 'Y / M'
+
+    @classmethod
+    def format(cls, bone_age: float) -> str:
+        years, months = divmod(bone_age, 12)
+        return f'{int(years)} / {months:.{cls.bone_age_decimals}f}'
+
+
+class TableColumn:
+    TITLE = ''
+
+
+class TableNameColumn(TableColumn):
+    TITLE = 'Name'
+
+
+class TableGenderColumn(TableColumn):
+    TITLE = 'Gender'
+
+
+class TableAgeColumn(TableColumn):
+    TITLE = 'Age'
+
+
+class TableBoneAgeColumn(TableColumn):
+    TITLE = 'Bone Age'
+
+
+class TableDenseNetBoneAgeColumn(TableBoneAgeColumn):
+    TITLE = 'DenseNet\nBone Age'
+
+
+class TableActivationMapColumn(TableColumn):
+    TITLE = 'Activation Map Visibility'
+
+
 class PatientBoneAgeJournalTable(QTableWidget):
+    record_selected = Signal(PatientBoneAgeRecord)
+
+    RECORD_REF_ROLE = Qt.UserRole
+
     def __init__(self, data: PatientBoneAgeJournal = None):
         super().__init__()
 
         self.data = data
 
-        self.setColumnCount(5)
+        self._bone_age_formats = [MonthsBoneAgeFormat, YearsMonthsBoneAgeFormat]
+        self._bone_age_format = YearsMonthsBoneAgeFormat
+
+        self._columns = [TableNameColumn, TableGenderColumn, TableAgeColumn, TableDenseNetBoneAgeColumn,
+                         TableActivationMapColumn]
+        self._columns_numbers = {column: number for number, column in enumerate(self._columns)}
+        self._bone_age_columns = {column for column in self._columns if issubclass(column, TableBoneAgeColumn)}
+        self._bone_age_column_numbers = {self._columns_numbers[column] for column in self._bone_age_columns}
+
+        self.setColumnCount(len(self._columns))
         self.setAlternatingRowColors(True)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setHorizontalHeaderLabels(['Name', 'Male', 'Age', 'Bone Age', 'Activation Map Visibility'])
+        horizontal_header_labels = [self._create_column_title(column) for column in self._columns]
+        self.setHorizontalHeaderLabels(horizontal_header_labels)
         # self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
@@ -95,13 +195,41 @@ class PatientBoneAgeJournalTable(QTableWidget):
                 '}')
             self.verticalHeader().setStyleSheet('QHeaderView::section { padding-left: 4px; }')
 
+        self.itemSelectionChanged.connect(self._on_item_selection_changed)
+
         for record in self.data.records:
             self._add_record_view(record)
 
         self.data.record_added.connect(self._add_record_view)
 
+        # Configure a custom context menu for the horizontal header
+        self.horizontalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
+        self.horizontalHeader().customContextMenuRequested.connect(self._display_header_context_menu)
+
+    def column_number(self, column: Type[TableColumn]) -> int:
+        return self._columns_numbers[column]
+
+    @property
+    def bone_age_format(self) -> Type[BoneAgeFormat]:
+        return self._bone_age_format
+
+    @bone_age_format.setter
+    def bone_age_format(self, value: Type[BoneAgeFormat]):
+        if self._bone_age_format != value:
+            self._bone_age_format = value
+            self._update_bone_age_column_headers()
+            self._update_bone_age_column_contents()
+
+    def _row_record(self, row: int) -> PatientBoneAgeRecord:
+        return self.item(row, self.column_number(TableNameColumn)).data(self.RECORD_REF_ROLE)
+
+    def _create_column_title(self, column: Type[TableColumn]) -> str:
+        column_title = column.TITLE
+        if issubclass(column, TableBoneAgeColumn):
+            column_title += f' ({self._bone_age_format.ABBR})'
+        return column_title
+
     def _add_record_view(self, record: PatientBoneAgeRecord):
-        print('_add_record_view')
         row = self.rowCount()
         self.insertRow(row)
 
@@ -109,131 +237,148 @@ class PatientBoneAgeJournalTable(QTableWidget):
         name_item = QTableWidgetItem(name)
         name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
         name_item.setTextAlignment(Qt.AlignCenter)
-        self.setItem(row, 0, name_item)
+        # Add the |record| reference to the |name_item|
+        name_item.setData(self.RECORD_REF_ROLE, record)
+        self.setItem(row, self.column_number(TableNameColumn), name_item)
 
         male_cell_widget = QWidget()
         male_check_box = QCheckBox()
         male_check_box.setChecked(record.male)
+        male_check_box.stateChanged.connect(partial(self._on_male_check_box_state_changed, record))
+        record.male_changed.connect(male_check_box.setChecked)
         male_cell_widget_layout = QHBoxLayout(male_cell_widget)
         male_cell_widget_layout.addWidget(male_check_box)
         male_cell_widget_layout.setAlignment(Qt.AlignCenter)
         male_cell_widget_layout.setContentsMargins(0, 0, 0, 0)
-        self.setCellWidget(row, 1, male_cell_widget)
+        self.setCellWidget(row, self.column_number(TableGenderColumn), male_cell_widget)
 
         age_item = QTableWidgetItem(str(record.age))
         age_item.setFlags(age_item.flags() & ~Qt.ItemIsEditable)
         age_item.setTextAlignment(Qt.AlignCenter)
-        self.setItem(row, 2, age_item)
+        self.setItem(row, self.column_number(TableAgeColumn), age_item)
 
-        bone_age_item = QTableWidgetItem(str(record.bone_age))
+        bone_age_item = QTableWidgetItem()
         bone_age_item.setFlags(bone_age_item.flags() & ~Qt.ItemIsEditable)
         bone_age_item.setTextAlignment(Qt.AlignCenter)
-        self.setItem(row, 3, bone_age_item)
+        self._set_bone_age_to_table_item(bone_age_item, record.bone_age)
+        record.bone_age_changed.connect(partial(self._set_bone_age_to_table_item, bone_age_item))
+        self.setItem(row, self.column_number(TableDenseNetBoneAgeColumn), bone_age_item)
 
         visibility_widget = VisibilityWidget(50, embedded=True)
         # visibility_widget.slider_bar_color = QColor(240, 206, 164)
         # visibility_widget.toggle_button_checked_color = QColor(240, 206, 164)
-        self.setCellWidget(row, 4, visibility_widget)
+        self.setCellWidget(row, self.column_number(TableActivationMapColumn), visibility_widget)
 
+    def _on_item_selection_changed(self):
+        selected_ranges = self.selectedRanges()
+        if selected_ranges:
+            bottom_selected_row = selected_ranges[-1].bottomRow()
+            selected_record = self._row_record(bottom_selected_row)
+            self.record_selected.emit(selected_record)
 
-        # test_w = QWidget()
-        # test_h_l = QHBoxLayout(test_w)
-        # test_h_l.setContentsMargins(0, 0, 0, 0)
-        # test_h_l.setSpacing(0)
-        # test_h_l.addWidget(QSpinBox())
-        # test_h_l.addWidget(QSpinBox())
-        # self.setCellWidget(row, 5, test_w)
+    def _on_male_check_box_state_changed(self, record: PatientBoneAgeRecord, state: int):
+        record.male = bool(state)
 
-        # test_item = QTableWidgetItem('TEST')
-        # self.setItem(row, 5, test_item)
+    def _set_bone_age_to_table_item(self, bone_age_table_item: QTableWidgetItem, bone_age: float):
+        bone_age_table_item.setText(self._bone_age_format.format(bone_age))
+
+    def _display_header_context_menu(self, point: QPoint):
+        column_number = self.horizontalHeader().logicalIndexAt(point)
+        if column_number in self._bone_age_column_numbers:
+            self._display_bone_age_column_context_menu(point)
+
+    def _display_bone_age_column_context_menu(self, point: QPoint):
+        menu = QMenu(self)
+        format_menu = menu.addMenu('Format')
+        format_action_group = QActionGroup(self)
+        for bone_age_format in self._bone_age_formats:
+            format_action = format_menu.addAction(bone_age_format.NAME)
+            format_action.bone_age_format = bone_age_format
+            format_action.setCheckable(True)
+
+            if self._bone_age_format == bone_age_format:
+                format_action.setChecked(True)
+
+            format_action_group.addAction(format_action)
+
+        triggered_action = menu.exec_(self.horizontalHeader().viewport().mapToGlobal(point))
+        if triggered_action:
+            self.bone_age_format = triggered_action.bone_age_format
+
+    def _update_bone_age_column_headers(self):
+        for bone_age_column in self._bone_age_columns:
+            header_label = self._create_column_title(bone_age_column)
+            bone_age_column_number = self._columns_numbers[bone_age_column]
+            self.horizontalHeaderItem(bone_age_column_number).setText(header_label)
+
+    def _update_bone_age_column_contents(self):
+        for row in range(self.rowCount()):
+            record = self._row_record(row)
+            bone_age = record.bone_age
+            for bone_age_column_number in self._bone_age_column_numbers:
+                self._set_bone_age_to_table_item(self.item(row, bone_age_column_number), bone_age)
 
 
 class PatientBoneAgeJournalViewer(DataViewer):
+    record_selected = Signal(PatientBoneAgeRecord)
+
     def __init__(self, data: PatientBoneAgeJournal = None):
         super().__init__(data)
 
         self.table = PatientBoneAgeJournalTable(self.data)
+        self.table.record_selected.connect(self.record_selected)
+
         grid_layout = QGridLayout()
         grid_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout.addWidget(self.table)
         self.setLayout(grid_layout)
 
 
-class TestSpin(QSpinBox):
-    def __init__(self):
-        super().__init__()
-
-    def focusInEvent(self, event: QFocusEvent):
-        print("FFFFFFFFFFFFFFFFFFFFFFFFFFFOOOOCUS")
-        super().focusInEvent(event)
-
-
 class TableVisualizer(QObject):
     def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi):
         super().__init__()
+
+        self.predictor = Predictor(Path(r'D:\Temp\TempBoneAgeModels\DenseNet_withInputShape___weighted.pb'))
+        # self.predictor.predict()
 
         self.visualization_manager = visualization_manager
         self.mdi = mdi
 
         self.journal = PatientBoneAgeJournal()
-        # self.journal.add_record(PatientBoneAgeRecord(None, True, 120, 125))
-        # self.journal.add_record(PatientBoneAgeRecord(None, False, 100, 110))
-        # self.journal.add_record(PatientBoneAgeRecord(None, False, 50, 51))
+        self.journal_viewer = PatientBoneAgeJournalViewer(self.journal)
+        self.journal_viewer.record_selected.connect(self._on_journal_record_selected)
 
-        self.viewer = PatientBoneAgeJournalViewer(self.journal)
+        self.records_image_sub_windows = {}
 
-        sub_window = DataViewerSubWindow(self.viewer)
+        sub_window = DataViewerSubWindow(self.journal_viewer)
+        sub_window.layout_anchors = np.array([[0, 0], [0.5, 1]])
         self.mdi.addSubWindow(sub_window)
-        sub_window.setGeometry(0, 0, 600, 500)   #######
-        sub_window.show()
 
-        # self.icon_label = QLabel()
-        # self.icon_label.setAlignment(Qt.AlignCenter)
-        # self.icon_label.setFrameShape(QFrame.Box)
-        # self.icon_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # self.icon_label.setBackgroundRole(QPalette.Base)
-        # self.icon_label.setAutoFillBackground(True)
-        # self.icon_label.setMinimumSize(132, 132)
-        # self.icon_pixmap = QPixmap(r'D:\Projects\vision\vision\bsmu\vision\plugins\bone_age\eye.svg') #'./../eye.svg')
-        # self.icon_label.setPixmap(self.icon_pixmap)
-        # self.icon_label.show()
-        #
-        # self.icon_label_2 = QLabel()
-        # self.icon_label_2.setPixmap(self.icon_pixmap)
-        # self.icon_label_2.show()
-
-        self.test_widget = QWidget()
-        l = QVBoxLayout(self.test_widget)
-
-        test_w = QFrame()
-        test_w.setFrameStyle(QFrame.Box)
-        test_h_box = QHBoxLayout(test_w)
-        test_h_box.addWidget(QLabel('TEST'))
-        # test_h_box.addWidget(QPushButton('PUSH'))
-        test_h_box.addWidget(TestSpin())
-
-        spin = QSpinBox()
-        # spin.setFocusPolicy(Qt.TabFocus)
-
-        self.combo_slider = ComboSlider('Opacity', 50)
-
-        l.addWidget(test_w)
-        l.addWidget(self.combo_slider)
-        l.addWidget(spin)
-        l.addWidget(QSlider(Qt.Horizontal))
-        l.addWidget(VisibilityWidget())
-
-        self.test_widget.show()
-        print('HHH', spin.height(), self.combo_slider.height())
-
-        # self.combo_slider.show()
-        # self.slider_bar = SliderBar()
-        # self.slider_bar.show()
-
-    def visualize_bone_age_table(self, data: Data, data_viewer_sub_windows: DataViewerSubWindow):
-        print('visualize_bone_age_table', type(data))
+    def visualize_bone_age_data(self, data: Data, data_viewer_sub_windows: List[DataViewerSubWindow]):
+        print('visualize_bone_age_data', type(data))
 
         if isinstance(data, LayeredImage):
             first_layer = data.layers[0]
 
-            self.journal.add_record(PatientBoneAgeRecord(first_layer.image, True, 120, 125))
+            male = True
+            predicted_bone_age = self.predictor.predict(first_layer.image, male)
+            record = PatientBoneAgeRecord(first_layer.image, male, 120, predicted_bone_age)
+            record.male_changed.connect(partial(self._on_record_male_changed, record))
+            self.journal.add_record(record)
+
+            self.records_image_sub_windows[record] = data_viewer_sub_windows
+
+            for sub_window in data_viewer_sub_windows:
+                sub_window.layout_anchors = np.array([[0.5, 0], [1, 1]])
+                sub_window.lay_out_to_anchors()
+
+    def _on_record_male_changed(self, record: PatientBoneAgeRecord, male: bool):
+        self._update_record_bone_age(record)
+
+    def _update_record_bone_age(self, record: PatientBoneAgeRecord):
+        record.bone_age = self.predictor.predict(record.image, record.male)
+
+    def _on_journal_record_selected(self, record: PatientBoneAgeRecord):
+        image_sub_windows = self.records_image_sub_windows.get(record)
+        for image_sub_window in image_sub_windows:
+            image_sub_window.raise_()

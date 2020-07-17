@@ -56,7 +56,6 @@ class MdiLayout(QObject):
 
             for sub_window in sub_windows:
                 sub_window.lay_out_to_anchors()
-                self.mdi.resized.connect(sub_window.lay_out_to_anchors)
 
     def find_best_resolution_viewer(self, layered_image_viewers: List[LayeredImageViewer]):
         best_resolution_viewer = None

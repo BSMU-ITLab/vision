@@ -33,4 +33,8 @@ class Mdi(QMdiArea):
 
     def resizeEvent(self, resize_event: QResizeEvent):
         super().resizeEvent(resize_event)
+
+        for sub_window in self.subWindowList():
+            sub_window.lay_out_to_anchors()
+
         self.resized.emit(resize_event)

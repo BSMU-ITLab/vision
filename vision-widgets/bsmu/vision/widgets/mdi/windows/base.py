@@ -43,5 +43,12 @@ class DataViewerSubWindow(QMdiSubWindow):
     def resizeEvent(self, resize_event: QResizeEvent):
         super().resizeEvent(resize_event)
 
-        if not self._laying_out:
-            self.layout_anchors = None
+        if not self._laying_out and self.layout_anchors is not None:
+            mdi = self.mdiArea()
+
+            top_left_point = self.mapTo(mdi, self.rect().topLeft())
+            bottom_right_point = self.mapTo(mdi, self.rect().bottomRight())
+
+            mdi_size = np.array([mdi.width(), mdi.height()])
+            self.layout_anchors[0] = np.array([top_left_point.x(), top_left_point.y()]) / mdi_size
+            self.layout_anchors[1] = np.array([bottom_right_point.x(), bottom_right_point.y()]) / mdi_size

@@ -5,6 +5,8 @@ from PySide2.QtCore import QObject, Signal
 from PySide2.QtGui import QColor
 from sortedcontainers import SortedList
 
+from bsmu.vision_core.data import Data
+
 
 class ColorTransferFunctionPoint(QObject):
     x_changed = Signal(float)
@@ -48,13 +50,33 @@ class ColorTransferFunctionPoint(QObject):
         return self.x < other.x
 
 
-class ColorTransferFunction(QObject):
+class ColorTransferFunction(Data):
     point_added = Signal(ColorTransferFunctionPoint)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, path: Path = None):
+        super().__init__(path)
 
         self.points = SortedList()
+
+    @classmethod
+    def from_x_fractions_colors_array(
+            cls, x_fractions_colors_array: np.ndarray, max_x: int = 255) -> ColorTransferFunction:
+        color_transfer_function = cls()
+        for row in x_fractions_colors_array:
+            x_fraction = row[0]
+            color_array = row[1:]
+            color_transfer_function.add_point_from_x_color(x_fraction * max_x, color_array)
+        return color_transfer_function
+
+    @classmethod
+    def default_jet(cls, max_x: int = 255) -> ColorTransferFunction:
+        return ColorTransferFunction.from_x_fractions_colors_array(
+            np.array([[0, 0, 0, 255, 255],
+                      [0.25, 0, 255, 255, 255],
+                      [0.5, 0, 255, 0, 255],
+                      [0.75, 255, 255, 0, 255],
+                      [1, 255, 0, 0, 255]]),
+            max_x)
 
     def add_point(self, point: ColorTransferFunctionPoint):
         self.points.add(point)

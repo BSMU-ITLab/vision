@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Tuple
 
 import cv2
 import numpy as np
-import skimage.transform
-import skimage.io
 import skimage.color
+import skimage.io
+import skimage.transform
 
 
 class DnnModelParams:
@@ -33,12 +34,15 @@ class Predictor:
 
         self._dnn_model = None
 
-    def predict(self, image: FlatImage, male: bool) -> float:
+    def predict(self, image: FlatImage, male: bool, calculate_activation_map: bool = True) -> Tuple[float, np.ndarray]:
         """
         :return: bone age in months
         """
         if self._dnn_model is None:
             self._dnn_model = cv2.dnn.readNet(str(self._dnn_model_path))
+
+            for index, layer_name in enumerate(self._dnn_model.getLayerNames()):
+                print(f'#{index} \t\t {layer_name}')
 
         print(f'FLAT {image.array.shape} {image.array.dtype} {image.array.min()} {image.array.max()}')
 
@@ -86,11 +90,50 @@ class Predictor:
         #input_male_blob = cv2.dnn.blobFromImage(input_male_blob)
         self._dnn_model.setInput(input_male_blob, name='input_male')
 
-        output_blob = self._dnn_model.forward()
+        # output_blob = self._dnn_model.forward()
+        OUTPUT_AGE_LAYER_NAME = 'output_age/MatMul'
+        OUTPUT_LAST_CONV_LAYER_NAME = 'relu/Relu'
+        OUTPUT_LAST_CONV_POOLING_LAYER_NAME = 'encoder_pooling/Mean/flatten'
+        output_blobs = self._dnn_model.forward([OUTPUT_AGE_LAYER_NAME, OUTPUT_LAST_CONV_LAYER_NAME, OUTPUT_LAST_CONV_POOLING_LAYER_NAME])
 
-        print(f'OUT BLOB: {output_blob.shape} {output_blob.dtype} {output_blob.min()} {output_blob.max()}')
-        output_age = output_blob[0, 0]
+        for out_blob in output_blobs:
+            print(f'OUT BLOB: {out_blob.shape} {out_blob.dtype} {out_blob.min()} {out_blob.max()}')
+
+        output_age_blob = output_blobs[0]
+        output_age = output_age_blob[0, 0]
         print(f'=== {output_age}')
         if self._dnn_model_params.age_denormalization:
             output_age = denormalized_age(output_age)
-        return output_age
+
+        # Calculate activation map
+        activation_map = None
+        if calculate_activation_map:
+            output_last_conv = output_blobs[1][0]
+            output_last_conv_pooling = output_blobs[2][0]
+            print(output_last_conv.shape, output_last_conv_pooling.shape)
+            activation_map = calculate_cam(output_last_conv, output_last_conv_pooling)
+
+        return output_age, activation_map
+
+
+def calculate_cam(conv, pooling):
+    cam = np.copy(conv)
+    for feature_map_index in range(cam.shape[0]):
+        cam[feature_map_index, ...] *= pooling[feature_map_index]
+    cam = np.mean(cam, axis=0)
+    cam = normalized_image(cam)
+    return cam
+
+
+def normalized_image(image):
+    """
+    :param image: two- or three-dimensional image
+    :return: normalized to [0, 1] image
+    """
+    image_min = image.min()
+    if image_min != 0:
+        image = image - image_min
+    image_max = image.max()
+    if image_max != 0 and image_max != 1:
+        image = image / image_max
+    return image

@@ -3,12 +3,14 @@ from PySide2.QtGui import QImage
 from skimage.color import gray2rgb
 
 
-def converted_to_normalized_uint8(image):
-    if image.dtype != np.uint8 or image.max() != 255:
-        if image.max() != 0:
-            image = image / image.max() * 255
-        image = image.astype(np.uint8)
-    return image
+def normalized(array: np.ndarray, min_range: float = 0, max_range: float = 1):
+    array_min = array.min()
+    normalized_between_zero_one = (array - array_min) / ((array.max() - array_min) or 1)
+    return normalized_between_zero_one * (max_range - min_range) + min_range
+
+
+def normalized_uint8(array: np.ndarray):
+    return normalized(array, 0, 255).astype(np.uint8)
 
 
 def converted_to_rgba(image):

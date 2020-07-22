@@ -7,6 +7,7 @@ from typing import List, Type
 from typing import TYPE_CHECKING
 
 import numpy as np
+import skimage.transform
 from PySide2.QtCore import QObject, Qt, QSysInfo, Signal
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
     QActionGroup
@@ -17,8 +18,12 @@ from bsmu.vision.widgets.gender import GenderWidget
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.visibility import VisibilityWidget
+from bsmu.vision_core.converters import color as color_converter
+from bsmu.vision_core.converters import image as image_converter
 from bsmu.vision_core.data import Data
+from bsmu.vision_core.image.base import FlatImage
 from bsmu.vision_core.image.layered import LayeredImage
+from bsmu.vision_core.transfer_functions.color import ColorTransferFunction
 
 if TYPE_CHECKING:
     from bsmu.vision.app import App
@@ -359,9 +364,10 @@ class TableVisualizer(QObject):
         if isinstance(data, LayeredImage):
             first_layer = data.layers[0]
 
-            male = True
-            predicted_bone_age = self.predictor.predict(first_layer.image, male)
-            record = PatientBoneAgeRecord(first_layer.image, male, 120, predicted_bone_age)
+            default_gender_is_male = True
+            image = first_layer.image
+            predicted_bone_age, activation_map = self.predictor.predict(image, default_gender_is_male)
+            record = PatientBoneAgeRecord(image, default_gender_is_male, 120, predicted_bone_age)
             record.male_changed.connect(partial(self._on_record_male_changed, record))
             self.journal.add_record(record)
 
@@ -371,11 +377,27 @@ class TableVisualizer(QObject):
                 sub_window.layout_anchors = np.array([[0.5, 0], [1, 1]])
                 sub_window.lay_out_to_anchors()
 
+            # Add a layer with the activation map
+            activation_map = skimage.transform.resize(activation_map, image.array.shape[:2], order=3)
+            activation_map = image_converter.normalized_uint8(activation_map)
+
+            activation_map_color_transfer_function = ColorTransferFunction.default_jet()
+            activation_map_color_transfer_function.points[0].color_array = np.array([0, 0, 255, 0])
+            activation_map_palette = color_converter.color_transfer_function_to_palette(
+                activation_map_color_transfer_function)
+
+            activation_map_layer = data.add_layer_from_image(
+                FlatImage(array=activation_map, palette=activation_map_palette), name='Activation Map')
+
+            for sub_window in data_viewer_sub_windows:
+                activation_layer_view = sub_window.viewer.layer_view_by_model(activation_map_layer)
+                activation_layer_view.opacity = 0.5
+
     def _on_record_male_changed(self, record: PatientBoneAgeRecord, male: bool):
         self._update_record_bone_age(record)
 
     def _update_record_bone_age(self, record: PatientBoneAgeRecord):
-        record.bone_age = self.predictor.predict(record.image, record.male)
+        record.bone_age, _ = self.predictor.predict(record.image, record.male, calculate_activation_map=False)
 
     def _on_journal_record_selected(self, record: PatientBoneAgeRecord):
         image_sub_windows = self.records_image_sub_windows.get(record)

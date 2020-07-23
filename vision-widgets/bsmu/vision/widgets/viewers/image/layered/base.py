@@ -42,8 +42,8 @@ class ImageLayerView(QObject):
 
     image_changed = Signal(Image)
     image_view_updated = Signal(FlatImage)
-    visibility_updated = Signal()
-    opacity_updated = Signal()
+    visibility_changed = Signal(bool)
+    opacity_changed = Signal(float)
 
     def __init__(self, image_layer: ImageLayer, visible: bool = True,
                  opacity: float = DEFAULT_LAYER_OPACITY):
@@ -78,7 +78,7 @@ class ImageLayerView(QObject):
     def visible(self, value: bool):
         if self._visible != value:
             self._visible = value
-            self.visibility_updated.emit()
+            self.visibility_changed.emit(self._visible)
 
     @property
     def opacity(self) -> float:
@@ -88,7 +88,7 @@ class ImageLayerView(QObject):
     def opacity(self, value: float):
         if self._opacity != value:
             self._opacity = value
-            self.opacity_updated.emit()
+            self.opacity_changed.emit(self._opacity)
 
     @property
     def image(self) -> Image:
@@ -209,7 +209,8 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         # See QWidget::update() documentation.
         layer_view.image_changed.connect(self._on_layer_image_changed)
         layer_view.image_view_updated.connect(self._on_layer_image_view_updated)
-        layer_view.visibility_updated.connect(self.update)
+        layer_view.visibility_changed.connect(lambda: self.update())
+        layer_view.opacity_changed.connect(lambda: self.update())
 
         if len(self.layer_views) == 1:  # If was added first layer view
             self._active_layer_view = layer_view

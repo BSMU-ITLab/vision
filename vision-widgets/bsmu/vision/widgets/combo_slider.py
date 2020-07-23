@@ -21,12 +21,12 @@ class ComboSlider(QFrame):
     value_changed = Signal(float)
 
     def __init__(self, title: str = '', value: float = 0, min_value: float = 0, max_value: float = 100,
-                 embedded: bool = False, parent: QWidget = None):
+                 displayed_value_factor: float = 1, embedded: bool = False, parent: QWidget = None):
         super().__init__(parent)
 
         self._embedded = embedded
 
-        self._slider_bar = SliderBar(title, value, min_value, max_value)
+        self._slider_bar = SliderBar(title, value, min_value, max_value, displayed_value_factor)
         self._slider_bar.value_changed.connect(self.value_changed)
 
         self._buttons_layout = QVBoxLayout()
@@ -186,12 +186,13 @@ class SliderBar(QWidget):
     value_changed = Signal(float)
 
     def __init__(self, title: str = '', value: float = 0, min_value: float = 0, max_value: float = 100,
-                 parent: QWidget = None):
+                 displayed_value_factor: float = 1, parent: QWidget = None):
         super().__init__(parent)
 
         self._value = value
         self._min_value = min_value
         self._max_value = max_value
+        self._displayed_value_factor = displayed_value_factor
 
         self._title_label = QLabel(title)
 
@@ -353,4 +354,4 @@ class SliderBar(QWidget):
         self._value_line_edit.setText(self._value_to_str(self.value))
 
     def _value_to_str(self, value: float) -> str:
-        return self._locale.toString(float(value), 'f', 2)
+        return self._locale.toString(float(value * self._displayed_value_factor), 'f', 2)

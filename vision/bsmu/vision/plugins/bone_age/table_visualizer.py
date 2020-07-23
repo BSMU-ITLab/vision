@@ -15,9 +15,9 @@ from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbst
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.predictor import Predictor
 from bsmu.vision.widgets.gender import GenderWidget
+from bsmu.vision.widgets.layer_visibility import LayerVisibilityWidget
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision.widgets.visibility import VisibilityWidget
 from bsmu.vision_core.converters import color as color_converter
 from bsmu.vision_core.converters import image as image_converter
 from bsmu.vision_core.data import Data
@@ -167,6 +167,8 @@ class PatientBoneAgeJournalTable(QTableWidget):
 
         self.data = data
 
+        self._records_rows = {}  # {PatientBoneAgeRecord: row}
+
         self._bone_age_formats = [MonthsBoneAgeFormat, YearsMonthsBoneAgeFormat]
         self._bone_age_format = YearsMonthsBoneAgeFormat
 
@@ -226,6 +228,11 @@ class PatientBoneAgeJournalTable(QTableWidget):
             self._update_bone_age_column_headers()
             self._update_bone_age_column_contents()
 
+    def add_record_activation_map_visibility_widget(
+            self, record: PatientBoneAgeRecord, layer_visibility_widget: LayerVisibilityWidget):
+        row = self._records_rows[record]
+        self.setCellWidget(row, self.column_number(TableActivationMapColumn), layer_visibility_widget)
+
     def _row_record(self, row: int) -> PatientBoneAgeRecord:
         return self.item(row, self.column_number(TableNameColumn)).data(self.RECORD_REF_ROLE)
 
@@ -238,6 +245,7 @@ class PatientBoneAgeJournalTable(QTableWidget):
     def _add_record_view(self, record: PatientBoneAgeRecord):
         row = self.rowCount()
         self.insertRow(row)
+        self._records_rows[record] = row
 
         name = '' if record.image is None else record.image.path.stem
         name_item = QTableWidgetItem(name)
@@ -264,11 +272,6 @@ class PatientBoneAgeJournalTable(QTableWidget):
         self._set_bone_age_to_table_item(bone_age_item, record.bone_age)
         record.bone_age_changed.connect(partial(self._set_bone_age_to_table_item, bone_age_item))
         self.setItem(row, self.column_number(TableDenseNetBoneAgeColumn), bone_age_item)
-
-        visibility_widget = VisibilityWidget(50, embedded=True)
-        # visibility_widget.slider_bar_color = QColor(240, 206, 164)
-        # visibility_widget.toggle_button_checked_color = QColor(240, 206, 164)
-        self.setCellWidget(row, self.column_number(TableActivationMapColumn), visibility_widget)
 
     def _on_item_selection_changed(self):
         selected_ranges = self.selectedRanges()
@@ -337,8 +340,14 @@ class PatientBoneAgeJournalViewer(DataViewer):
         grid_layout.addWidget(self.table)
         self.setLayout(grid_layout)
 
+    def add_record_activation_map_visibility_widget(
+            self, record: PatientBoneAgeRecord, layer_visibility_widget: LayerVisibilityWidget):
+        self.table.add_record_activation_map_visibility_widget(record, layer_visibility_widget)
+
 
 class TableVisualizer(QObject):
+    ACTIVATION_MAP_LAYER_NAME = 'Activation Map'
+
     def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi):
         super().__init__()
 
@@ -387,11 +396,18 @@ class TableVisualizer(QObject):
                 activation_map_color_transfer_function)
 
             activation_map_layer = data.add_layer_from_image(
-                FlatImage(array=activation_map, palette=activation_map_palette), name='Activation Map')
+                FlatImage(array=activation_map, palette=activation_map_palette), name=self.ACTIVATION_MAP_LAYER_NAME)
 
+            activation_map_layer_views = []
             for sub_window in data_viewer_sub_windows:
-                activation_layer_view = sub_window.viewer.layer_view_by_model(activation_map_layer)
-                activation_layer_view.opacity = 0.5
+                activation_map_layer_view = sub_window.viewer.layer_view_by_model(activation_map_layer)
+                activation_map_layer_view.opacity = 0.5
+                activation_map_layer_views.append(activation_map_layer_view)
+            activation_map_visibility_widget = LayerVisibilityWidget(activation_map_layer_views, embedded=True)
+            # activation_map_visibility_widget.slider_bar_color = QColor(240, 206, 164)
+            # activation_map_visibility_widget.toggle_button_checked_color = QColor(240, 206, 164)
+            self.journal_viewer.add_record_activation_map_visibility_widget(
+                record, activation_map_visibility_widget)
 
     def _on_record_male_changed(self, record: PatientBoneAgeRecord, male: bool):
         self._update_record_bone_age(record)
@@ -400,6 +416,6 @@ class TableVisualizer(QObject):
         record.bone_age, _ = self.predictor.predict(record.image, record.male, calculate_activation_map=False)
 
     def _on_journal_record_selected(self, record: PatientBoneAgeRecord):
-        image_sub_windows = self.records_image_sub_windows.get(record)
+        image_sub_windows = self.records_image_sub_windows.get(record, [])
         for image_sub_window in image_sub_windows:
             image_sub_window.raise_()

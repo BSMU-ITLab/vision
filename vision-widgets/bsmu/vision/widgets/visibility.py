@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide2.QtCore import QSize
+from PySide2.QtCore import QSize, Signal
 from PySide2.QtGui import QIcon, QColor
 from PySide2.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSizePolicy, QFrame
 
@@ -12,10 +12,11 @@ DEFAULT_COLOR = QColor(204, 228, 247)
 
 
 class VisibilityToggleButton(QPushButton):
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, checked: bool = False, parent: QWidget = None):
         super().__init__(parent)
 
         self.setCheckable(True)
+        self.setChecked(checked)
         self.setFlat(True)
 
         self._checked_color = DEFAULT_COLOR
@@ -52,7 +53,10 @@ class VisibilityToggleButton(QPushButton):
 
 
 class VisibilityWidget(QFrame):
-    def __init__(self, opacity: float = 50, embedded: bool = False, parent: QWidget = None):
+    toggled = Signal(bool)
+    opacity_changed = Signal(float)
+
+    def __init__(self, checked: bool = False, opacity: float = 0.5, embedded: bool = False, parent: QWidget = None):
         super().__init__(parent)
 
         self._embedded = embedded
@@ -61,11 +65,14 @@ class VisibilityWidget(QFrame):
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.setSpacing(0)
 
-        self._toggle_button = VisibilityToggleButton()
+        self._toggle_button = VisibilityToggleButton(checked)
+        self._toggle_button.toggled.connect(self.toggled)
 
-        self._combo_slider = ComboSlider('Opacity', opacity, embedded=embedded)
+        self._combo_slider = ComboSlider(
+            'Opacity', value=opacity, max_value=1, displayed_value_factor=100, embedded=embedded)
         self._combo_slider.bar_color = DEFAULT_COLOR
         self._combo_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self._combo_slider.value_changed.connect(self.opacity_changed)
 
         if self._embedded:
             # Set minimum width, else widget will go beyond the cell width (e.g. a table cell)
@@ -83,6 +90,22 @@ class VisibilityWidget(QFrame):
 
         h_layout.addWidget(self._toggle_button)
         h_layout.addWidget(self._combo_slider)
+
+    @property
+    def checked(self) -> bool:
+        return self._toggle_button.isChecked()
+
+    @checked.setter
+    def checked(self, value: bool):
+        self._toggle_button.setChecked(value)
+
+    @property
+    def opacity(self) -> float:
+        return self._combo_slider.value
+
+    @opacity.setter
+    def opacity(self, value: float):
+        self._combo_slider.value = value
 
     @property
     def slider_bar_color(self) -> QColor:

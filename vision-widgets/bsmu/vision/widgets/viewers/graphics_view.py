@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import partial
 
 from PySide2.QtCore import Qt, QObject, Signal, QTimeLine, QEvent
+from PySide2.QtGui import QPainter, QFont, QColor
 from PySide2.QtWidgets import QGraphicsView
 
 
@@ -23,12 +24,38 @@ class GraphicsView(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
+        self._cur_scale = self._calculate_scale()
+
+        self.scale_font = QFont()
+        self.scale_font.setPointSize(16)
+
+        # Without FullViewportUpdate mode, scale text will not be properly updated when scrolling,
+        # Because QGraphicsView::scrollContentsBy contains scroll optimization to update only part of the viewport.
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+
     def enable_zooming(self):
         self.setTransformationAnchor(QGraphicsView.NoAnchor)
         self.setResizeAnchor(QGraphicsView.NoAnchor)
 
         view_smooth_zoom = _ViewSmoothZoom(self, self)
+        view_smooth_zoom.zoom_finished.connect(self._update_scale)
         self.viewport().installEventFilter(view_smooth_zoom)
+
+    def paintEvent(self, event: QPaintEvent):
+        super().paintEvent(event)
+
+        painter = QPainter(self.viewport())
+        painter.setPen(QColor(123, 184, 234))
+        painter.setFont(self.scale_font)
+        painter.drawText(self.viewport().rect(), Qt.AlignHCenter | Qt.AlignBottom, f'{self._cur_scale * 100:.0f}%')
+
+    def _calculate_scale(self) -> float:
+        cur_transform = self.transform()
+        assert cur_transform.m11() == cur_transform.m22(), 'Scaled without keeping aspect ratio'
+        return cur_transform.m11()
+
+    def _update_scale(self):
+        self._cur_scale = self._calculate_scale()
 
 
 class _ViewSmoothZoom(QObject):

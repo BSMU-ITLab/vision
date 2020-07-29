@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from functools import partial
 
-from PySide2.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QRect
+import numpy as np
+from PySide2.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QRect, QRectF, QPointF
 from PySide2.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics
 from PySide2.QtWidgets import QGraphicsView
 
@@ -29,6 +30,9 @@ class GraphicsView(QGraphicsView):
         self._scale_font_metrics = QFontMetrics(self._scale_font)
         self._scale_text_rect = QRect()
 
+        self._viewport_anchors = np.array([[0, 0], [1, 1]], dtype=np.float)
+        self._viewport_anchoring = False
+
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
@@ -42,7 +46,7 @@ class GraphicsView(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.NoAnchor)
 
         view_smooth_zoom = _ViewSmoothZoom(self, self)
-        view_smooth_zoom.zoom_finished.connect(self._update_scale)
+        view_smooth_zoom.zoom_finished.connect(self._on_zoom_finished)
         self.viewport().installEventFilter(view_smooth_zoom)
 
     def paintEvent(self, event: QPaintEvent):
@@ -75,6 +79,8 @@ class GraphicsView(QGraphicsView):
         self.viewport().update(self._scale_text_rect)
         self.viewport().update(self._scale_text_rect.translated(dx, dy))
 
+        self._update_viewport_anchors()
+
     def _calculate_scale(self) -> float:
         cur_transform = self.transform()
         assert cur_transform.m11() == cur_transform.m22(), 'Scaled without keeping aspect ratio'
@@ -82,6 +88,46 @@ class GraphicsView(QGraphicsView):
 
     def _update_scale(self):
         self._cur_scale = self._calculate_scale()
+
+    def _on_zoom_finished(self):
+        self._update_scale()
+        self._update_viewport_anchors()
+
+    def _update_viewport_anchors(self):
+        if self._viewport_anchoring:
+            return
+
+        viewport_rect = self.viewport().rect()
+        top_left_viewport_point = self.mapToScene(viewport_rect.topLeft())
+        bottom_right_viewport_point = self.mapToScene(viewport_rect.bottomRight())
+
+        scene_rect = self.sceneRect()
+        scene_size = np.array([scene_rect.width(), scene_rect.height()])
+
+        self._viewport_anchors[0] = np.array([top_left_viewport_point.x(), top_left_viewport_point.y()]) / scene_size
+        self._viewport_anchors[1] = \
+            np.array([bottom_right_viewport_point.x(), bottom_right_viewport_point.y()]) / scene_size
+
+    def resizeEvent(self, resize_event: QResizeEvent):
+        self._anchor_viewport()
+
+    def _anchor_viewport(self):
+        self._viewport_anchoring = True
+
+        scene_rect = self.sceneRect()
+        scene_size = np.array([scene_rect.width(), scene_rect.height()])
+
+        viewport_rect_angle_point_coords = self._viewport_anchors * scene_size
+        viewport_rect = QRectF(QPointF(*viewport_rect_angle_point_coords[0]),
+                               QPointF(*viewport_rect_angle_point_coords[1]))
+        self.fit_in_view(viewport_rect, Qt.KeepAspectRatio)
+
+        self._viewport_anchoring = False
+
+    def fit_in_view(self, rect: QRectF, aspect_ratio_mode: Qt.AspectRatioMode = Qt.IgnoreAspectRatio):
+        self.fitInView(rect, aspect_ratio_mode)
+
+        self._update_scale()
 
 
 class _ViewSmoothZoom(QObject):

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from functools import partial
 
-from PySide2.QtCore import Qt, QObject, Signal, QTimeLine, QEvent
-from PySide2.QtGui import QPainter, QFont, QColor
+from PySide2.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QRect
+from PySide2.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics
 from PySide2.QtWidgets import QGraphicsView
 
 
@@ -17,21 +17,25 @@ class GraphicsView(QGraphicsView):
 
         self.setScene(scene)
 
-        self.zoomable = zoomable
-        if self.zoomable:
+        self._zoomable = zoomable
+        if self._zoomable:
             self.enable_zooming()
+
+        self._cur_scale = self._calculate_scale()
+
+        self._scale_font = QFont()
+        self._scale_font.setPointSize(16)
+        self._scale_font.setBold(True)
+        self._scale_font_metrics = QFontMetrics(self._scale_font)
+        self._scale_text_rect = QRect()
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
-        self._cur_scale = self._calculate_scale()
-
-        self.scale_font = QFont()
-        self.scale_font.setPointSize(16)
-
         # Without FullViewportUpdate mode, scale text will not be properly updated when scrolling,
         # Because QGraphicsView::scrollContentsBy contains scroll optimization to update only part of the viewport.
-        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        # self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        # Now we override the scrollContentsBy method instead of changing the mode to FullViewportUpdate
 
     def enable_zooming(self):
         self.setTransformationAnchor(QGraphicsView.NoAnchor)
@@ -45,9 +49,31 @@ class GraphicsView(QGraphicsView):
         super().paintEvent(event)
 
         painter = QPainter(self.viewport())
-        painter.setPen(QColor(123, 184, 234))
-        painter.setFont(self.scale_font)
-        painter.drawText(self.viewport().rect(), Qt.AlignHCenter | Qt.AlignBottom, f'{self._cur_scale * 100:.0f}%')
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QColor(123, 184, 234))
+        painter.setPen(QPen(Qt.white, 0.5))
+
+        scale_text = f'{self._cur_scale * 100:.0f}%'
+        scale_text_bounding_rect = self._scale_font_metrics.boundingRect(scale_text)
+        viewport_rect = self.viewport().rect()
+        # Align the scale text to (Qt.AlignHCenter | Qt.AlignBottom)
+        pad = 2
+        self._scale_text_rect = QRect(viewport_rect.width() / 2 - scale_text_bounding_rect.width() / 2,
+                                      viewport_rect.height() - scale_text_bounding_rect.height() - 6,
+                                      scale_text_bounding_rect.width(), scale_text_bounding_rect.height())\
+            .adjusted(-pad, -pad, pad, pad)  # add pads to update when scrolling without artifacts
+
+        # Use QPainterPath to draw text with outline
+        path = QPainterPath()
+        path.addText(self._scale_text_rect.bottomLeft(), self._scale_font, scale_text)
+        painter.drawPath(path)
+
+    def scrollContentsBy(self, dx: int, dy: int):
+        super().scrollContentsBy(dx, dy)
+
+        # Update old (to clear text) and new rectangles (to draw) with the scale text
+        self.viewport().update(self._scale_text_rect)
+        self.viewport().update(self._scale_text_rect.translated(dx, dy))
 
     def _calculate_scale(self) -> float:
         cur_transform = self.transform()

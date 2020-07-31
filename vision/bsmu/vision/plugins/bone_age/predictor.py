@@ -96,6 +96,9 @@ class Predictor:
         OUTPUT_LAST_CONV_POOLING_LAYER_NAME = 'encoder_pooling/Mean/flatten'
         output_blobs = self._dnn_model.forward([OUTPUT_AGE_LAYER_NAME, OUTPUT_LAST_CONV_LAYER_NAME, OUTPUT_LAST_CONV_POOLING_LAYER_NAME])
 
+        # inp_test_blod = np.zeros(shape=(1664,))
+        # self._dnn_model.setInput(inp_test_blod, name='encoder_pooling/Mean/flatten')
+
         for out_blob in output_blobs:
             print(f'OUT BLOB: {out_blob.shape} {out_blob.dtype} {out_blob.min()} {out_blob.max()}')
 

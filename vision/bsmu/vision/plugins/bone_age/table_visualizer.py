@@ -8,16 +8,18 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import skimage.transform
-from PySide2.QtCore import QObject, Qt, QSysInfo, Signal
+from PySide2.QtCore import QObject, Qt, QSysInfo, Signal, QDate
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
     QActionGroup
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.predictor import Predictor
+from bsmu.vision.widgets.date import DateEditWidget
 from bsmu.vision.widgets.gender import GenderWidget
 from bsmu.vision.widgets.layer_visibility import LayerVisibilityWidget
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
+from bsmu.vision_core import date
 from bsmu.vision_core.converters import color as color_converter
 from bsmu.vision_core.converters import image as image_converter
 from bsmu.vision_core.data import Data
@@ -47,15 +49,23 @@ class TableVisualizerPlugin(Plugin):
 
 class PatientBoneAgeRecord(QObject):
     male_changed = Signal(bool)
+    birthdate_changed = Signal(QDate)
+    image_date_changed = Signal(QDate)
+    age_in_image_changed = Signal(float)
     bone_age_changed = Signal(float)
 
-    def __init__(self, image: FlatImage, male: bool, age: float, bone_age: float):
+    def __init__(self, image: FlatImage, male: bool, birthdate: QDate, image_date: QDate, bone_age: float):
         super().__init__()
 
         self.image = image
         self._male = male
-        self.age = age
-        self._bone_age = bone_age  # in months
+        self._birthdate = birthdate
+        self._image_date = image_date
+        self._bone_age = bone_age  # in days
+
+        self._age_in_image = self._calculate_age_in_image()  # in days
+        self.birthdate_changed.connect(self._update_age_in_image)
+        self.image_date_changed.connect(self._update_age_in_image)
 
     @property
     def male(self) -> bool:
@@ -68,6 +78,30 @@ class PatientBoneAgeRecord(QObject):
             self.male_changed.emit(self._male)
 
     @property
+    def birthdate(self) -> QDate:
+        return self._birthdate
+
+    @birthdate.setter
+    def birthdate(self, value: QDate):
+        if self._birthdate != value:
+            self._birthdate = value
+            self.birthdate_changed.emit(self._birthdate)
+
+    @property
+    def image_date(self) -> QDate:
+        return self._image_date
+
+    @image_date.setter
+    def image_date(self, value: QDate):
+        if self._image_date != value:
+            self._image_date = value
+            self.image_date_changed.emit(self._image_date)
+
+    @property
+    def age_in_image(self) -> float:
+        return self._age_in_image
+
+    @property
     def bone_age(self) -> float:
         return self._bone_age
 
@@ -76,6 +110,13 @@ class PatientBoneAgeRecord(QObject):
         if self._bone_age != value:
             self._bone_age = value
             self.bone_age_changed.emit(self._bone_age)
+
+    def _calculate_age_in_image(self):
+        return self.birthdate.daysTo(self.image_date)
+
+    def _update_age_in_image(self):
+        self._age_in_image = self._calculate_age_in_image()
+        self.age_in_image_changed.emit(self.age_in_image)
 
 
 class PatientBoneAgeJournal(Data):
@@ -98,35 +139,35 @@ class PatientBoneAgeJournalTableRecord(QObject):
         self.record = record
 
 
-class BoneAgeFormat(ABC):
+class AgeFormat(ABC):
     NAME = ''
     ABBR = ''
 
-    bone_age_decimals = 2
+    age_decimals = 2
 
     @classmethod
     @abstractmethod
-    def format(cls, bone_age: float) -> str:
+    def format(cls, age: float) -> str:
         pass
 
 
-class MonthsBoneAgeFormat(BoneAgeFormat):
+class MonthsAgeFormat(AgeFormat):
     NAME = 'Months'
     ABBR = 'M'
 
     @classmethod
-    def format(cls, bone_age: float) -> str:
-        return f'{bone_age:.{cls.bone_age_decimals}f}'
+    def format(cls, age_in_days: float) -> str:
+        return f'{date.days_to_months(age_in_days):.{cls.age_decimals}f}'
 
 
-class YearsMonthsBoneAgeFormat(BoneAgeFormat):
+class YearsMonthsAgeFormat(AgeFormat):
     NAME = 'Years / Months'
     ABBR = 'Y / M'
 
     @classmethod
-    def format(cls, bone_age: float) -> str:
-        years, months = divmod(bone_age, 12)
-        return f'{int(years)} / {months:.{cls.bone_age_decimals}f}'
+    def format(cls, age_in_days: float) -> str:
+        years, months = date.days_to_years_months(age_in_days)
+        return f'{int(years)} / {months:.{cls.age_decimals}f}'
 
 
 class TableColumn:
@@ -141,16 +182,34 @@ class TableGenderColumn(TableColumn):
     TITLE = 'Gender'
 
 
+class TableBirthdateColumn(TableColumn):
+    TITLE = 'Date of Birth'
+
+
+class TableImageDateColumn(TableColumn):
+    TITLE = 'Image Date'
+
+
 class TableAgeColumn(TableColumn):
     TITLE = 'Age'
 
+    RECORD_PROPERTY = None
 
-class TableBoneAgeColumn(TableColumn):
-    TITLE = 'Bone Age'
+    @classmethod
+    def value(cls, record: PatientBoneAgeRecord):
+        return cls.RECORD_PROPERTY.__get__(record)
 
 
-class TableDenseNetBoneAgeColumn(TableBoneAgeColumn):
+class TableAgeInImageColumn(TableAgeColumn):
+    TITLE = 'Age in Image'
+
+    RECORD_PROPERTY = PatientBoneAgeRecord.age_in_image
+
+
+class TableDenseNetBoneAgeColumn(TableAgeColumn):
     TITLE = 'DenseNet\nBone Age'
+
+    RECORD_PROPERTY = PatientBoneAgeRecord.bone_age
 
 
 class TableActivationMapColumn(TableColumn):
@@ -169,14 +228,14 @@ class PatientBoneAgeJournalTable(QTableWidget):
 
         self._records_rows = {}  # {PatientBoneAgeRecord: row}
 
-        self._bone_age_formats = [MonthsBoneAgeFormat, YearsMonthsBoneAgeFormat]
-        self._bone_age_format = YearsMonthsBoneAgeFormat
+        self._age_formats = [MonthsAgeFormat, YearsMonthsAgeFormat]
+        self._age_format = YearsMonthsAgeFormat
 
-        self._columns = [TableNameColumn, TableGenderColumn, TableAgeColumn, TableDenseNetBoneAgeColumn,
-                         TableActivationMapColumn]
+        self._columns = [TableNameColumn, TableGenderColumn, TableBirthdateColumn, TableImageDateColumn,
+                         TableAgeInImageColumn, TableDenseNetBoneAgeColumn, TableActivationMapColumn]
         self._columns_numbers = {column: number for number, column in enumerate(self._columns)}
-        self._bone_age_columns = {column for column in self._columns if issubclass(column, TableBoneAgeColumn)}
-        self._bone_age_column_numbers = {self._columns_numbers[column] for column in self._bone_age_columns}
+        self._age_columns = {column for column in self._columns if issubclass(column, TableAgeColumn)}
+        self._age_column_numbers = {self._columns_numbers[column] for column in self._age_columns}
 
         self.setColumnCount(len(self._columns))
         self.setAlternatingRowColors(True)
@@ -218,15 +277,15 @@ class PatientBoneAgeJournalTable(QTableWidget):
         return self._columns_numbers[column]
 
     @property
-    def bone_age_format(self) -> Type[BoneAgeFormat]:
-        return self._bone_age_format
+    def age_format(self) -> Type[AgeFormat]:
+        return self._age_format
 
-    @bone_age_format.setter
-    def bone_age_format(self, value: Type[BoneAgeFormat]):
-        if self._bone_age_format != value:
-            self._bone_age_format = value
-            self._update_bone_age_column_headers()
-            self._update_bone_age_column_contents()
+    @age_format.setter
+    def age_format(self, value: Type[AgeFormat]):
+        if self._age_format != value:
+            self._age_format = value
+            self._update_age_column_headers()
+            self._update_age_column_contents()
 
     def add_record_activation_map_visibility_widget(
             self, record: PatientBoneAgeRecord, layer_visibility_widget: LayerVisibilityWidget):
@@ -238,8 +297,8 @@ class PatientBoneAgeJournalTable(QTableWidget):
 
     def _create_column_title(self, column: Type[TableColumn]) -> str:
         column_title = column.TITLE
-        if issubclass(column, TableBoneAgeColumn):
-            column_title += f' ({self._bone_age_format.ABBR})'
+        if issubclass(column, TableAgeColumn):
+            column_title += f' ({self._age_format.ABBR})'
         return column_title
 
     def _add_record_view(self, record: PatientBoneAgeRecord):
@@ -261,17 +320,27 @@ class PatientBoneAgeJournalTable(QTableWidget):
         record.male_changed.connect(partial(self._on_record_male_changed, gender_widget))
         self.setCellWidget(row, self.column_number(TableGenderColumn), gender_widget)
 
-        age_item = QTableWidgetItem(str(record.age))
-        age_item.setFlags(age_item.flags() & ~Qt.ItemIsEditable)
-        age_item.setTextAlignment(Qt.AlignCenter)
-        self.setItem(row, self.column_number(TableAgeColumn), age_item)
+        birthdate_edit_widget = DateEditWidget(record.birthdate, embedded=True)
+        birthdate_edit_widget.dateChanged.connect(partial(self._on_birthdate_changed, record))
+        self.setCellWidget(row, self.column_number(TableBirthdateColumn), birthdate_edit_widget)
+
+        image_date_edit_widget = DateEditWidget(record.image_date, embedded=True)
+        image_date_edit_widget.dateChanged.connect(partial(self._on_image_date_changed, record))
+        self.setCellWidget(row, self.column_number(TableImageDateColumn), image_date_edit_widget)
+
+        age_in_image_item = QTableWidgetItem()
+        age_in_image_item.setFlags(age_in_image_item.flags() & ~Qt.ItemIsEditable)
+        age_in_image_item.setTextAlignment(Qt.AlignCenter)
+        record.age_in_image_changed.connect(partial(self._set_age_to_table_item, age_in_image_item))
+        self.setItem(row, self.column_number(TableAgeInImageColumn), age_in_image_item)
 
         bone_age_item = QTableWidgetItem()
         bone_age_item.setFlags(bone_age_item.flags() & ~Qt.ItemIsEditable)
         bone_age_item.setTextAlignment(Qt.AlignCenter)
-        self._set_bone_age_to_table_item(bone_age_item, record.bone_age)
-        record.bone_age_changed.connect(partial(self._set_bone_age_to_table_item, bone_age_item))
+        record.bone_age_changed.connect(partial(self._set_age_to_table_item, bone_age_item))
         self.setItem(row, self.column_number(TableDenseNetBoneAgeColumn), bone_age_item)
+
+        self._update_age_column_contents()
 
     def _on_item_selection_changed(self):
         selected_ranges = self.selectedRanges()
@@ -286,44 +355,51 @@ class PatientBoneAgeJournalTable(QTableWidget):
     def _on_record_male_changed(self, gender_widget: GenderWidget, male: bool):
         gender_widget.man = male
 
-    def _set_bone_age_to_table_item(self, bone_age_table_item: QTableWidgetItem, bone_age: float):
-        bone_age_table_item.setText(self._bone_age_format.format(bone_age))
+    def _on_birthdate_changed(self, record: PatientBoneAgeRecord, date: QDate):
+        record.birthdate = date
+
+    def _on_image_date_changed(self, record: PatientBoneAgeRecord, date: QDate):
+        record.image_date = date
+
+    def _set_age_to_table_item(self, age_table_item: QTableWidgetItem, age: float):
+        age_table_item.setText(self._age_format.format(age))
 
     def _display_header_context_menu(self, point: QPoint):
         column_number = self.horizontalHeader().logicalIndexAt(point)
-        if column_number in self._bone_age_column_numbers:
-            self._display_bone_age_column_context_menu(point)
+        if column_number in self._age_column_numbers:
+            self._display_age_column_context_menu(point)
 
-    def _display_bone_age_column_context_menu(self, point: QPoint):
+    def _display_age_column_context_menu(self, point: QPoint):
         menu = QMenu(self)
         format_menu = menu.addMenu('Format')
         format_action_group = QActionGroup(self)
-        for bone_age_format in self._bone_age_formats:
-            format_action = format_menu.addAction(bone_age_format.NAME)
-            format_action.bone_age_format = bone_age_format
+        for age_format in self._age_formats:
+            format_action = format_menu.addAction(age_format.NAME)
+            format_action.age_format = age_format
             format_action.setCheckable(True)
 
-            if self._bone_age_format == bone_age_format:
+            if self._age_format == age_format:
                 format_action.setChecked(True)
 
             format_action_group.addAction(format_action)
 
         triggered_action = menu.exec_(self.horizontalHeader().viewport().mapToGlobal(point))
         if triggered_action:
-            self.bone_age_format = triggered_action.bone_age_format
+            self.age_format = triggered_action.age_format
 
-    def _update_bone_age_column_headers(self):
-        for bone_age_column in self._bone_age_columns:
-            header_label = self._create_column_title(bone_age_column)
-            bone_age_column_number = self._columns_numbers[bone_age_column]
-            self.horizontalHeaderItem(bone_age_column_number).setText(header_label)
+    def _update_age_column_headers(self):
+        for age_column in self._age_columns:
+            header_label = self._create_column_title(age_column)
+            age_column_number = self._columns_numbers[age_column]
+            self.horizontalHeaderItem(age_column_number).setText(header_label)
 
-    def _update_bone_age_column_contents(self):
+    def _update_age_column_contents(self):
         for row in range(self.rowCount()):
             record = self._row_record(row)
-            bone_age = record.bone_age
-            for bone_age_column_number in self._bone_age_column_numbers:
-                self._set_bone_age_to_table_item(self.item(row, bone_age_column_number), bone_age)
+            for age_column in self._age_columns:
+                age_column_number = self._columns_numbers[age_column]
+                age_item = self.item(row, age_column_number)
+                self._set_age_to_table_item(age_item, age_column.value(record))
 
 
 class PatientBoneAgeJournalViewer(DataViewer):
@@ -376,7 +452,8 @@ class TableVisualizer(QObject):
             default_gender_is_male = True
             image = first_layer.image
             predicted_bone_age, activation_map = self.predictor.predict(image, default_gender_is_male)
-            record = PatientBoneAgeRecord(image, default_gender_is_male, 120, predicted_bone_age)
+            record = PatientBoneAgeRecord(image, default_gender_is_male, QDate(2000, 1, 1), QDate.currentDate(),
+                                          date.months_to_days(predicted_bone_age))
             record.male_changed.connect(partial(self._on_record_male_changed, record))
             self.journal.add_record(record)
 
@@ -413,7 +490,8 @@ class TableVisualizer(QObject):
         self._update_record_bone_age(record)
 
     def _update_record_bone_age(self, record: PatientBoneAgeRecord):
-        record.bone_age, _ = self.predictor.predict(record.image, record.male, calculate_activation_map=False)
+        predicted_bone_age, _ = self.predictor.predict(record.image, record.male, calculate_activation_map=False)
+        record.bone_age = date.months_to_days(predicted_bone_age)
 
     def _on_journal_record_selected(self, record: PatientBoneAgeRecord):
         image_sub_windows = self.records_image_sub_windows.get(record, [])

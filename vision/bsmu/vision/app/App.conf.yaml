@@ -43,5 +43,5 @@ plugins:
 #  - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
 #  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
 
-  - bsmu.vision.plugins.bone_age.table_visualizer.TableVisualizerPlugin
+  - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin
 #  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin

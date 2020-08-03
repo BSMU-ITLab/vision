@@ -11,8 +11,9 @@ import skimage.transform
 
 
 class DnnModelParams:
-    def __init__(self, input_image_size: tuple = (500, 500), image_net_torch_preprocessing: bool = True,
+    def __init__(self, path: Path, input_image_size: tuple = (500, 500), image_net_torch_preprocessing: bool = True,
                  age_denormalization: bool = True):
+        self.path = path
         self.input_image_size = input_image_size
         self.image_net_torch_preprocessing = image_net_torch_preprocessing
         self.age_denormalization = age_denormalization
@@ -27,19 +28,17 @@ def denormalized_age(age: float) -> float:
 
 
 class Predictor:
-    def __init__(self, dnn_model_path: Path, dnn_model_params: DnnModelParams = DnnModelParams()):
-
-        self._dnn_model_path = dnn_model_path
+    def __init__(self, dnn_model_params: DnnModelParams):
         self._dnn_model_params = dnn_model_params
 
         self._dnn_model = None
 
     def predict(self, image: FlatImage, male: bool, calculate_activation_map: bool = True) -> Tuple[float, np.ndarray]:
         """
-        :return: bone age in months
+        :return: tuple of (bone age in months, activation map)
         """
         if self._dnn_model is None:
-            self._dnn_model = cv2.dnn.readNet(str(self._dnn_model_path))
+            self._dnn_model = cv2.dnn.readNet(str(self._dnn_model_params.path))
 
             for index, layer_name in enumerate(self._dnn_model.getLayerNames()):
                 print(f'#{index} \t\t {layer_name}')

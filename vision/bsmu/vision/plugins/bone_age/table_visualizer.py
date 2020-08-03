@@ -13,7 +13,7 @@ from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbst
     QActionGroup
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.bone_age.predictor import Predictor
+from bsmu.vision.plugins.bone_age.predictor import Predictor, DnnModelParams
 from bsmu.vision.widgets.date import DateEditWidget
 from bsmu.vision.widgets.gender import GenderWidget
 from bsmu.vision.widgets.layer_visibility import LayerVisibilityWidget
@@ -31,14 +31,14 @@ if TYPE_CHECKING:
     from bsmu.vision.app import App
 
 
-class TableVisualizerPlugin(Plugin):
+class BoneAgeTableVisualizerPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
         self.data_visualization_manager = app.enable_plugin(
             'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin').data_visualization_manager
         mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
-        self.table_visualizer = TableVisualizer(self.data_visualization_manager, mdi)
+        self.table_visualizer = BoneAgeTableVisualizer(self.data_visualization_manager, mdi)
 
     def _enable(self):
         self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_bone_age_data)
@@ -308,7 +308,6 @@ class PatientBoneAgeJournalTable(QTableWidget):
 
         name = '' if record.image is None else record.image.path.stem
         name_item = QTableWidgetItem(name)
-        name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
         name_item.setTextAlignment(Qt.AlignCenter)
         # Add the |record| reference to the |name_item|
         name_item.setData(self.RECORD_REF_ROLE, record)
@@ -421,14 +420,14 @@ class PatientBoneAgeJournalViewer(DataViewer):
         self.table.add_record_activation_map_visibility_widget(record, layer_visibility_widget)
 
 
-class TableVisualizer(QObject):
+class BoneAgeTableVisualizer(QObject):
     ACTIVATION_MAP_LAYER_NAME = 'Activation Map'
 
     def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi):
         super().__init__()
 
-        self.predictor = Predictor(Path(r'D:\Temp\TempBoneAgeModels\DenseNet_withInputShape___weighted.pb'))
-        # self.predictor.predict()
+        self.predictor = Predictor(
+            DnnModelParams(Path(__file__).parent / 'dnn-models' / 'DenseNet_withInputShape___weighted.pb'))
 
         self.visualization_manager = visualization_manager
         self.mdi = mdi

@@ -14,6 +14,7 @@ dependencies:
   - wheel=0.33.4=py37_0
   - wincertstore=0.2=py37_0
   - pip:
+    - cx-freeze==6.1
     - decorator==4.4.0
     - imageio==2.5.0
     - networkx==2.3

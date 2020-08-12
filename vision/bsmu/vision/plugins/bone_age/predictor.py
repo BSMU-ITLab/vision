@@ -8,6 +8,7 @@ import numpy as np
 import skimage.color
 import skimage.io
 import skimage.transform
+import bsmu.vision_core.converters.image as image_converter
 
 
 class DnnModelParams:
@@ -65,7 +66,7 @@ class Predictor:
 
         image = skimage.color.rgb2gray(image.array)
         image = cv2.resize(image, (500, 500), interpolation=cv2.INTER_AREA)
-
+        image = image_converter.normalized(image)
 
         print(f'IMAGE: {image.shape} {image.dtype} {image.min()} {image.max()}')
 

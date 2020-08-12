@@ -57,5 +57,10 @@ setup(
         'install_exe': install_exe_options,
         'bdist_msi': bdist_msi_options,
     },
-    executables=[Executable(FILE_DIR / 'bsmu/vision/app/main.py', base=app_base)]
+    executables=[Executable(
+        FILE_DIR / 'bsmu/vision/app/main.py',
+        base=app_base,
+        shortcutName='Bone Age',
+        shortcutDir='DesktopFolder',
+    )]
 )

@@ -207,7 +207,7 @@ class TableAgeInImageColumn(TableAgeColumn):
 
 
 class TableDenseNetBoneAgeColumn(TableAgeColumn):
-    TITLE = 'DenseNet\nBone Age'
+    TITLE = 'Bone Age'
 
     RECORD_PROPERTY = PatientBoneAgeRecord.bone_age
 
@@ -426,8 +426,9 @@ class BoneAgeTableVisualizer(QObject):
     def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi):
         super().__init__()
 
+        model_name = 'DenseNet169_500x500_b7_AllImages3_MoreAugments_Mae5.80.pb'  # 'DenseNet_withInputShape___weighted.pb'
         self.predictor = Predictor(
-            DnnModelParams(Path(__file__).parent / 'dnn-models' / 'DenseNet_withInputShape___weighted.pb'))
+            DnnModelParams(Path(__file__).parent / 'dnn-models' / model_name))
 
         self.visualization_manager = visualization_manager
         self.mdi = mdi

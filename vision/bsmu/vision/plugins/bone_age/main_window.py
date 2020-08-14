@@ -16,15 +16,13 @@ class BoneAgeMainWindowPlugin(MainWindowPlugin):
     #                        py_modules=('main',))
 
     def __init__(self, app: App):
-        super().__init__(app)
+        super().__init__(app, BoneAgeMainWindow)
 
-        self.main_window = BoneAgeMainWindow()
-
-    def _enable(self):
-        self.main_window.show()
-
-    def _disable(self):
-        self.main_window.hide()
+    # def _enable(self):
+    #     self.main_window.show()
+    #
+    # def _disable(self):
+    #     self.main_window.hide()
 
 
 class BoneAgeMainWindow(MainWindow):

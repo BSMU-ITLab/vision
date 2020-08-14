@@ -7,11 +7,13 @@ from PySide2.QtGui import QResizeEvent
 from PySide2.QtWidgets import QMdiArea
 
 from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.plugins.windows.main import MainWindowPlugin
 
 
 class MdiPlugin(Plugin):
     def __init__(self, app: App,
-                 main_window_plugin: Union[str, Plugin] = 'bsmu.vision.plugins.windows.main.MainWindowPlugin'):
+                 main_window_plugin: Union[str, MainWindowPlugin] = MainWindowPlugin.ALIAS,
+                 ):
         super().__init__(app)
 
         self.main_window = app.enable_plugin(main_window_plugin).main_window

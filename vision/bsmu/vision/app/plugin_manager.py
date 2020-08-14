@@ -36,8 +36,9 @@ class PluginManager(QObject):
         self._enabled_plugins[plugin.full_name()] = plugin
 
     def _create_plugin(self, full_name: str, params: str):
-        plugin = self._created_plugins.get(full_name)
+        plugin = self._created_plugins.get(full_name) or self._aliases_plugins.get(full_name)
         if plugin is None:
+            print('fff', full_name)
             module_name, class_name = full_name.rsplit(".", 1)
             plugin_class = getattr(importlib.import_module(module_name), class_name)
 
@@ -49,8 +50,11 @@ class PluginManager(QObject):
                     plugin_as_param = self._aliases_plugins.get(p)
                     plugins_as_params.append(plugin_as_param or p)
 
+            print('aaaaaa', plugin_class.ALIAS)
             plugin = plugin_class(self.app, *plugins_as_params)
             self._created_plugins[plugin.full_name()] = plugin
+            if plugin.ALIAS:
+                self._aliases_plugins[plugin.ALIAS] = plugin
 
         return plugin
 

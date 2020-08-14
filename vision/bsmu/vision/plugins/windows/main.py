@@ -8,30 +8,6 @@ from sortedcontainers import SortedDict
 from bsmu.vision.app.plugin import Plugin
 
 
-class MainWindowPlugin(Plugin):
-    # setup_info = SetupInfo(name='bsmu-vision-main-window',
-    #                        version=Version(0, 0, 1),
-    #                        py_modules=('main',))
-
-    def __init__(self, app: App):
-        super().__init__(app)
-
-        self.united_config = self.old_config()
-
-        self.main_window = MainWindow(self.united_config.data['title'])
-
-        # self.main_window.add_menu_action(FileMenu, 'Load', None, None)
-        # self.main_window.add_menu_action(FileMenu, 'Export Results', None, None)
-        # self.main_window.add_menu_action(AtlasMenu, 'Male', None, None)
-        # self.main_window.add_menu_action(AtlasMenu, 'Female', None, None)
-
-    def _enable(self):
-        self.main_window.show()
-
-    def _disable(self):
-        self.main_window.hide()
-
-
 class MainWindow(QMainWindow):
     def __init__(self, title: str = '', menu_order: Optional[Tuple[MainMenu]] = None):
         super().__init__()
@@ -45,6 +21,30 @@ class MainWindow(QMainWindow):
 
     def add_menu_action(self, menu_type: MenuType, action_name, method, shortcut):
         return self.menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
+
+
+class MainWindowPlugin(Plugin):
+    ALIAS = 'main_window_plugin'
+
+    # setup_info = SetupInfo(name='bsmu-vision-main-window',
+    #                        version=Version(0, 0, 1),
+    #                        py_modules=('main',))
+
+    def __init__(self, app: App, main_window_class: Type[MainWindow] = MainWindow):
+        super().__init__(app)
+
+        self.main_window = main_window_class(self.config.value('title'))
+
+        # self.main_window.add_menu_action(FileMenu, 'Load', None, None)
+        # self.main_window.add_menu_action(FileMenu, 'Export Results', None, None)
+        # self.main_window.add_menu_action(AtlasMenu, 'Male', None, None)
+        # self.main_window.add_menu_action(AtlasMenu, 'Female', None, None)
+
+    def _enable(self):
+        self.main_window.show()
+
+    def _disable(self):
+        self.main_window.hide()
 
 
 class MainMenu(QMenu):

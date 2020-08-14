@@ -5,7 +5,7 @@ import os
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.windows.main import ViewMenu
+from bsmu.vision.plugins.windows.main import MainWindowPlugin, ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 
 
@@ -13,7 +13,7 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
-        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
+        self.main_window = app.enable_plugin(MainWindowPlugin.ALIAS).main_window
         mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
         file_loading_manager = app.enable_plugin(
             'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin').file_loading_manager

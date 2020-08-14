@@ -27,7 +27,11 @@
 
 
 plugins:
-  - bsmu.vision.plugins.file_dropper.FileDropperPlugin
+  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin
+#  - mdi_plugin = bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin(main_window_plugin)
+#  - bsmu.vision.plugins.file_dropper.FileDropperPlugin(mdi_plugin)
+
+
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
   - bsmu.vision.plugins.loaders.dicom.multi_frame.MultiFrameDicomFileLoaderPlugin
   - bsmu.vision.plugins.loaders.nifti.base.NiftiFileLoaderPlugin
@@ -35,13 +39,13 @@ plugins:
   - bsmu.vision.plugins.visualizers.image.volume.VolumeImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin
   - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
-#  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
-  - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
-  - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
-#  - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
-  - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
-#  - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
-#  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
-
-  - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin
-#  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin
+##  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
+#  - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
+#  - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
+##  - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
+#  - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
+##  - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
+##  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
+#
+#  - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin
+##  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin

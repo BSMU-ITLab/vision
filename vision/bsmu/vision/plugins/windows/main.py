@@ -24,8 +24,6 @@ class MainWindow(QMainWindow):
 
 
 class MainWindowPlugin(Plugin):
-    ALIAS = 'main_window_plugin'
-
     # setup_info = SetupInfo(name='bsmu-vision-main-window',
     #                        version=Version(0, 0, 1),
     #                        py_modules=('main',))

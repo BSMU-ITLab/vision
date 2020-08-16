@@ -18,27 +18,30 @@ class PluginManager(QObject):
 
         self.app = app
 
-        self._plugin_expression_pattern_str = r'((?P<alias>.+)=)?(?P<full_name>[^=\(]+)(\((?P<params>.*)\))?'
+        ### self._plugin_expression_pattern_str = r'((?P<alias>.+)=)?(?P<full_name>[^=\(]+)(\((?P<params>.*)\))?'
+        self._plugin_expression_pattern_str = \
+            r'((?P<alias>.+)=)?(?P<full_name>[^->\(]+)(\((?P<params>.*)\))?\s*(->(?P<replace_full_name>.+))?'
         self._plugin_expression_pattern = re.compile(self._plugin_expression_pattern_str)
 
         self._created_plugins = {}  # { full_name: Plugin }
         self._enabled_plugins = {}  # { full_name: Plugin }
         self._aliases_plugins = {}  # { alias: Plugin }
 
-    def _enable_created_plugin(self, plugin: Plugin):
-        assert plugin.full_name() in self._created_plugins, \
-            f'Plugin {plugin.full_name()} have to be in |self._created_plugins|'
+    def _enable_created_plugin(self, plugin: Plugin, replace_full_name: str = None):
+        full_name = replace_full_name or plugin.full_name()
+
+        assert full_name in self._created_plugins, \
+            f'Plugin {full_name} have to be in |self._created_plugins|'
 
         plugin.enabled.connect(self.plugin_enabled)
         plugin.disabled.connect(self.plugin_disabled)
 
         plugin.enable()
-        self._enabled_plugins[plugin.full_name()] = plugin
+        self._enabled_plugins[full_name] = plugin
 
-    def _create_plugin(self, full_name: str, params: str):
-        plugin = self._created_plugins.get(full_name) or self._aliases_plugins.get(full_name)
+    def _create_plugin(self, full_name: str, params: str, replace_full_name: str):
+        plugin = self._created_plugins.get(full_name)   #### or self._aliases_plugins.get(full_name)
         if plugin is None:
-            print('fff', full_name)
             module_name, class_name = full_name.rsplit(".", 1)
             plugin_class = getattr(importlib.import_module(module_name), class_name)
 
@@ -50,11 +53,8 @@ class PluginManager(QObject):
                     plugin_as_param = self._aliases_plugins.get(p)
                     plugins_as_params.append(plugin_as_param or p)
 
-            print('aaaaaa', plugin_class.ALIAS)
             plugin = plugin_class(self.app, *plugins_as_params)
-            self._created_plugins[plugin.full_name()] = plugin
-            if plugin.ALIAS:
-                self._aliases_plugins[plugin.ALIAS] = plugin
+            self._created_plugins[replace_full_name or plugin.full_name()] = plugin
 
         return plugin
 
@@ -65,11 +65,14 @@ class PluginManager(QObject):
         alias = match.group('alias')
         full_name = match.group('full_name')
         params = match.group('params')
+        replace_full_name = match.group('replace_full_name')
 
         plugin = self._enabled_plugins.get(full_name)
         if plugin is None:
-            plugin = self._create_plugin(full_name, params)
-            self._enable_created_plugin(plugin)
+            if replace_full_name is not None:
+                replace_full_name = replace_full_name.replace(' ', '')
+            plugin = self._create_plugin(full_name, params, replace_full_name)
+            self._enable_created_plugin(plugin, replace_full_name)
 
         if alias is not None:
             self._aliases_plugins[alias] = plugin

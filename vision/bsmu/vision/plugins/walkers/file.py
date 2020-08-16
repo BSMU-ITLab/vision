@@ -1,22 +1,29 @@
 from __future__ import annotations
 
 import os
+from typing import Union
 
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.windows.main import MainWindowPlugin, ViewMenu
+from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
+from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin
+from bsmu.vision.plugins.windows.main import MainWindowPlugin
+from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 
 
 class MdiImageLayerFileWalkerPlugin(Plugin):
-    def __init__(self, app: App):
+    def __init__(self, app: App,
+                 main_window_plugin: Union[str, MainWindowPlugin] = MainWindowPlugin.full_name(),
+                 mdi_plugin: Union[str, MdiPlugin] = MdiPlugin.full_name(),
+                 file_loading_manager_plugin: Union[str, FileLoadingManagerPlugin] = FileLoadingManagerPlugin.full_name(),
+                 ):
         super().__init__(app)
 
-        self.main_window = app.enable_plugin(MainWindowPlugin.ALIAS).main_window
-        mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
-        file_loading_manager = app.enable_plugin(
-            'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin').file_loading_manager
+        self.main_window = app.enable_plugin(main_window_plugin).main_window
+        mdi = app.enable_plugin(mdi_plugin).mdi
+        file_loading_manager = app.enable_plugin(file_loading_manager_plugin).file_loading_manager
 
         self.mdi_image_layer_file_walker = MdiImageLayerFileWalker(mdi, file_loading_manager)
 

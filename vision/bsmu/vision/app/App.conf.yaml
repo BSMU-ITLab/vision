@@ -27,9 +27,10 @@
 
 
 plugins:
-  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin
+  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin -> bsmu.vision.plugins.windows.main.MainWindowPlugin
 #  - mdi_plugin = bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin(main_window_plugin)
 #  - bsmu.vision.plugins.file_dropper.FileDropperPlugin(mdi_plugin)
+  - bsmu.vision.plugins.file_dropper.FileDropperPlugin
 
 
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
@@ -43,9 +44,8 @@ plugins:
 #  - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
 #  - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
 ##  - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
-#  - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
+  - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
 ##  - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
 ##  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
 #
-#  - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin
-##  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin
+  - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin

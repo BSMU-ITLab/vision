@@ -12,7 +12,7 @@ from bsmu.vision.plugins.windows.main import MainWindowPlugin
 
 class MdiPlugin(Plugin):
     def __init__(self, app: App,
-                 main_window_plugin: Union[str, MainWindowPlugin] = MainWindowPlugin.ALIAS,
+                 main_window_plugin: Union[str, MainWindowPlugin] = MainWindowPlugin.full_name(),
                  ):
         super().__init__(app)
 

@@ -8,25 +8,23 @@ from PySide2.QtCore import QObject, QEvent
 from bsmu.vision.app.plugin import Plugin
 
 
-def __init__(self, app: App,
+class FileDropperPlugin(Plugin):
+    def __init__(self, app: App,
              mdi_plugin: Union[str, MdiPlugin] = 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
              file_loading_manager_plugin: Union[str, FileLoadingManagerPlugin] = 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
              post_load_conversion_manager_plugin: Union[str, PostLoadConversionManagerPlugin] = 'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
              data_visualization_manager_plugin: Union[str, DataVisualizationManagerPlugin] = 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
              ):
-    super().__init__(app)
+        super().__init__(app)
 
-    self.mdi = app.enable_plugin(mdi_plugin).mdi
-    file_loading_manager = app.enable_plugin(file_loading_manager_plugin).file_loading_manager
-    post_load_conversion_manager = app.enable_plugin(post_load_conversion_manager_plugin).post_load_conversion_manager
-    data_visualization_manager = app.enable_plugin(data_visualization_manager_plugin).data_visualization_manager
+        self.mdi = app.enable_plugin(mdi_plugin).mdi
+        file_loading_manager = app.enable_plugin(file_loading_manager_plugin).file_loading_manager
+        post_load_conversion_manager = app.enable_plugin(post_load_conversion_manager_plugin).post_load_conversion_manager
+        data_visualization_manager = app.enable_plugin(data_visualization_manager_plugin).data_visualization_manager
 
-    self.file_dropper = FileDropper(file_loading_manager,
-                                    post_load_conversion_manager,
-                                    data_visualization_manager)
-
-
-class FileDropperPlugin(Plugin):
+        self.file_dropper = FileDropper(file_loading_manager,
+                                        post_load_conversion_manager,
+                                        data_visualization_manager)
 
     def _enable(self):
         self.mdi.setAcceptDrops(True)

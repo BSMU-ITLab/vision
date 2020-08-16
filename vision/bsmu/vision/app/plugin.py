@@ -6,8 +6,6 @@ from bsmu.vision.app.united_config import UnitedConfig
 
 
 class Plugin(QObject):
-    ALIAS = ''
-
     # setup_info = None
 
     enabled = Signal(QObject)  # Have to be a Plugin instead of QObject, but the Plugin is not defined yet
@@ -72,9 +70,9 @@ class Plugin(QObject):
         return united_config
 
     @classmethod
-    def name(cls):
+    def name(cls) -> str:
         return cls.__name__
 
     @classmethod
-    def full_name(cls):
+    def full_name(cls) -> str:
         return f'{cls.__module__}.{cls.__qualname__}'

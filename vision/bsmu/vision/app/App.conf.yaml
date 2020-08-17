@@ -49,3 +49,4 @@ plugins:
 ##  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
 #
   - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin
+  - bsmu.vision.plugins.bone_age.atlas_visualizer.BoneAgeAtlasVisualizerPlugin

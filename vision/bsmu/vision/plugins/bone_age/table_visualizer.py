@@ -10,7 +10,7 @@ import numpy as np
 import skimage.transform
 from PySide2.QtCore import QObject, Qt, QSysInfo, Signal, QDate
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
-    QActionGroup
+    QActionGroup, QAction
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.predictor import Predictor, DnnModelParams
@@ -216,6 +216,13 @@ class TableActivationMapColumn(TableColumn):
     TITLE = 'Activation Map Visibility'
 
 
+class PatienBoneAgeRecordAction(QAction):
+    triggered_on_record = Signal(PatientBoneAgeRecord)
+
+    def __init__(self, text: str):
+        super().__init__(text)
+
+
 class PatientBoneAgeJournalTable(QTableWidget):
     record_selected = Signal(PatientBoneAgeRecord)
 
@@ -236,6 +243,8 @@ class PatientBoneAgeJournalTable(QTableWidget):
         self._columns_numbers = {column: number for number, column in enumerate(self._columns)}
         self._age_columns = {column for column in self._columns if issubclass(column, TableAgeColumn)}
         self._age_column_numbers = {self._columns_numbers[column] for column in self._age_columns}
+
+        self._age_column_context_menu_actions = []
 
         self.setColumnCount(len(self._columns))
         self.setAlternatingRowColors(True)
@@ -273,6 +282,10 @@ class PatientBoneAgeJournalTable(QTableWidget):
         self.horizontalHeader().setContextMenuPolicy(Qt.CustomContextMenu)
         self.horizontalHeader().customContextMenuRequested.connect(self._display_header_context_menu)
 
+        # Configure a custom context menu for the table
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._display_context_menu)
+
     def column_number(self, column: Type[TableColumn]) -> int:
         return self._columns_numbers[column]
 
@@ -291,6 +304,12 @@ class PatientBoneAgeJournalTable(QTableWidget):
             self, record: PatientBoneAgeRecord, layer_visibility_widget: LayerVisibilityWidget):
         row = self._records_rows[record]
         self.setCellWidget(row, self.column_number(TableActivationMapColumn), layer_visibility_widget)
+
+    def add_age_column_context_menu_action(self, action: PatienBoneAgeRecordAction):
+        self._age_column_context_menu_actions.append(action)
+
+    def remove_age_column_context_menu_action(self, action: PatienBoneAgeRecordAction):
+        self._age_column_context_menu_actions.remove(action)
 
     def _row_record(self, row: int) -> PatientBoneAgeRecord:
         return self.item(row, self.column_number(TableNameColumn)).data(self.RECORD_REF_ROLE)
@@ -366,9 +385,9 @@ class PatientBoneAgeJournalTable(QTableWidget):
     def _display_header_context_menu(self, point: QPoint):
         column_number = self.horizontalHeader().logicalIndexAt(point)
         if column_number in self._age_column_numbers:
-            self._display_age_column_context_menu(point)
+            self._display_age_column_header_context_menu(point)
 
-    def _display_age_column_context_menu(self, point: QPoint):
+    def _display_age_column_header_context_menu(self, point: QPoint):
         menu = QMenu(self)
         format_menu = menu.addMenu('Format')
         format_action_group = QActionGroup(self)
@@ -385,6 +404,24 @@ class PatientBoneAgeJournalTable(QTableWidget):
         triggered_action = menu.exec_(self.horizontalHeader().viewport().mapToGlobal(point))
         if triggered_action:
             self.age_format = triggered_action.age_format
+
+    def _display_context_menu(self, point: QPoint):
+        column_number = self.horizontalHeader().logicalIndexAt(point)
+        if column_number in self._age_column_numbers:
+            self._display_age_column_context_menu(point)
+
+    def _display_age_column_context_menu(self, point: QPoint):
+        if not self._age_column_context_menu_actions:
+            return
+
+        menu = QMenu(self)
+        for action in self._age_column_context_menu_actions:
+            menu.insertAction(None, action)
+
+        triggered_action = menu.exec_(self.viewport().mapToGlobal(point))
+        if triggered_action:
+            menu_patient_record = self._row_record(self.itemAt(point).row())
+            triggered_action.triggered_on_record.emit(menu_patient_record)
 
     def _update_age_column_headers(self):
         for age_column in self._age_columns:
@@ -418,6 +455,12 @@ class PatientBoneAgeJournalViewer(DataViewer):
     def add_record_activation_map_visibility_widget(
             self, record: PatientBoneAgeRecord, layer_visibility_widget: LayerVisibilityWidget):
         self.table.add_record_activation_map_visibility_widget(record, layer_visibility_widget)
+
+    def add_age_column_context_menu_action(self, action: PatienBoneAgeRecordAction):
+        self.table.add_age_column_context_menu_action(action)
+
+    def remove_age_column_context_menu_action(self, action: PatienBoneAgeRecordAction):
+        self.table.remove_age_column_context_menu_action(action)
 
 
 class BoneAgeTableVisualizer(QObject):
@@ -485,6 +528,12 @@ class BoneAgeTableVisualizer(QObject):
             # activation_map_visibility_widget.toggle_button_checked_color = QColor(240, 206, 164)
             self.journal_viewer.add_record_activation_map_visibility_widget(
                 record, activation_map_visibility_widget)
+
+    def add_age_column_context_menu_action(self, action: PatienBoneAgeRecordAction):
+        self.journal_viewer.add_age_column_context_menu_action(action)
+
+    def remove_age_column_context_menu_action(self, action: PatienBoneAgeRecordAction):
+        self.journal_viewer.remove_age_column_context_menu_action(action)
 
     def _on_record_male_changed(self, record: PatientBoneAgeRecord, male: bool):
         self._update_record_bone_age(record)

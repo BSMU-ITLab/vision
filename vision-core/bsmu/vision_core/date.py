@@ -9,6 +9,10 @@ def months_to_days(months: float) -> float:
     return months * DAYS_IN_MONTH
 
 
+def years_months_to_days(years: float, months: float) -> float:
+    return years * DAYS_IN_YEAR + months * DAYS_IN_MONTH
+
+
 def days_to_months(days: float) -> float:
     return days / DAYS_IN_MONTH
 

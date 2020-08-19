@@ -482,9 +482,9 @@ class BoneAgeTableVisualizer(QObject):
 
         self.records_image_sub_windows = {}
 
-        sub_window = DataViewerSubWindow(self.journal_viewer)
-        sub_window.layout_anchors = np.array([[0, 0], [0.5, 1]])
-        self.mdi.addSubWindow(sub_window)
+        self.journal_sub_window = DataViewerSubWindow(self.journal_viewer)
+        self.journal_sub_window.layout_anchors = np.array([[0, 0], [0.6, 1]])
+        self.mdi.addSubWindow(self.journal_sub_window)
 
     def visualize_bone_age_data(self, data: Data, data_viewer_sub_windows: List[DataViewerSubWindow]):
         print('visualize_bone_age_data', type(data))
@@ -503,7 +503,7 @@ class BoneAgeTableVisualizer(QObject):
             self.records_image_sub_windows[record] = data_viewer_sub_windows
 
             for sub_window in data_viewer_sub_windows:
-                sub_window.layout_anchors = np.array([[0.5, 0], [1, 1]])
+                sub_window.layout_anchors = np.array([[0.6, 0], [1, 1]])
                 sub_window.lay_out_to_anchors()
 
             # Add a layer with the activation map

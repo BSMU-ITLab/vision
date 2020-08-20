@@ -12,8 +12,8 @@ class MainWindow(QMainWindow):
     def __init__(self, title: str = '', menu_order: Optional[Tuple[MainMenu]] = None):
         super().__init__()
 
-        self.resize(800, 600)
-        self.move(300, 300)
+        self.resize(1200, 800)
+        self.move(100, 100)
         self.setWindowTitle(title)
 
         self.menu_bar = MenuBar(menu_order)

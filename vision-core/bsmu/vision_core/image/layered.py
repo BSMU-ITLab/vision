@@ -72,7 +72,7 @@ class LayeredImage(Data):
         self._names_layers = {}
 
     @property
-    def layers(self):
+    def layers(self) -> List[ImageLayer]:
         return self._layers
 
     def layer_by_name(self, name: str) -> ImageLayer:

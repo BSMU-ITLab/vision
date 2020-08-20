@@ -28,7 +28,3 @@ class BoneAgeMainWindowPlugin(MainWindowPlugin):
 class BoneAgeMainWindow(MainWindow):
     def __init__(self, title: str = ''):
         super().__init__()
-
-        self.resize(800, 600)
-        self.move(300, 300)
-        self.setWindowTitle(title)

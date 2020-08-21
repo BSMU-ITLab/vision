@@ -14,6 +14,7 @@ from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbst
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.predictor import Predictor, DnnModelParams
+from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.date import DateEditWidget
 from bsmu.vision.widgets.gender import GenderWidget
 from bsmu.vision.widgets.layer_visibility import LayerVisibilityWidget
@@ -35,6 +36,7 @@ class BoneAgeTableVisualizerPlugin(Plugin):
     def __init__(self, app: App):
         super().__init__(app)
 
+        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
         self.data_visualization_manager = app.enable_plugin(
             'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin').data_visualization_manager
         mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
@@ -42,6 +44,9 @@ class BoneAgeTableVisualizerPlugin(Plugin):
 
     def _enable(self):
         self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_bone_age_data)
+
+        self.main_window.add_menu_action(WindowsMenu, 'Journal', self.table_visualizer.raise_journal_sub_window,
+                                         Qt.CTRL + Qt.Key_1)
 
     def _disable(self):
         self.data_visualization_manager.data_visualized.disconnect(self.table_visualizer.visualize_bone_age_data)
@@ -534,6 +539,11 @@ class BoneAgeTableVisualizer(QObject):
 
     def remove_age_column_context_menu_action(self, action: PatienBoneAgeRecordAction):
         self.journal_viewer.remove_age_column_context_menu_action(action)
+
+    def raise_journal_sub_window(self):
+        self.mdi.setActiveSubWindow(self.journal_sub_window)
+
+        # self.journal_sub_window.raise_()
 
     def _on_record_male_changed(self, record: PatientBoneAgeRecord, male: bool):
         self._update_record_bone_age(record)

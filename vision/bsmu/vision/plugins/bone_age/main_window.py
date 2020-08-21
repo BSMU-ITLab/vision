@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from enum import IntEnum
-from typing import Optional
+from typing import Optional, Tuple
 
-from PySide2.QtWidgets import QMainWindow, QMenuBar, QMenu
-from sortedcontainers import SortedDict
-
-from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
+
+
+class BoneAgeMainWindow(MainWindow):
+    def __init__(self, title: str = '', menu_order: Optional[Tuple[MainMenu]] = None):
+        super().__init__(title, menu_order)
 
 
 class BoneAgeMainWindowPlugin(MainWindowPlugin):
@@ -17,14 +17,3 @@ class BoneAgeMainWindowPlugin(MainWindowPlugin):
 
     def __init__(self, app: App):
         super().__init__(app, BoneAgeMainWindow)
-
-    # def _enable(self):
-    #     self.main_window.show()
-    #
-    # def _disable(self):
-    #     self.main_window.hide()
-
-
-class BoneAgeMainWindow(MainWindow):
-    def __init__(self, title: str = ''):
-        super().__init__()

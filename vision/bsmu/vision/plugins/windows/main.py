@@ -72,6 +72,10 @@ class AlgorithmsMenu(MainMenu):
 #     name = 'Atlas'
 #
 
+class WindowsMenu(MainMenu):
+    name = 'Windows'
+
+
 class HelpMenu(MainMenu):
     name = 'Help'
 
@@ -81,7 +85,7 @@ class MenuBar(QMenuBar):
         super().__init__()
 
         self._menu_order = menu_order \
-            if menu_order is not None else (FileMenu, ViewMenu, ToolsMenu, AlgorithmsMenu, HelpMenu)
+            if menu_order is not None else (FileMenu, ViewMenu, ToolsMenu, AlgorithmsMenu, WindowsMenu, HelpMenu)
         self._menus_order_indexes = {menu_type: i for (i, menu_type) in enumerate(self._menu_order)}
 
         self._ordered_added_menus = SortedDict()  # {order_index: MainMenu class}

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide2.QtCore import QObject
+from PySide2.QtCore import QObject, Qt
 from ruamel.yaml import YAML
 from sortedcontainers import SortedDict
 
@@ -22,16 +22,20 @@ from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewe
 from bsmu.vision_core.image.layered import LayeredImage
 from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin
 from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
+from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin
+from bsmu.vision.plugins.windows.main import WindowsMenu, MainWindowPlugin
 
 
 class BoneAgeAtlasVisualizerPlugin(Plugin):
     def __init__(self, app: App,
+                 main_window_plugin=MainWindowPlugin.full_name(),   ## BoneAgeMainWindowPlugin.full_name(),
                  bone_age_table_visualizer_plugin=BoneAgeTableVisualizerPlugin.full_name(),
                  mdi_plugin: Union[str, MdiPlugin] = MdiPlugin.full_name(),
                  file_loading_manager_plugin: Union[str, FileLoadingManagerPlugin] = FileLoadingManagerPlugin.full_name(),
                  ):
         super().__init__(app)
 
+        self.main_window = app.enable_plugin(main_window_plugin).main_window
         self.bone_age_table_visualizer = app.enable_plugin(bone_age_table_visualizer_plugin).table_visualizer
         mdi = app.enable_plugin(mdi_plugin).mdi
         file_loading_manager = app.enable_plugin(file_loading_manager_plugin).file_loading_manager
@@ -40,10 +44,13 @@ class BoneAgeAtlasVisualizerPlugin(Plugin):
                                                                 self.bone_age_table_visualizer)
 
         self._show_atlas_action = PatienBoneAgeRecordAction('Show Atlas')
-        self._show_atlas_action.triggered_on_record.connect(self.bone_age_atlas_visualizer.show_atlas)
+        self._show_atlas_action.triggered_on_record.connect(self.bone_age_atlas_visualizer.show_atlas_for_record)
 
     def _enable(self):
         self.bone_age_table_visualizer.add_age_column_context_menu_action(self._show_atlas_action)
+
+        self.main_window.add_menu_action(WindowsMenu, 'Atlas', self.bone_age_atlas_visualizer.raise_atlas_sub_windows,
+                                         Qt.CTRL + Qt.Key_2)
 
     def _disable(self):
         self.bone_age_table_visualizer.remove_age_column_context_menu_action(self._show_atlas_action)
@@ -81,14 +88,24 @@ class BoneAgeAtlasVisualizer(QObject):
         self._next_atlas_sub_window = None
         self._prev_atlas_sub_window = None
 
-    def show_atlas(self, record: PatientBoneAgeRecord):
-        print('SHOW ATLAS!!!', record.bone_age)
+    def raise_atlas_sub_windows(self):
+        if self._nearest_atlas_sub_window is None:
+            return
+
+        # This will take the focus off from the table sub window,
+        # else this will raise later table over the atlas sub windows.
+        self.mdi.setActiveSubWindow(self._nearest_atlas_sub_window)
+
+        self._nearest_atlas_sub_window.raise_()
+        self._next_atlas_sub_window.raise_()
+        self._prev_atlas_sub_window.raise_()
+
+    def show_atlas_for_record(self, record: PatientBoneAgeRecord):
         gender_sorted_atlas_index = self._genders_sorted_atlas_indexes.get(record.male)
         if gender_sorted_atlas_index is None:
             gender_sorted_atlas_index = SortedDict(self._read_gender_atlas_index_file(record.male))
             self._genders_sorted_atlas_indexes[record.male] = gender_sorted_atlas_index
 
-        print('ggg', gender_sorted_atlas_index)
         # Find the two closest key indexes around the |record.bone_age|
         right_key_index = gender_sorted_atlas_index.bisect_right(record.bone_age)
         left_key_index = right_key_index - 1
@@ -110,7 +127,6 @@ class BoneAgeAtlasVisualizer(QObject):
                              + table_sub_window_layout_anchors[0, 1]
         nearest_atlas_image_layout_anchors = np.copy(table_sub_window_layout_anchors)
         nearest_atlas_image_layout_anchors[0, 0] = table_mid_x_anchor
-        print('ppp', nearest_atlas_image_layout_anchors)
 
         next_atlas_image_layout_anchors = np.copy(table_sub_window_layout_anchors)
         next_atlas_image_layout_anchors[1, 0] = table_mid_x_anchor
@@ -130,26 +146,18 @@ class BoneAgeAtlasVisualizer(QObject):
             gender_sorted_atlas_index, nearest_key_index - 1, record.male, self._prev_atlas_sub_window,
             prev_atlas_image_layout_anchors)
 
-        # print('nearest_key', nearest_key)
-        # print('nearest_file_name', gender_sorted_atlas_index[nearest_key])
-
-        # right_value = gender_sorted_atlas_index[right_key] if right_key else float('-inf')
-        # left_value = gender_sorted_atlas_index[left_key] if left_key else float('-inf')
+        self.raise_atlas_sub_windows()
 
     def _show_atlas_image_by_key_index(
             self, sorted_atlas_index: SortedDict, key_index, male: bool, atlas_sub_window: LayeredImageViewerSubWindow,
             atlas_sub_window_anchors: np.ndarray) -> LayeredImageViewerSubWindow:
-        sorted_atlas_index.values()
-        sorted_atlas_index_keys = sorted_atlas_index.keys()
-        if key_index < 0 or key_index >= len(sorted_atlas_index_keys):
+        if key_index < 0 or key_index >= len(sorted_atlas_index.keys()):
             return
 
         # key = sorted_atlas_index_keys[key_index]
         # atlas_image_file_name = sorted_atlas_index[key]
         atlas_image_file_name = sorted_atlas_index.values()[key_index]
-        print('filename:', atlas_image_file_name)
         atlas_image_file_path = self._GENDERS_ATLAS_DIRS[male] / atlas_image_file_name
-        print('filepath:', atlas_image_file_path)
 
         atlas_image = self.file_loading_manager.load_file(atlas_image_file_path)
 
@@ -160,7 +168,6 @@ class BoneAgeAtlasVisualizer(QObject):
             atlas_sub_window.show()
 
         atlas_sub_window.viewer.layers[0].image = atlas_image
-        atlas_sub_window.raise_()
         return atlas_sub_window
 
     def _create_atlas_sub_window(self, atlas_image: Image) -> LayeredImageViewerSubWindow:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from PySide2.QtCore import QObject, Signal
 
@@ -27,8 +27,8 @@ class ImageLayer(QObject):
         self.name = name if name else 'Layer ' + str(self.id)
 
     @property
-    def image_path(self) -> Path:
-        return self.image.path
+    def image_path(self) -> Optional[Path]:
+        return self.image.path if self.image is not None else None
 
     @property
     def image_palette(self) -> Palette:
@@ -40,7 +40,7 @@ class ImageLayer(QObject):
 
     @property
     def image_path_name(self) -> str:
-        return self.image_path.name
+        return self.image_path.name if self.image_path is not None else ''
 
     @property  # TODO: this is slow. If we need only setter, there are alternatives without getter
     def image(self) -> Image:

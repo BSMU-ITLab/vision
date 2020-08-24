@@ -8,43 +8,6 @@ from sortedcontainers import SortedDict
 from bsmu.vision.app.plugin import Plugin
 
 
-class MainWindow(QMainWindow):
-    def __init__(self, title: str = '', menu_order: Optional[Tuple[MainMenu]] = None):
-        super().__init__()
-
-        self.resize(1200, 800)
-        self.move(100, 100)
-        self.setWindowTitle(title)
-
-        self.menu_bar = MenuBar(menu_order)
-        self.setMenuBar(self.menu_bar)
-
-    def add_menu_action(self, menu_type: MenuType, action_name, method, shortcut):
-        return self.menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
-
-
-class MainWindowPlugin(Plugin):
-    # setup_info = SetupInfo(name='bsmu-vision-main-window',
-    #                        version=Version(0, 0, 1),
-    #                        py_modules=('main',))
-
-    def __init__(self, app: App, main_window_class: Type[MainWindow] = MainWindow):
-        super().__init__(app)
-
-        self.main_window = main_window_class(self.config.value('title'))
-
-        # self.main_window.add_menu_action(FileMenu, 'Load', None, None)
-        # self.main_window.add_menu_action(FileMenu, 'Export Results', None, None)
-        # self.main_window.add_menu_action(AtlasMenu, 'Male', None, None)
-        # self.main_window.add_menu_action(AtlasMenu, 'Female', None, None)
-
-    def _enable(self):
-        self.main_window.show()
-
-    def _disable(self):
-        self.main_window.hide()
-
-
 class MainMenu(QMenu):
     name = ''
 
@@ -68,10 +31,6 @@ class AlgorithmsMenu(MainMenu):
     name = 'Algorithms'
 
 
-# class AtlasMenu(MainMenu):
-#     name = 'Atlas'
-#
-
 class WindowsMenu(MainMenu):
     name = 'Windows'
 
@@ -81,11 +40,11 @@ class HelpMenu(MainMenu):
 
 
 class MenuBar(QMenuBar):
-    def __init__(self, menu_order: Optional[Tuple[MainMenu]] = None):
+    def __init__(self,
+                 menu_order: Tuple[MainMenu] = (FileMenu, ViewMenu, ToolsMenu, AlgorithmsMenu, WindowsMenu, HelpMenu)):
         super().__init__()
 
-        self._menu_order = menu_order \
-            if menu_order is not None else (FileMenu, ViewMenu, ToolsMenu, AlgorithmsMenu, WindowsMenu, HelpMenu)
+        self._menu_order = menu_order
         self._menus_order_indexes = {menu_type: i for (i, menu_type) in enumerate(self._menu_order)}
 
         self._ordered_added_menus = SortedDict()  # {order_index: MainMenu class}
@@ -117,3 +76,44 @@ class MenuBar(QMenuBar):
 
     def _menu_order_index(self, menu_type: Type[MainMenu]) -> int:
         return self._menus_order_indexes[menu_type]
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, title: str = '', menu_bar: MenuBar = MenuBar()):
+        super().__init__()
+
+        self.resize(1200, 800)
+        self.move(100, 100)
+        self.setWindowTitle(title)
+
+        self.menu_bar = menu_bar
+        self.setMenuBar(self.menu_bar)
+
+    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut):
+        return self.menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
+
+
+class MainWindowPlugin(Plugin):
+    # setup_info = SetupInfo(name='bsmu-vision-main-window',
+    #                        version=Version(0, 0, 1),
+    #                        py_modules=('main',))
+
+    def __init__(self, app: App, main_window: MainWindow = MainWindow()):
+        super().__init__(app)
+
+        self.main_window = main_window
+
+        title_config = self.config.value('title')
+        if title_config is not None:
+            self.main_window.setWindowTitle(title_config)
+
+        # self.main_window.add_menu_action(FileMenu, 'Load', None, None)
+        # self.main_window.add_menu_action(FileMenu, 'Export Results', None, None)
+        # self.main_window.add_menu_action(AtlasMenu, 'Male', None, None)
+        # self.main_window.add_menu_action(AtlasMenu, 'Female', None, None)
+
+    def _enable(self):
+        self.main_window.show()
+
+    def _disable(self):
+        self.main_window.hide()

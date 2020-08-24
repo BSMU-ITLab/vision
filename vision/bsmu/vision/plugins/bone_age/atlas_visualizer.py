@@ -22,7 +22,7 @@ from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewe
 from bsmu.vision_core.image.layered import LayeredImage
 from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin
 from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
-from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin
+from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin, AtlasMenu
 from bsmu.vision.plugins.windows.main import WindowsMenu, MainWindowPlugin
 
 
@@ -51,6 +51,11 @@ class BoneAgeAtlasVisualizerPlugin(Plugin):
 
         self.main_window.add_menu_action(WindowsMenu, 'Atlas', self.bone_age_atlas_visualizer.raise_atlas_sub_windows,
                                          Qt.CTRL + Qt.Key_2)
+
+        self.main_window.add_menu_action(AtlasMenu, 'Next Image', self.bone_age_atlas_visualizer.show_next_image,
+                                         Qt.CTRL + Qt.Key_Up)
+        self.main_window.add_menu_action(AtlasMenu, 'Previous Image', self.bone_age_atlas_visualizer.show_prev_image,
+                                         Qt.CTRL + Qt.Key_Down)
 
     def _disable(self):
         self.bone_age_table_visualizer.remove_age_column_context_menu_action(self._show_atlas_action)
@@ -84,6 +89,9 @@ class BoneAgeAtlasVisualizer(QObject):
 
         self._genders_sorted_atlas_indexes = {}  # Male: sorted atlas indexes
 
+        # self.nearest_key_index
+        # sorted_atlas_index
+
         self._nearest_atlas_sub_window = None
         self._next_atlas_sub_window = None
         self._prev_atlas_sub_window = None
@@ -116,7 +124,7 @@ class BoneAgeAtlasVisualizer(QObject):
         left_key = gender_sorted_atlas_index_keys[left_key_index] \
             if left_key_index < len(gender_sorted_atlas_index_keys) else float('-inf')
 
-        nearest_key_index = right_key_index \
+        self.nearest_key_index = right_key_index \
             if abs(right_key - record.bone_age) < abs(left_key - record.bone_age) \
             else left_key_index
 
@@ -147,6 +155,12 @@ class BoneAgeAtlasVisualizer(QObject):
             prev_atlas_image_layout_anchors)
 
         self.raise_atlas_sub_windows()
+
+    def show_next_image(self):
+        ...
+
+    def show_prev_image(self):
+        ...
 
     def _show_atlas_image_by_key_index(
             self, sorted_atlas_index: SortedDict, key_index, male: bool, atlas_sub_window: LayeredImageViewerSubWindow,

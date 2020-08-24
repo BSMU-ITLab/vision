@@ -45,7 +45,7 @@ class BoneAgeTableVisualizerPlugin(Plugin):
     def _enable(self):
         self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_bone_age_data)
 
-        self.main_window.add_menu_action(WindowsMenu, 'Journal', self.table_visualizer.raise_journal_sub_window,
+        self.main_window.add_menu_action(WindowsMenu, 'Table', self.table_visualizer.raise_journal_sub_window,
                                          Qt.CTRL + Qt.Key_1)
 
     def _disable(self):

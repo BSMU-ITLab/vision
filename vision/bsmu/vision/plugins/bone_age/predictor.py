@@ -41,8 +41,8 @@ class Predictor:
         if self._dnn_model is None:
             self._dnn_model = cv2.dnn.readNet(str(self._dnn_model_params.path))
 
-            for index, layer_name in enumerate(self._dnn_model.getLayerNames()):
-                print(f'#{index} \t\t {layer_name}')
+            # for index, layer_name in enumerate(self._dnn_model.getLayerNames()):
+            #     print(f'#{index} \t\t {layer_name}')
 
         print(f'FLAT {image.array.shape} {image.array.dtype} {image.array.min()} {image.array.max()}')
 

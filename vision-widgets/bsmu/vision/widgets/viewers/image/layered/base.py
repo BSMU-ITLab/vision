@@ -230,6 +230,9 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
             #  We have to use union of bounding boxes of every layer.
             #  Now we use only bounding box of first layer.
             first_layer_image_view = self.layer_views[0].image_view
+            if first_layer_image_view is None:
+                return QRectF()
+
             rect_top_left_pixel_indexes = np.array([0, 0])
             rect_bottom_right_pixel_indexes = first_layer_image_view.array.shape[:2]
             rect_top_left_pos = first_layer_image_view.pixel_indexes_to_pos(rect_top_left_pixel_indexes)
@@ -285,6 +288,8 @@ class LayeredImageViewer(DataViewer):
             self._on_active_layer_view_changed)
         self.layered_image_graphics_object.bounding_rect_changed.connect(
             self.graphics_view.setSceneRect)
+        # self.layered_image_graphics_object.bounding_rect_changed.connect(
+        #     self.graphics_scene.setSceneRect)
 
         self.graphics_scene.addItem(self.layered_image_graphics_object)
 

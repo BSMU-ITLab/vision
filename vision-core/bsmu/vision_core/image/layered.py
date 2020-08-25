@@ -83,7 +83,7 @@ class LayeredImage(Data):
         self._names_layers[layer.name] = layer
         self.layer_added.emit(layer)
 
-    def add_layer_from_image(self, image: Image, name: str = '') -> ImageLayer:
+    def add_layer_from_image(self, image: Optional[Image], name: str = '') -> ImageLayer:
         image_layer = ImageLayer(image, name)
         self.add_layer(image_layer)
         return image_layer

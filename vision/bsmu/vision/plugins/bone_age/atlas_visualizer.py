@@ -13,7 +13,6 @@ from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.table_visualizer import BoneAgeTableVisualizerPlugin, PatientBoneAgeRecord, \
     PatienBoneAgeRecordAction
 from bsmu.vision_core import date
-from bsmu.vision_core.image.base import FlatImage
 
 if TYPE_CHECKING:
     from bsmu.vision.app import App
@@ -166,19 +165,21 @@ class BoneAgeAtlasVisualizer(QObject):
         prev_atlas_image_layout_anchors[0, 1] = table_mid_y_anchor
 
         self._atlas_sub_windows = 3 * [None]
-        self._atlas_sub_windows[0] = self._create_atlas_sub_window(None, nearest_atlas_image_layout_anchors)
-        self._atlas_sub_windows[1] = self._create_atlas_sub_window(None, next_atlas_image_layout_anchors)
-        self._atlas_sub_windows[2] = self._create_atlas_sub_window(None, prev_atlas_image_layout_anchors)
+        self._atlas_sub_windows[0] = self._create_atlas_sub_window(nearest_atlas_image_layout_anchors)
+        self._atlas_sub_windows[1] = self._create_atlas_sub_window(next_atlas_image_layout_anchors)
+        self._atlas_sub_windows[2] = self._create_atlas_sub_window(prev_atlas_image_layout_anchors)
 
     def show_next_image(self):
-        self._cur_gender_sorted_atlas_image_key_index += 1
+        if self._cur_gender_sorted_atlas_image_key_index < len(self._cur_gender_sorted_atlas_index) - 2:
+            self._cur_gender_sorted_atlas_image_key_index += 1
 
-        self._show_atlas_image_set()
+            self._show_atlas_image_set()
 
     def show_prev_image(self):
-        self._cur_gender_sorted_atlas_image_key_index -= 1
+        if self._cur_gender_sorted_atlas_image_key_index > 1:
+            self._cur_gender_sorted_atlas_image_key_index -= 1
 
-        self._show_atlas_image_set()
+            self._show_atlas_image_set()
 
     def _show_atlas_image_by_key_index(
             self, sorted_atlas_index: SortedDict, key_index, male: bool, atlas_sub_window: LayeredImageViewerSubWindow):
@@ -191,18 +192,11 @@ class BoneAgeAtlasVisualizer(QObject):
         atlas_image_file_path = self._GENDERS_ATLAS_DIRS[male] / atlas_image_file_name
 
         atlas_image = self.file_loading_manager.load_file(atlas_image_file_path)
-
-        # if atlas_sub_window is None:
-        #     atlas_sub_window = self._create_atlas_sub_window(atlas_image)
-        #     atlas_sub_window.layout_anchors = atlas_sub_window_anchors
-        #     atlas_sub_window.lay_out_to_anchors()
-        #     atlas_sub_window.show()
-
         atlas_sub_window.viewer.layers[0].image = atlas_image
 
-    def _create_atlas_sub_window(self, atlas_image: Image, atlas_sub_window_anchors: np.ndarray) -> LayeredImageViewerSubWindow:
+    def _create_atlas_sub_window(self, atlas_sub_window_anchors: np.ndarray) -> LayeredImageViewerSubWindow:
         atlas_layered_image = LayeredImage()
-        atlas_layered_image.add_layer_from_image(atlas_image)
+        atlas_layered_image.add_layer_from_image(None)
         atlas_image_viewer = LayeredFlatImageViewer(atlas_layered_image)
         atlas_sub_window = LayeredImageViewerSubWindow(atlas_image_viewer)
         atlas_image_viewer.data_name_changed.connect(atlas_sub_window.setWindowTitle)

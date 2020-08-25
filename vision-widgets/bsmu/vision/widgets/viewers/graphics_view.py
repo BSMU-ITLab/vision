@@ -30,8 +30,12 @@ class GraphicsView(QGraphicsView):
         self._scale_font_metrics = QFontMetrics(self._scale_font)
         self._scale_text_rect = QRect()
 
-        self._viewport_anchors = np.array([[0, 0], [1, 1]], dtype=np.float)
+        self._viewport_anchors = None
+        self._reset_viewport_anchors()
         self._viewport_anchoring = False
+
+        self._viewport_anchoring_scheduled = False
+        scene.sceneRectChanged.connect(self._reset_viewport_anchors)
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -51,6 +55,10 @@ class GraphicsView(QGraphicsView):
 
     def paintEvent(self, event: QPaintEvent):
         super().paintEvent(event)
+
+        if self._viewport_anchoring_scheduled:
+            self._anchor_viewport()
+            self._viewport_anchoring_scheduled = False
 
         painter = QPainter(self.viewport())
         painter.setRenderHint(QPainter.Antialiasing)
@@ -109,7 +117,14 @@ class GraphicsView(QGraphicsView):
             np.array([bottom_right_viewport_point.x(), bottom_right_viewport_point.y()]) / scene_size
 
     def resizeEvent(self, resize_event: QResizeEvent):
-        self._anchor_viewport()
+        self._schedule_viewport_anchoring()
+
+    def _schedule_viewport_anchoring(self):
+        self._viewport_anchoring_scheduled = True
+
+    def _reset_viewport_anchors(self):
+        self._viewport_anchors = np.array([[0, 0], [1, 1]], dtype=np.float)
+        self._schedule_viewport_anchoring()
 
     def _anchor_viewport(self):
         self._viewport_anchoring = True

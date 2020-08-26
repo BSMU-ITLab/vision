@@ -170,9 +170,9 @@ class YearsMonthsAgeFormat(AgeFormat):
     ABBR = 'Y / M'
 
     @classmethod
-    def format(cls, age_in_days: float) -> str:
+    def format(cls, age_in_days: float, delimiter: str = '/') -> str:
         years, months = date.days_to_years_months(age_in_days)
-        return f'{int(years)} / {months:.{cls.age_decimals}f}'
+        return f'{int(years)} {delimiter} {months:.{cls.age_decimals}f}'
 
 
 class TableColumn:

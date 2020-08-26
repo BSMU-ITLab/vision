@@ -39,7 +39,7 @@ plugins:
   - bsmu.vision.plugins.visualizers.image.flat.FlatImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.volume.VolumeImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin
-  - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
+#  - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
 ##  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
 #  - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
 #  - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
@@ -50,3 +50,4 @@ plugins:
 #
   - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin
   - bsmu.vision.plugins.bone_age.atlas_visualizer.BoneAgeAtlasVisualizerPlugin
+  - bsmu.vision.plugins.bone_age.journal_exporter.PatientBoneAgeJournalExporterPlugin

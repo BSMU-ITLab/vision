@@ -10,8 +10,12 @@ class AtlasMenu(MainMenu):
     name = 'Atlas'
 
 
+class TableMenu(MainMenu):
+    name = 'Table'
+
+
 class BoneAgeMenuBar(MenuBar):
-    def __init__(self, menu_order: Tuple[MainMenu] = (FileMenu, ViewMenu, AtlasMenu, WindowsMenu, HelpMenu)):
+    def __init__(self, menu_order: Tuple[MainMenu] = (FileMenu, ViewMenu, TableMenu, AtlasMenu, WindowsMenu, HelpMenu)):
         super().__init__(menu_order)
 
 

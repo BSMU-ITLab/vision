@@ -71,7 +71,7 @@ class MenuBar(QMenuBar):
             menu = self.add_menu(menu_type)
         return menu
 
-    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut) -> QAction:
+    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut=None) -> QAction:
         return self.menu(menu_type).addAction(action_name, method, shortcut)
 
     def _menu_order_index(self, menu_type: Type[MainMenu]) -> int:
@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         self.menu_bar = menu_bar
         self.setMenuBar(self.menu_bar)
 
-    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut):
+    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut=None):
         return self.menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
 
 

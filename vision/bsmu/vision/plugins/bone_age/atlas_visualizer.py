@@ -170,12 +170,18 @@ class BoneAgeAtlasVisualizer(QObject):
         self._atlas_sub_windows[2] = self._create_atlas_sub_window(prev_atlas_image_layout_anchors)
 
     def show_next_image(self):
+        if self._cur_gender_sorted_atlas_image_key_index is None:
+            return
+
         if self._cur_gender_sorted_atlas_image_key_index < len(self._cur_gender_sorted_atlas_index) - 2:
             self._cur_gender_sorted_atlas_image_key_index += 1
 
             self._show_atlas_image_set()
 
     def show_prev_image(self):
+        if self._cur_gender_sorted_atlas_image_key_index is None:
+            return
+
         if self._cur_gender_sorted_atlas_image_key_index > 1:
             self._cur_gender_sorted_atlas_image_key_index -= 1
 

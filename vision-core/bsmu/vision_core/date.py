@@ -17,6 +17,10 @@ def days_to_months(days: float) -> float:
     return days / DAYS_IN_MONTH
 
 
+def days_to_years(days: float) -> float:
+    return days / DAYS_IN_YEAR
+
+
 def days_to_years_days(days: float) -> Tuple[int, float]:
     years, days_remainder = divmod(days, DAYS_IN_YEAR)
     return int(years), days_remainder

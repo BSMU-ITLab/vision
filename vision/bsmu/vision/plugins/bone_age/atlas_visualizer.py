@@ -11,7 +11,7 @@ from sortedcontainers import SortedDict
 
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.table_visualizer import BoneAgeTableVisualizerPlugin, PatientBoneAgeRecord, \
-    PatienBoneAgeRecordAction
+    PatientBoneAgeRecordAction
 from bsmu.vision_core import date
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ class BoneAgeAtlasVisualizerPlugin(Plugin):
         self.bone_age_atlas_visualizer = BoneAgeAtlasVisualizer(mdi, file_loading_manager,
                                                                 self.bone_age_table_visualizer)
 
-        self._show_atlas_action = PatienBoneAgeRecordAction('Show Atlas')
+        self._show_atlas_action = PatientBoneAgeRecordAction('Show Atlas')
         self._show_atlas_action.triggered_on_record.connect(self.bone_age_atlas_visualizer.show_atlas_for_record)
 
     def _enable(self):

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from enum import IntEnum
 from functools import partial
 from pathlib import Path
-from typing import List, Type
+from typing import List, Type, Optional
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -12,9 +13,10 @@ import skimage.transform
 from PySide2.QtCore import QObject, Qt, QSysInfo, Signal, QDate
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
-    QActionGroup, QAction, QStyledItemDelegate, QStyle
+    QActionGroup, QAction, QStyledItemDelegate, QStyle, QDoubleSpinBox
 
 from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.plugins.bone_age.max_height_analyzer import MaxHeightAnalyzer
 from bsmu.vision.plugins.bone_age.predictor import Predictor, DnnModelParams
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.date import DateEditWidget
@@ -66,8 +68,11 @@ class PatientBoneAgeRecord(QObject):
     image_date_changed = Signal(QDate)
     age_in_image_changed = Signal(float)
     bone_age_changed = Signal(float)
+    height_changed = Signal(float)
+    max_height_changed = Signal(float)
 
-    def __init__(self, image: FlatImage, male: bool, birthdate: QDate, image_date: QDate, bone_age: float):
+    def __init__(self, image: FlatImage, male: bool, birthdate: QDate, image_date: QDate, bone_age: float,
+                 height: float = 140):
         super().__init__()
 
         self.image = image
@@ -79,6 +84,13 @@ class PatientBoneAgeRecord(QObject):
         self._age_in_image = self._calculate_age_in_image()  # in days
         self.birthdate_changed.connect(self._update_age_in_image)
         self.image_date_changed.connect(self._update_age_in_image)
+
+        self._height = height  # in cm
+        self._max_height = self._calculate_max_height()
+        self.age_in_image_changed.connect(self._update_max_height)
+        self.bone_age_changed.connect(self._update_max_height)
+        self.height_changed.connect(self._update_max_height)
+        self.male_changed.connect(self._update_max_height)
 
     @property
     def male(self) -> bool:
@@ -124,12 +136,51 @@ class PatientBoneAgeRecord(QObject):
             self._bone_age = value
             self.bone_age_changed.emit(self._bone_age)
 
+    @property
+    def height(self) -> float:
+        return self._height
+
+    @height.setter
+    def height(self, value: float):
+        if self._height != value:
+            self._height = value
+            self.height_changed.emit(self._height)
+
+    @property
+    def max_height(self) -> Optional[float]:
+        return self._max_height
+
     def _calculate_age_in_image(self):
         return self.birthdate.daysTo(self.image_date)
 
     def _update_age_in_image(self):
         self._age_in_image = self._calculate_age_in_image()
         self.age_in_image_changed.emit(self.age_in_image)
+
+    def _calculate_max_height(self) -> float:
+        age_delta_in_years = date.days_to_years(self.age_in_image - self.bone_age)
+        print('_calculate_max_height   bone_age: ', self.bone_age)
+        if abs(age_delta_in_years) <= 1:
+            # Normal bone growth
+            print('Normal bone growth')
+            max_height_factor = \
+                MaxHeightAnalyzer.max_height_factor_functions_for_normal_bone_growth()[self.male](self.bone_age)
+        elif age_delta_in_years > 1:
+            # Slow bone growth
+            print('Slow bone growth')
+            max_height_factor = \
+                MaxHeightAnalyzer.max_height_factor_functions_for_slow_bone_growth()[self.male](self.bone_age)
+        else:
+            # Premature bone growth
+            print('Premature bone growth')
+            max_height_factor = \
+                MaxHeightAnalyzer.max_height_factor_functions_for_premature_bone_growth()[self.male](self.bone_age)
+        print('max_height_factor: ', max_height_factor)
+        return self.height / max_height_factor * 100
+
+    def _update_max_height(self):
+        self._max_height = self._calculate_max_height()
+        self.max_height_changed.emit(self.max_height)
 
 
 class PatientBoneAgeJournal(Data):
@@ -225,6 +276,14 @@ class TableDenseNetBoneAgeColumn(TableAgeColumn):
     RECORD_PROPERTY = PatientBoneAgeRecord.bone_age
 
 
+class TableHeightColumn(TableColumn):
+    TITLE = 'Height'
+
+
+class TableMaxHeightColumn(TableColumn):
+    TITLE = 'Max Height'
+
+
 class TableActivationMapColumn(TableColumn):
     TITLE = 'Activation Map Visibility'
 
@@ -247,13 +306,19 @@ class HighlightedItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
         # Change table item foreground (pen color) to red color if it's highlighted
-        if option.state & QStyle.State_Selected:
-            painter.fillRect(option.rect, option.palette.highlight())
+        highlighted_palette = False
 
-            if index.data(TableItemDataRole.HIGHLIGHT):
-                painter.setPen(QColor(255, 128, 128))
-        elif index.data(TableItemDataRole.HIGHLIGHT):
-            painter.setPen(Qt.red)
+        if option.state & QStyle.State_Selected:
+            if option.state & QStyle.State_Active:
+                painter.fillRect(option.rect, option.palette.highlight())
+                highlighted_palette = True
+            elif not (option.state & QStyle.State_HasFocus):
+                painter.fillRect(option.rect, option.palette.background())
+
+        if index.data(TableItemDataRole.HIGHLIGHT):
+            painter.setPen(QColor(255, 128, 128) if highlighted_palette else Qt.red)
+        else:
+            painter.setPen(Qt.black)
 
         painter.drawText(option.rect, Qt.AlignCenter, index.data())
 
@@ -272,7 +337,8 @@ class PatientBoneAgeJournalTable(QTableWidget):
         self._age_format = YearsMonthsAgeFormat
 
         self._columns = [TableNameColumn, TableGenderColumn, TableBirthdateColumn, TableImageDateColumn,
-                         TableAgeInImageColumn, TableDenseNetBoneAgeColumn, TableActivationMapColumn]
+                         TableAgeInImageColumn, TableDenseNetBoneAgeColumn, TableHeightColumn, TableMaxHeightColumn,
+                         TableActivationMapColumn]
         self._columns_numbers = {column: number for number, column in enumerate(self._columns)}
         self._age_columns = {column for column in self._columns if issubclass(column, TableAgeColumn)}
         self._age_column_numbers = {self._columns_numbers[column] for column in self._age_columns}
@@ -352,7 +418,7 @@ class PatientBoneAgeJournalTable(QTableWidget):
     def _create_column_title(self, column: Type[TableColumn]) -> str:
         column_title = column.TITLE
         if issubclass(column, TableAgeColumn):
-            column_title += f' ({self._age_format.ABBR})'
+            column_title += f'\n({self._age_format.ABBR})'
         return column_title
 
     def _add_record_view(self, record: PatientBoneAgeRecord):
@@ -393,8 +459,25 @@ class PatientBoneAgeJournalTable(QTableWidget):
         record.bone_age_changed.connect(partial(self._on_record_age_changed, record))
         record.age_in_image_changed.connect(partial(self._on_record_age_changed, record))
         self.setItem(row, self.column_number(TableDenseNetBoneAgeColumn), bone_age_item)
-
         self._update_bone_age_table_item_foreground(record)
+
+        height_spin_box = QDoubleSpinBox()
+        height_spin_box.setAlignment(Qt.AlignCenter)
+        height_spin_box.setFrame(False)
+        height_spin_box.setDecimals(1)
+        height_spin_box.setMaximum(300)
+        self._set_height_to_table_item_widget(height_spin_box, record.height)
+        record.height_changed.connect(partial(self._set_height_to_table_item_widget, height_spin_box))
+        height_spin_box.valueChanged.connect(partial(self._on_height_table_item_widget_value_changed, record))
+        self.setCellWidget(row, self.column_number(TableHeightColumn), height_spin_box)
+
+        max_height_item = QTableWidgetItem()
+        max_height_item.setFlags(max_height_item.flags() & ~Qt.ItemIsEditable)
+        max_height_item.setTextAlignment(Qt.AlignCenter)
+        self._set_max_height_to_table_item(max_height_item, record.max_height)
+        record.max_height_changed.connect(partial(self._set_max_height_to_table_item, max_height_item))
+        self.setItem(row, self.column_number(TableMaxHeightColumn), max_height_item)
+
         self._update_age_column_contents_for_row(row)
 
     def _on_item_selection_changed(self):
@@ -416,11 +499,21 @@ class PatientBoneAgeJournalTable(QTableWidget):
     def _on_image_date_changed(self, record: PatientBoneAgeRecord, date: QDate):
         record.image_date = date
 
+    def _on_height_table_item_widget_value_changed(self, record: PatientBoneAgeRecord, height: float):
+        record.height = height
+
     def _set_age_to_table_item(self, age_table_item: QTableWidgetItem, age: float):
         age_table_item.setText(self._age_format.format(age))
 
     def _on_record_age_changed(self, record: PatientBoneAgeRecord, age: float):
         self._update_bone_age_table_item_foreground(record)
+
+    def _set_height_to_table_item_widget(self, height_spin_box: QDoubleSpinBox, height: float):
+        height_spin_box.setValue(height)
+
+    def _set_max_height_to_table_item(self, max_height_table_item: QTableWidgetItem, max_height: float):
+        max_height_str = '' if math.isnan(max_height) else f'{max_height:.1f}'
+        max_height_table_item.setText(max_height_str)
 
     def _update_bone_age_table_item_foreground(self, record: PatientBoneAgeRecord):
         bone_age_item = self.item(self._records_rows[record], self.column_number(TableDenseNetBoneAgeColumn))
@@ -544,7 +637,7 @@ class BoneAgeTableVisualizer(QObject):
             default_gender_is_male = True
             image = first_layer.image
             predicted_bone_age, activation_map = self.predictor.predict(image, default_gender_is_male)
-            record = PatientBoneAgeRecord(image, default_gender_is_male, QDate(2000, 1, 1), QDate.currentDate(),
+            record = PatientBoneAgeRecord(image, default_gender_is_male, QDate(2010, 1, 1), QDate.currentDate(),
                                           date.months_to_days(predicted_bone_age))
             record.male_changed.connect(partial(self._on_record_male_changed, record))
             self.journal.add_record(record)

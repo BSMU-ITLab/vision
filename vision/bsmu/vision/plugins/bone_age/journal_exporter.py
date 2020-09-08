@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import locale
+import math
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject
@@ -38,6 +40,8 @@ class PatientBoneAgeJournalExporter(QObject):
     AGE_IN_IMAGE_FIELD_NAME = 'Age in Image (Y // M)'
     BONE_AGE_FIELD_NAME = 'Bone Age (Y // M)'
     AGE_DELIMITER = '//'
+    HEIGHT_FIELD_NAME = 'Height'
+    MAX_HEIGHT_FIELD_NAME = 'Max Height'
 
     DATE_STR_FORMAT = 'dd.MM.yyyy'
 
@@ -62,7 +66,8 @@ class PatientBoneAgeJournalExporter(QObject):
         else:
             with csv_file:
                 field_names = [self.IMAGE_NAME_FIELD_NAME, self.GENDER_FIELD_NAME, self.BIRTHDATE_FIELD_NAME,
-                               self.IMAGE_DATE_FIELD_NAME, self.AGE_IN_IMAGE_FIELD_NAME, self.BONE_AGE_FIELD_NAME]
+                               self.IMAGE_DATE_FIELD_NAME, self.AGE_IN_IMAGE_FIELD_NAME, self.BONE_AGE_FIELD_NAME,
+                               self.HEIGHT_FIELD_NAME, self.MAX_HEIGHT_FIELD_NAME]
 
                 writer = csv.DictWriter(csv_file, delimiter=';', fieldnames=field_names)
                 writer.writeheader()
@@ -76,4 +81,6 @@ class PatientBoneAgeJournalExporter(QObject):
                                          record.age_in_image, delimiter=self.AGE_DELIMITER),
                                      self.BONE_AGE_FIELD_NAME: YearsMonthsAgeFormat.format(
                                          record.bone_age, delimiter=self.AGE_DELIMITER),
+                                     self.HEIGHT_FIELD_NAME: record.height_str,
+                                     self.MAX_HEIGHT_FIELD_NAME: record.max_height_str,
                                      })

@@ -1,4 +1,5 @@
 import sys
+import locale
 from pathlib import Path
 
 from typing import Union
@@ -21,6 +22,9 @@ class App(QApplication):
 
     def __init__(self, argv, child_config_paths: tuple = ()):
         super().__init__(argv)
+
+        # Set to users preferred locale to output correct decimal point (comma or point):
+        locale.setlocale(locale.LC_NUMERIC, '')
 
         self.config_uniter = ConfigUniter(child_config_paths)
         self.united_config = self.config_uniter.unite_configs(Path(__file__).parent.resolve(), 'App.conf.yaml')

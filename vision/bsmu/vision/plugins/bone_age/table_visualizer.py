@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import locale
 import math
 from abc import ABC, abstractmethod
 from enum import IntEnum
 from functools import partial
 from pathlib import Path
-from typing import List, Type, Optional
+from typing import List, Type
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -140,6 +141,10 @@ class PatientBoneAgeRecord(QObject):
     def height(self) -> float:
         return self._height
 
+    @property
+    def height_str(self) -> str:
+        return PatientBoneAgeRecord.height_to_str(self.height)
+
     @height.setter
     def height(self, value: float):
         if self._height != value:
@@ -147,8 +152,12 @@ class PatientBoneAgeRecord(QObject):
             self.height_changed.emit(self._height)
 
     @property
-    def max_height(self) -> Optional[float]:
+    def max_height(self) -> float:
         return self._max_height
+
+    @property
+    def max_height_str(self) -> str:
+        return PatientBoneAgeRecord.height_to_str(self.max_height)
 
     def _calculate_age_in_image(self):
         return self.birthdate.daysTo(self.image_date)
@@ -176,6 +185,10 @@ class PatientBoneAgeRecord(QObject):
     def _update_max_height(self):
         self._max_height = self._calculate_max_height()
         self.max_height_changed.emit(self.max_height)
+
+    @staticmethod
+    def height_to_str(height: float) -> str:
+        return '' if math.isnan(height) else locale.str(round(height, 1))
 
 
 class PatientBoneAgeJournal(Data):
@@ -216,7 +229,7 @@ class MonthsAgeFormat(AgeFormat):
 
     @classmethod
     def format(cls, age_in_days: float) -> str:
-        return f'{date.days_to_months(age_in_days):.{cls.age_decimals}f}'
+        return locale.str(round(date.days_to_months(age_in_days), cls.age_decimals))
 
 
 class YearsMonthsAgeFormat(AgeFormat):
@@ -226,7 +239,7 @@ class YearsMonthsAgeFormat(AgeFormat):
     @classmethod
     def format(cls, age_in_days: float, delimiter: str = '/') -> str:
         years, months = date.days_to_years_months(age_in_days)
-        return f'{int(years)} {delimiter} {months:.{cls.age_decimals}f}'
+        return f'{int(years)} {delimiter} {locale.str(round(months, cls.age_decimals))}'
 
 
 class TableColumn:
@@ -507,8 +520,7 @@ class PatientBoneAgeJournalTable(QTableWidget):
         height_spin_box.setValue(height)
 
     def _set_max_height_to_table_item(self, max_height_table_item: QTableWidgetItem, max_height: float):
-        max_height_str = '' if math.isnan(max_height) else f'{max_height:.1f}'
-        max_height_table_item.setText(max_height_str)
+        max_height_table_item.setText(PatientBoneAgeRecord.height_to_str(max_height))
 
     def _update_bone_age_table_item_foreground(self, record: PatientBoneAgeRecord):
         bone_age_item = self.item(self._records_rows[record], self.column_number(TableDenseNetBoneAgeColumn))

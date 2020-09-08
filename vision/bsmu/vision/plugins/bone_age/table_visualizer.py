@@ -159,23 +159,18 @@ class PatientBoneAgeRecord(QObject):
 
     def _calculate_max_height(self) -> float:
         age_delta_in_years = date.days_to_years(self.age_in_image - self.bone_age)
-        print('_calculate_max_height   bone_age: ', self.bone_age)
         if abs(age_delta_in_years) <= 1:
             # Normal bone growth
-            print('Normal bone growth')
             max_height_factor = \
                 MaxHeightAnalyzer.max_height_factor_functions_for_normal_bone_growth()[self.male](self.bone_age)
         elif age_delta_in_years > 1:
             # Slow bone growth
-            print('Slow bone growth')
             max_height_factor = \
                 MaxHeightAnalyzer.max_height_factor_functions_for_slow_bone_growth()[self.male](self.bone_age)
         else:
             # Premature bone growth
-            print('Premature bone growth')
             max_height_factor = \
                 MaxHeightAnalyzer.max_height_factor_functions_for_premature_bone_growth()[self.male](self.bone_age)
-        print('max_height_factor: ', max_height_factor)
         return self.height / max_height_factor * 100
 
     def _update_max_height(self):

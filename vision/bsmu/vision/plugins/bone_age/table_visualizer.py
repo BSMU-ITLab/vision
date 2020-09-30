@@ -19,6 +19,8 @@ from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbst
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.max_height_analyzer import MaxHeightAnalyzer
 from bsmu.vision.plugins.bone_age.predictor import Predictor, DnnModelParams
+from bsmu.vision.plugins.bone_age.skeletal_development_rate_analyzer import SkeletalDevelopmentRate, \
+    SkeletalDevelopmentRateAnalyzer
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.date import DateEditWidget
 from bsmu.vision.widgets.gender import GenderWidget
@@ -69,6 +71,7 @@ class PatientBoneAgeRecord(QObject):
     image_date_changed = Signal(QDate)
     age_in_image_changed = Signal(float)
     bone_age_changed = Signal(float)
+    skeletal_development_rate_changed = Signal(object)
     height_changed = Signal(float)
     max_height_changed = Signal(float)
 
@@ -85,6 +88,11 @@ class PatientBoneAgeRecord(QObject):
         self._age_in_image = self._calculate_age_in_image()  # in days
         self.birthdate_changed.connect(self._update_age_in_image)
         self.image_date_changed.connect(self._update_age_in_image)
+
+        self._skeletal_development_rate = self._calculate_skeletal_development_rate()
+        self.male_changed.connect(self._update_skeletal_development_rate)
+        self.age_in_image_changed.connect(self._update_skeletal_development_rate)
+        self.bone_age_changed.connect(self._update_skeletal_development_rate)
 
         self._height = height  # in cm
         self._max_height = self._calculate_max_height()
@@ -138,6 +146,10 @@ class PatientBoneAgeRecord(QObject):
             self.bone_age_changed.emit(self._bone_age)
 
     @property
+    def skeletal_development_rate(self) -> SkeletalDevelopmentRate:
+        return self._skeletal_development_rate
+
+    @property
     def height(self) -> float:
         return self._height
 
@@ -166,20 +178,17 @@ class PatientBoneAgeRecord(QObject):
         self._age_in_image = self._calculate_age_in_image()
         self.age_in_image_changed.emit(self.age_in_image)
 
+    def _calculate_skeletal_development_rate(self) -> SkeletalDevelopmentRate:
+        return SkeletalDevelopmentRateAnalyzer.analyze_skeletal_development_rate(
+            self.male, self.age_in_image, self.bone_age)
+
+    def _update_skeletal_development_rate(self):
+        self._skeletal_development_rate = self._calculate_skeletal_development_rate()
+        self.skeletal_development_rate_changed.emit(self.skeletal_development_rate)
+
     def _calculate_max_height(self) -> float:
-        age_delta_in_years = date.days_to_years(self.age_in_image - self.bone_age)
-        if abs(age_delta_in_years) <= 1:
-            # Normal bone growth
-            max_height_factor = \
-                MaxHeightAnalyzer.max_height_factor_functions_for_normal_bone_growth()[self.male](self.bone_age)
-        elif age_delta_in_years > 1:
-            # Slow bone growth
-            max_height_factor = \
-                MaxHeightAnalyzer.max_height_factor_functions_for_slow_bone_growth()[self.male](self.bone_age)
-        else:
-            # Premature bone growth
-            max_height_factor = \
-                MaxHeightAnalyzer.max_height_factor_functions_for_premature_bone_growth()[self.male](self.bone_age)
+        max_height_factor = float('nan') if self.skeletal_development_rate == SkeletalDevelopmentRate.UNKNOWN \
+            else MaxHeightAnalyzer.max_height_factor_functions_for_bone_growth()[self.skeletal_development_rate][self.male](self.bone_age)
         return self.height / max_height_factor * 100
 
     def _update_max_height(self):
@@ -464,8 +473,7 @@ class PatientBoneAgeJournalTable(QTableWidget):
         bone_age_item = QTableWidgetItem()
         bone_age_item.setFlags(bone_age_item.flags() & ~Qt.ItemIsEditable)
         record.bone_age_changed.connect(partial(self._set_age_to_table_item, bone_age_item))
-        record.bone_age_changed.connect(partial(self._on_record_age_changed, record))
-        record.age_in_image_changed.connect(partial(self._on_record_age_changed, record))
+        record.skeletal_development_rate_changed.connect(partial(self._on_skeletal_development_rate_changed, record))
         self.setItem(row, self.column_number(TableDenseNetBoneAgeColumn), bone_age_item)
         self._update_bone_age_table_item_foreground(record)
 
@@ -513,7 +521,8 @@ class PatientBoneAgeJournalTable(QTableWidget):
     def _set_age_to_table_item(self, age_table_item: QTableWidgetItem, age: float):
         age_table_item.setText(self._age_format.format(age))
 
-    def _on_record_age_changed(self, record: PatientBoneAgeRecord, age: float):
+    def _on_skeletal_development_rate_changed(self, record: PatientBoneAgeRecord,
+                                              skeletal_development_rate: SkeletalDevelopmentRate):
         self._update_bone_age_table_item_foreground(record)
 
     def _set_height_to_table_item_widget(self, height_spin_box: QDoubleSpinBox, height: float):
@@ -525,7 +534,7 @@ class PatientBoneAgeJournalTable(QTableWidget):
     def _update_bone_age_table_item_foreground(self, record: PatientBoneAgeRecord):
         bone_age_item = self.item(self._records_rows[record], self.column_number(TableDenseNetBoneAgeColumn))
         # Highlight the item foreground if the |record.bone_age| differs from the |record.age_in_image| more than a year
-        highlight = date.days_to_years(abs(record.bone_age - record.age_in_image)) > 1
+        highlight = record.skeletal_development_rate != SkeletalDevelopmentRate.NORMAL
         bone_age_item.setData(TableItemDataRole.HIGHLIGHT, highlight)
 
     def _display_header_context_menu(self, point: QPoint):

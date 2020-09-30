@@ -60,7 +60,7 @@ setup(
     executables=[Executable(
         FILE_DIR / 'bsmu/vision/app/main.py',
         base=app_base,
-        shortcutName='Bone Age',
+        shortcutName='Bone Age Analyzer',
         shortcutDir='DesktopFolder',
     )]
 )

@@ -51,3 +51,4 @@ plugins:
   - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin
   - bsmu.vision.plugins.bone_age.atlas_visualizer.BoneAgeAtlasVisualizerPlugin
   - bsmu.vision.plugins.bone_age.journal_exporter.PatientBoneAgeJournalExporterPlugin
+  - bsmu.vision.plugins.bone_age.image_loader.ImageLoaderPlugin

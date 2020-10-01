@@ -59,6 +59,9 @@ class SkeletalDevelopmentRateAnalyzer:
         if math.isnan(average_bone_age) or math.isnan(average_bone_age_sigma):
             return SkeletalDevelopmentRate.UNKNOWN
 
+        # print(f'age: {age_in_image}\taverage_bone_age: {average_bone_age}\tsigma: {average_bone_age_sigma}\n'
+        #       f'min: {average_bone_age - 2 * average_bone_age_sigma}\tmax: {average_bone_age + 2 * average_bone_age_sigma}\tcur_bone_age: {bone_age}')
+
         bone_age_delta = bone_age - average_bone_age
         if abs(bone_age_delta) <= 2 * average_bone_age_sigma:
             return SkeletalDevelopmentRate.NORMAL

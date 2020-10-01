@@ -26,7 +26,7 @@ class PatientBoneAgeJournalExporterPlugin(Plugin):
         self.journal_exporter = PatientBoneAgeJournalExporter(self.table_visualizer, self.main_window)
 
     def _enable(self):
-        self.main_window.add_menu_action(TableMenu, 'Export to CSV...', self.journal_exporter.export_to_csv)
+        self.main_window.add_menu_action(TableMenu, 'Export to Excel...', self.journal_exporter.export_to_csv)
 
     def _disable(self):
         self.data_visualization_manager.data_visualized.disconnect(self.table_visualizer.visualize_bone_age_data)

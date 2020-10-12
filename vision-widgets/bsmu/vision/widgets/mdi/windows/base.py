@@ -40,6 +40,13 @@ class DataViewerSubWindow(QMdiSubWindow):
         self.setGeometry(layout_rect)
         self._laying_out = False
 
+    def show_normal(self):
+        if self.isHidden():
+            self.show()
+            self.viewer.show()
+        if self.isMinimized():
+            self.showNormal()
+
     def resizeEvent(self, resize_event: QResizeEvent):
         super().resizeEvent(resize_event)
 

@@ -694,6 +694,8 @@ class BoneAgeTableVisualizer(QObject):
         self.journal_viewer.remove_age_column_context_menu_action(action)
 
     def raise_journal_sub_window(self):
+        self.journal_sub_window.show_normal()
+
         self.mdi.setActiveSubWindow(self.journal_sub_window)
 
         # self.journal_sub_window.raise_()
@@ -708,4 +710,6 @@ class BoneAgeTableVisualizer(QObject):
     def _on_journal_record_selected(self, record: PatientBoneAgeRecord):
         image_sub_windows = self.records_image_sub_windows.get(record, [])
         for image_sub_window in image_sub_windows:
+            image_sub_window.show_normal()
+
             image_sub_window.raise_()

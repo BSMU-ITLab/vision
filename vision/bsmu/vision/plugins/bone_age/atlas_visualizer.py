@@ -104,13 +104,9 @@ class BoneAgeAtlasVisualizer(QObject):
         self.mdi.setActiveSubWindow(self._atlas_sub_windows[0])
 
         for atlas_sub_window in self._atlas_sub_windows:
-            if atlas_sub_window.isHidden():
-                atlas_sub_window.show()
-                atlas_sub_window.viewer.show()
-            elif atlas_sub_window.isMinimized():
-                atlas_sub_window.showNormal()
-            else:
-                atlas_sub_window.raise_()
+            atlas_sub_window.show_normal()
+
+            atlas_sub_window.raise_()
 
     def show_atlas_for_record(self, record: PatientBoneAgeRecord):
         self._cur_atlas_is_male = record.male

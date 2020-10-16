@@ -5,6 +5,7 @@
 # (vision) D:\Projects\vision>   python vision/build.py bdist_msi
 
 
+import sys
 from pathlib import Path
 
 from cx_Freeze import setup, Executable
@@ -41,12 +42,8 @@ bdist_msi_options = {
 }
 
 # GUI applications require a different base on Windows (the default is for a console application).
-app_base = None
-# if sys.platform == 'win32':
-#     app_base = 'Win32GUI'
-#     print('Win32GUI')
-# else:
-#     print('app_base = None')
+app_base = 'Win32GUI' if sys.platform == 'win32' else None
+print('app_base:', app_base)
 
 setup(
     name='Vision',

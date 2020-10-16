@@ -7,7 +7,7 @@ with open('README.md', 'r') as fh:
 
 setuptools.setup(
     name='bsmu.vision',
-    version='0.0.1',
+    version='0.1.0',
     author='Ivan Kosik',
     author_email='ivankosik91@gmail.com',
     description='Base application for extension by plugins',

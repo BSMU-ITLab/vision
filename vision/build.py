@@ -47,7 +47,7 @@ print('app_base:', app_base)
 
 setup(
     name='Vision',
-    version='0.0.1',
+    version='0.1.0',
     description='Base application for extension by plugins',
     options={
         'build_exe': build_exe_options,

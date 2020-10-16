@@ -30,7 +30,7 @@ class ImageLoaderPlugin(Plugin):
 
     def _show_image_load_dialog(self):
         file_path_strings, selected_filter = QFileDialog.getOpenFileNames(
-            self.main_window, 'Open File', filter='Images (*.png *.jpg)')
+            self.main_window, 'Open File', filter='Images (*.png *.jpg *.bmp)')
         for file_path_str in file_path_strings:
             image_data = self.simple_image_file_loader.load_file(Path(file_path_str))
             image_data = self.post_load_conversion_manager.convert_data(image_data)

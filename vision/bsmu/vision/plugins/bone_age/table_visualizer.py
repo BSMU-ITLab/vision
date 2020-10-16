@@ -228,7 +228,7 @@ class AgeFormat(ABC):
 
     @classmethod
     @abstractmethod
-    def format(cls, age: float) -> str:
+    def format(cls, age: float, **kwargs) -> str:
         pass
 
 
@@ -237,7 +237,7 @@ class MonthsAgeFormat(AgeFormat):
     ABBR = 'M'
 
     @classmethod
-    def format(cls, age_in_days: float) -> str:
+    def format(cls, age_in_days: float, **kwargs) -> str:
         return locale.str(round(date.days_to_months(age_in_days), cls.age_decimals))
 
 
@@ -246,7 +246,7 @@ class YearsMonthsAgeFormat(AgeFormat):
     ABBR = 'Y / M'
 
     @classmethod
-    def format(cls, age_in_days: float, delimiter: str = '/') -> str:
+    def format(cls, age_in_days: float, delimiter: str = '/', **kwargs) -> str:
         years, months = date.days_to_years_months(age_in_days)
         return f'{int(years)} {delimiter} {locale.str(round(months, cls.age_decimals))}'
 
@@ -610,6 +610,10 @@ class PatientBoneAgeJournalViewer(DataViewer):
         grid_layout.addWidget(self.table)
         self.setLayout(grid_layout)
 
+    @property
+    def age_format(self) -> Type[AgeFormat]:
+        return self.table.age_format
+
     def add_record_activation_map_visibility_widget(
             self, record: PatientBoneAgeRecord, layer_visibility_widget: LayerVisibilityWidget):
         self.table.add_record_activation_map_visibility_widget(record, layer_visibility_widget)
@@ -643,6 +647,10 @@ class BoneAgeTableVisualizer(QObject):
         self.journal_sub_window = DataViewerSubWindow(self.journal_viewer)
         self.journal_sub_window.layout_anchors = np.array([[0, 0], [0.6, 1]])
         self.mdi.addSubWindow(self.journal_sub_window)
+
+    @property
+    def age_format(self) -> Type[AgeFormat]:
+        return self.journal_viewer.age_format
 
     def visualize_bone_age_data(self, data: Data, data_viewer_sub_windows: List[DataViewerSubWindow]):
         print('visualize_bone_age_data', type(data))

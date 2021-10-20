@@ -1,0 +1,20 @@
+layers:
+  masks:
+    color: [0, 255, 0, 255]
+  predictions:
+    color: [255, 0, 0, 255]
+intersection-layer:
+  name: intersection
+  color: [255, 255, 0, 255]
+  opacity: 1
+
+
+#layers:
+#  masks:
+#    color: [255, 255, 0, 255]
+#  predictions:
+#    color: [255, 0, 0, 255]
+#intersection-layer:
+#  name: intersection
+#  color: [0, 255, 0, 255]
+#  opacity: 0.2

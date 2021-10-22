@@ -1,6 +1,6 @@
 import numpy as np
 from PySide2.QtGui import QImage
-from skimage.color import gray2rgb
+from skimage.color import gray2rgba
 
 
 def normalized(array: np.ndarray, min_range: float = 0, max_range: float = 1):
@@ -15,7 +15,7 @@ def normalized_uint8(array: np.ndarray):
 
 def converted_to_rgba(image):
     if image.ndim == 2:  # one channel (grayscale image)
-        image = gray2rgb(image, True)
+        image = gray2rgba(image)
     elif image.ndim == 3 and image.shape[2] == 3:  # 3-channel image
         # Add alpha-channel
         image = np.dstack((image, np.full(image.shape[:2], 255, np.uint8)))

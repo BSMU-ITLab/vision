@@ -58,6 +58,7 @@ class ImageLayerView(QObject):
         self._image_view = None
 
         self._displayed_qimage_cache = None
+        self._view_min_spacing = None
         # Store numpy array's data, because QImage uses it without copying,
         # and QImage will crash if it's data buffer will be deleted
         self._displayed_pixels_data = None
@@ -115,6 +116,17 @@ class ImageLayerView(QObject):
         return self._image_layer.name
 
     @property
+    def view_min_spacing(self) -> float:
+        return self._view_min_spacing
+
+    @view_min_spacing.setter
+    def view_min_spacing(self, value: float):
+        if self._view_min_spacing != value:
+            self._view_min_spacing = value
+
+            self._displayed_qimage_cache = None
+
+    @property
     def displayed_image(self):
         if self._displayed_qimage_cache is None:
             if self.image_view.is_indexed:
@@ -125,18 +137,27 @@ class ImageLayerView(QObject):
 
                 displayed_rgba_pixels = image_converter.converted_to_rgba(self.image_view.array)
 
+            if not displayed_rgba_pixels.flags['C_CONTIGUOUS']:
+                displayed_rgba_pixels = np.ascontiguousarray(displayed_rgba_pixels)
             self._displayed_pixels_data = displayed_rgba_pixels.data
             displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied if displayed_rgba_pixels.itemsize == 1 \
                 else QImage.Format_RGBA64_Premultiplied
+
             self._displayed_qimage_cache = image_converter.numpy_rgba_image_to_qimage(
                 displayed_rgba_pixels, displayed_qimage_format)
 
             # Scale image to take into account spatial attributes (spacings)
-            spatial_width = self.image_view.spatial.spacing[1] * self._displayed_qimage_cache.width()
-            spatial_height = self.image_view.spatial.spacing[0] * self._displayed_qimage_cache.height()
+            width_spacing = self.image_view.spatial.spacing[1]
+            height_spacing = self.image_view.spatial.spacing[0]
+            spatial_width = width_spacing / self.view_min_spacing * self._displayed_qimage_cache.width()
+            spatial_height = height_spacing / self.view_min_spacing * self._displayed_qimage_cache.height()
+
             self._displayed_qimage_cache = self._displayed_qimage_cache.scaled(
                 spatial_width, spatial_height, mode=Qt.SmoothTransformation)
         return self._displayed_qimage_cache
+
+    def calculate_view_min_spacing(self):
+        return self.image_view.spatial.spacing.min()
 
     def _on_layer_image_updated(self, image: Image):
         self.image_changed.emit(image)
@@ -188,6 +209,8 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
         self._bounding_rect_cache = None
 
+        self._view_min_spacing = float('inf')
+
     @property
     def active_layer_view(self) -> ImageLayerView:
         return self._active_layer_view
@@ -195,6 +218,10 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
     @property
     def layer_views(self):
         return self._layered_image_view.layer_views
+
+    @property
+    def view_min_spacing(self) -> float:
+        return self._view_min_spacing
 
     def layer_view_by_name(self, name: str) -> ImageLayerView:
         return self._layered_image_view.layer_view_by_name(name)
@@ -216,6 +243,15 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
             self._active_layer_view = layer_view
             self.active_layer_view_changed.emit(None, self.active_layer_view)
 
+        # Apply for all layers the same minimal view spacing to overlay them correctly
+        added_layer_min_view_spacing = layer_view.calculate_view_min_spacing()
+        if added_layer_min_view_spacing < self._view_min_spacing:
+            self._view_min_spacing = added_layer_min_view_spacing
+            for layer_view in self.layer_views:
+                layer_view.view_min_spacing = self._view_min_spacing
+        else:
+            layer_view.view_min_spacing = self._view_min_spacing
+
         self._reset_bounding_rect_cache()  # self.prepareGeometryChange() will call update() if this is necessary.
 
     def boundingRect(self):
@@ -235,8 +271,12 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
             rect_top_left_pixel_indexes = np.array([0, 0])
             rect_bottom_right_pixel_indexes = first_layer_image_view.array.shape[:2]
-            rect_top_left_pos = first_layer_image_view.pixel_indexes_to_pos(rect_top_left_pixel_indexes)
-            rect_bottom_right_pos = first_layer_image_view.pixel_indexes_to_pos(rect_bottom_right_pixel_indexes)
+
+            rect_top_left_pos = first_layer_image_view.pixel_indexes_to_pos(
+                rect_top_left_pixel_indexes / self.view_min_spacing)
+            rect_bottom_right_pos = first_layer_image_view.pixel_indexes_to_pos(
+                rect_bottom_right_pixel_indexes / self.view_min_spacing)
+
             bounding_rect = QRectF(QPointF(rect_top_left_pos[1], rect_top_left_pos[0]),
                                    QPointF(rect_bottom_right_pos[1], rect_bottom_right_pos[0]))
 
@@ -254,6 +294,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         return bounding_rect
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
+        # painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         for layer_view in self.layer_views:
             if layer_view.visible and layer_view.image_view is not None:
@@ -350,11 +391,11 @@ class LayeredImageViewer(DataViewer):
 
     def viewport_pos_to_image_pixel_indexes(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
         layered_image_item_pos = self.viewport_pos_to_layered_image_item_pos(viewport_pos)
-        return image.pos_to_pixel_indexes(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()]))
+        return image.pos_to_pixel_indexes(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()])) \
+            * self.layered_image_graphics_object.view_min_spacing
 
     def viewport_pos_to_image_pixel_indexes_rounded(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
-        layered_image_item_pos = self.viewport_pos_to_layered_image_item_pos(viewport_pos)
-        return image.pos_to_pixel_indexes_rounded(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()]))
+        return self.viewport_pos_to_image_pixel_indexes(viewport_pos, image).round().astype(np.int_)
 
     def viewport_pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
         scene_pos = self.graphics_view.mapToScene(viewport_pos)

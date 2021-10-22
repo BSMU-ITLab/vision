@@ -3,9 +3,9 @@ layers:
     palette:
       - [0, 0, 0, 0, 0]
       - [1, 0, 255, 0, 255]
-    opacity: 0.3
+    opacity: 0.5
   predictions:
     palette:
       - [0, 0, 0, 0, 0]
-      - [1, 255, 127, 0, 255]
-    opacity: 0.3
+      - [1, 255, 0, 0, 255]
+    opacity: 0.4

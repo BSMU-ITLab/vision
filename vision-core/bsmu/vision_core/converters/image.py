@@ -25,8 +25,9 @@ def converted_to_rgba(image):
 # Do not delete |numpy_image| or it's data, because QImage uses it without copying,
 # and QImage will crash if it's data buffer will be deleted
 def numpy_rgba_image_to_qimage(numpy_image, image_format: QImage.Format = QImage.Format_RGBA8888_Premultiplied):
-    # print("STRIDES", numpy_image.strides[0])
-    # print(numpy_image.flags['C_CONTIGUOUS'])
+    # print('STRIDES', numpy_image.strides[0])
+    # print(numpy_image.flags)
+    assert numpy_image.flags['C_CONTIGUOUS'], 'Numpy array have to be C-contiguous'
     height, width, channel = numpy_image.shape
     bytes_per_line = width * channel * numpy_image.itemsize
     return QImage(numpy_image.data, width, height, bytes_per_line, image_format)

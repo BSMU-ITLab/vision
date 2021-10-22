@@ -4,7 +4,8 @@ from enum import Enum
 
 import cv2
 import numpy as np
-import skimage
+import skimage.draw
+import skimage.measure
 from PySide2.QtCore import QEvent
 from PySide2.QtCore import Qt
 

@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from enum import IntEnum
 from pathlib import Path
-from typing import List, Any, Type
+from typing import List, Any, Type, Optional
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide2.QtCore import QObject, Qt, Signal, QAbstractTableModel, QModelIndex
-from PySide2.QtWidgets import QGridLayout, QTableView
+from PySide2.QtCore import QObject, Qt, Signal, QAbstractTableModel, QModelIndex, QSize
+from PySide2.QtGui import QImage
+from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate
 
+import bsmu.vision_core.converters.image as image_converter
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
@@ -19,7 +21,7 @@ from bsmu.vision_core.image.layered import LayeredImage
 
 if TYPE_CHECKING:
     from PySide2.QtCore import QAbstractItemModel
-    from PySide2.QtWidgets import QWidget
+    from PySide2.QtWidgets import QWidget, QStyleOptionViewItem
 
     from bsmu.vision.app import App
     from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
@@ -93,15 +95,21 @@ class TableItemDataRole(IntEnum):
 
 
 class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
-    def __init__(self, data: PatientRetinalFundusJournal, parent: QObject = None):
+    def __init__(self, data: PatientRetinalFundusJournal, preview_height: Optional[int] = None, parent: QObject = None):
         super().__init__(parent)
 
         self._data = data
         self._data.record_adding.connect(self._on_data_record_adding)
         self._data.record_added.connect(self.endInsertRows)
 
+        self._preview_height = preview_height
+
         self._columns = [PreviewTableColumn, NameTableColumn]
         self._number_by_column = {column: number for number, column in enumerate(self._columns)}
+
+        # Store numpy array's data for preview images, because QImage uses it without copying,
+        # and QImage will crash if it's data buffer will be deleted
+        self._preview_data_buffer_by_row = {}
 
     def column_number(self, column: Type[TableColumn]) -> int:
         return self._number_by_column[column]
@@ -121,13 +129,23 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
 
         record = self._data.records[index.row()]
         if role == Qt.DisplayRole:
-            if index.column() == self.column_number(PreviewTableColumn):
-                return record.image.path_name
-            elif index.column() == self.column_number(NameTableColumn):
+            if index.column() == self.column_number(NameTableColumn):
                 return record.image.path_name
         elif role == TableItemDataRole.RECORD_REF:
             if index.column() == self.column_number(PreviewTableColumn):
                 return record
+        elif role == Qt.DecorationRole:
+            if index.column() == self.column_number(PreviewTableColumn):
+                preview_rgba_pixels = image_converter.converted_to_rgba(record.image.array)
+                # Keep reference to numpy data, otherwise QImage will crash
+                self._preview_data_buffer_by_row[index.row()] = preview_rgba_pixels.data
+
+                qimage_format = QImage.Format_RGBA8888_Premultiplied if preview_rgba_pixels.itemsize == 1 \
+                    else QImage.Format_RGBA64_Premultiplied
+                preview_qimage = image_converter.numpy_rgba_image_to_qimage(preview_rgba_pixels, qimage_format)
+                if self._preview_height is not None:
+                    preview_qimage = preview_qimage.scaledToHeight(self._preview_height, Qt.SmoothTransformation)
+                return preview_qimage
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
         if role != Qt.DisplayRole:
@@ -168,14 +186,39 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
         self.beginInsertRows(QModelIndex(), row_count, row_count)
 
 
+class ImageCenterAlignmentDelegate(QStyledItemDelegate):
+    def __init__(self, table_view: QTableView, parent: QObject = None):
+        super().__init__(parent)
+
+        self._table_view = table_view
+
+    def initStyleOption(self, option: QStyleOptionViewItem, index: QModelIndex):
+        super().initStyleOption(option, index)
+
+        option.decorationSize = QSize(self._table_view.columnWidth(index.column()),
+                                      self._table_view.verticalHeader().defaultSectionSize())
+        # option.decorationAlignment = Qt.AlignCenter
+
+
 class PatientRetinalFundusJournalTableView(QTableView):
     record_selected = Signal(PatientRetinalFundusRecord)
 
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, row_height: Optional[int] = None, parent: QWidget = None):
         super().__init__(parent)
+
+        if row_height is not None:
+            vertical_header = self.verticalHeader()
+            vertical_header.setSectionResizeMode(QHeaderView.Fixed)
+            vertical_header.setDefaultSectionSize(row_height)
 
     def setModel(self, model: QAbstractItemModel):
         super().setModel(model)
+
+        if model is None:
+            return
+
+        self.setItemDelegateForColumn(self.model().column_number(PreviewTableColumn),
+                                      ImageCenterAlignmentDelegate(self))
 
         self.selectionModel().currentRowChanged.connect(self._on_current_row_changed)
 
@@ -189,8 +232,9 @@ class PatientRetinalFundusJournalViewer(DataViewer):
     def __init__(self, data: PatientRetinalFundusJournal = None):
         super().__init__(data)
 
-        self._table_model = PatientRetinalFundusJournalTableModel(data)
-        self._table_view = PatientRetinalFundusJournalTableView()
+        row_height = 64
+        self._table_model = PatientRetinalFundusJournalTableModel(data, preview_height=row_height - 4)
+        self._table_view = PatientRetinalFundusJournalTableView(row_height=row_height)
         self._table_view.setModel(self._table_model)
         self._table_view.record_selected.connect(self.record_selected)
 

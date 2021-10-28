@@ -252,10 +252,12 @@ class RetinalFundusTableVisualizer(QObject):
         self._mdi = mdi
 
         self._journal = PatientRetinalFundusJournal()
-        self._journal.add_record(
-            PatientRetinalFundusRecord(FlatImage(array=np.random.rand(50, 50), path=Path(r'D:\Temp\Void-1.png'))))
-        self._journal.add_record(
-            PatientRetinalFundusRecord(FlatImage(array=np.random.rand(50, 50), path=Path(r'D:\Temp\Void-2.png'))))
+        self._journal.add_record(PatientRetinalFundusRecord(FlatImage(
+            array=np.random.randint(low=0, high=256, size=(50, 50), dtype=np.uint8),
+            path=Path(r'D:\Temp\Void-1.png'))))
+        self._journal.add_record(PatientRetinalFundusRecord(FlatImage(
+            array=np.random.randint(low=0, high=256, size=(50, 50), dtype=np.uint8),
+            path=Path(r'D:\Temp\Void-2.png'))))
         self._journal_viewer = PatientRetinalFundusJournalViewer(self.journal)
         self._journal_viewer.record_selected.connect(self._on_journal_record_selected)
 

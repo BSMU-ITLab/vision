@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from enum import IntEnum
 from pathlib import Path
-from typing import List, Any
+from typing import List, Any, Type
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -17,6 +18,7 @@ from bsmu.vision_core.image.base import FlatImage
 from bsmu.vision_core.image.layered import LayeredImage
 
 if TYPE_CHECKING:
+    from PySide2.QtCore import QAbstractItemModel
     from PySide2.QtWidgets import QWidget
 
     from bsmu.vision.app import App
@@ -74,6 +76,22 @@ class PatientRetinalFundusJournal(Data):
         self.record_added.emit(record)
 
 
+class TableColumn:
+    TITLE = ''
+
+
+class PreviewTableColumn(TableColumn):
+    TITLE = 'Preview'
+
+
+class NameTableColumn(TableColumn):
+    TITLE = 'Name'
+
+
+class TableItemDataRole(IntEnum):
+    RECORD_REF = Qt.UserRole
+
+
 class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
     def __init__(self, data: PatientRetinalFundusJournal, parent: QObject = None):
         super().__init__(parent)
@@ -82,11 +100,17 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
         self._data.record_adding.connect(self._on_data_record_adding)
         self._data.record_added.connect(self.endInsertRows)
 
+        self._columns = [PreviewTableColumn, NameTableColumn]
+        self._number_by_column = {column: number for number, column in enumerate(self._columns)}
+
+    def column_number(self, column: Type[TableColumn]) -> int:
+        return self._number_by_column[column]
+
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self._data.records)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 0 if parent.isValid() else 2
+        return 0 if parent.isValid() else len(self._columns)
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if not index.isValid():
@@ -95,22 +119,22 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
         if index.row() >= len(self._data.records) or index.row() < 0:
             return
 
+        record = self._data.records[index.row()]
         if role == Qt.DisplayRole:
-            record = self._data.records[index.row()]
-            if index.column() == 0:
+            if index.column() == self.column_number(PreviewTableColumn):
                 return record.image.path_name
-            elif index.column() == 1:
+            elif index.column() == self.column_number(NameTableColumn):
                 return record.image.path_name
+        elif role == TableItemDataRole.RECORD_REF:
+            if index.column() == self.column_number(PreviewTableColumn):
+                return record
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
         if role != Qt.DisplayRole:
             return
 
         if orientation == Qt.Horizontal:
-            if section == 0:
-                return 'Preview'
-            elif section == 1:
-                return 'Name'
+            return self._columns[section].TITLE
         elif orientation == Qt.Vertical:
             return section + 1
 
@@ -134,6 +158,10 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
         self.endRemoveRows()
         return True
 
+    def row_record(self, row: int) -> PatientRetinalFundusRecord:
+        preview_model_index = self.index(row, self.column_number(PreviewTableColumn))
+        return self.data(preview_model_index, TableItemDataRole.RECORD_REF)
+
     def _on_data_record_adding(self):
         # Append one row
         row_count = self.rowCount()
@@ -141,8 +169,18 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
 
 
 class PatientRetinalFundusJournalTableView(QTableView):
+    record_selected = Signal(PatientRetinalFundusRecord)
+
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
+
+    def setModel(self, model: QAbstractItemModel):
+        super().setModel(model)
+
+        self.selectionModel().currentRowChanged.connect(self._on_current_row_changed)
+
+    def _on_current_row_changed(self, current: QModelIndex, previous: QModelIndex):
+        self.record_selected.emit(self.model().row_record(current.row()))
 
 
 class PatientRetinalFundusJournalViewer(DataViewer):
@@ -151,10 +189,10 @@ class PatientRetinalFundusJournalViewer(DataViewer):
     def __init__(self, data: PatientRetinalFundusJournal = None):
         super().__init__(data)
 
-        self._table_view = PatientRetinalFundusJournalTableView()
         self._table_model = PatientRetinalFundusJournalTableModel(data)
+        self._table_view = PatientRetinalFundusJournalTableView()
         self._table_view.setModel(self._table_model)
-        # self.table.record_selected.connect(self.record_selected)
+        self._table_view.record_selected.connect(self.record_selected)
 
         grid_layout = QGridLayout()
         grid_layout.setContentsMargins(0, 0, 0, 0)

@@ -91,7 +91,7 @@ build_exe_options = {
         'numpy.core',
         'ruamel.yaml',
         'bsmu.vision.core',
-        'bsmu.vision_dnn',
+        'bsmu.vision.dnn',
         'bsmu.vision.widgets',
         'bsmu.vision.plugins',
     ],

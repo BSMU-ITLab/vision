@@ -2,7 +2,7 @@ import setuptools
 
 
 setuptools.setup(
-    name='bsmu.vision_dnn',
+    name='bsmu.vision.dnn',
     version='0.0.1',
     author='Ivan Kosik',
     author_email='ivankosik91@gmail.com',

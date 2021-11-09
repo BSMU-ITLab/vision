@@ -20,7 +20,7 @@ from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
-from bsmu.vision_dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
+from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
 
 if TYPE_CHECKING:
     from PySide2.QtCore import QAbstractItemModel

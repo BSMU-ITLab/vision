@@ -9,9 +9,9 @@ from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import AlgorithmsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.transfer_functions.color import ColorTransferFunctionViewer
-from bsmu.vision_core.transfer_functions.color import ColorTransferFunction, ColorTransferFunctionPoint
-from bsmu.vision_core.image.base import VolumeImage
-from bsmu.vision_core.palette import Palette
+from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
+from bsmu.vision.core.image.base import VolumeImage
+from bsmu.vision.core.palette import Palette
 
 if TYPE_CHECKING:
     from bsmu.vision.app import App

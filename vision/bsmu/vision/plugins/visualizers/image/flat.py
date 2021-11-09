@@ -3,8 +3,8 @@ from __future__ import annotations
 from bsmu.vision.plugins.visualizers.image.base import ImageVisualizerPlugin, ImageVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
-from bsmu.vision_core.image.base import FlatImage
-from bsmu.vision_core.image.layered import LayeredImage
+from bsmu.vision.core.image.base import FlatImage
+from bsmu.vision.core.image.layered import LayeredImage
 
 
 class FlatImageVisualizerPlugin(ImageVisualizerPlugin):

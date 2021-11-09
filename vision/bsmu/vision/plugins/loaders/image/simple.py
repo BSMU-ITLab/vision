@@ -4,7 +4,7 @@ import numpy as np
 import skimage.io
 
 from bsmu.vision.plugins.loaders.image.base import ImageFileLoaderPlugin, ImageFileLoader
-from bsmu.vision_core.image.base import FlatImage
+from bsmu.vision.core.image.base import FlatImage
 
 
 class SimpleImageFileLoaderPlugin(ImageFileLoaderPlugin):

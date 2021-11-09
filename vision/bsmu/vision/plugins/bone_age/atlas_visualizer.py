@@ -12,14 +12,14 @@ from sortedcontainers import SortedDict
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.bone_age.table_visualizer import BoneAgeTableVisualizerPlugin, PatientBoneAgeRecord, \
     PatientBoneAgeRecordAction
-from bsmu.vision_core import date
+from bsmu.vision.core import date
 
 if TYPE_CHECKING:
     from bsmu.vision.app import App
 from typing import Union
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
-from bsmu.vision_core.image.layered import LayeredImage
+from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin
 from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
 from bsmu.vision.plugins.bone_age.main_window import AtlasMenu

@@ -1,7 +1,7 @@
 import math
 from enum import Enum
 
-from bsmu.vision_core.equations import PolynomialInterval
+from bsmu.vision.core.equations import PolynomialInterval
 
 
 class SkeletalDevelopmentRate(Enum):

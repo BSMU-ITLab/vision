@@ -11,15 +11,15 @@ from PySide2.QtCore import QObject, Qt, Signal, QAbstractTableModel, QModelIndex
 from PySide2.QtGui import QImage
 from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate
 
-import bsmu.vision_core.converters.image as image_converter
+import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision_core.data import Data
-from bsmu.vision_core.image.base import FlatImage
-from bsmu.vision_core.image.layered import LayeredImage
-from bsmu.vision_core.palette import Palette
+from bsmu.vision.core.data import Data
+from bsmu.vision.core.image.base import FlatImage
+from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.palette import Palette
 from bsmu.vision_dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
 
 if TYPE_CHECKING:

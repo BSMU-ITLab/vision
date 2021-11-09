@@ -4,11 +4,11 @@ import itertools
 
 from PySide2.QtCharts import QtCharts
 from PySide2.QtCore import Qt, QPointF, QRectF
-from PySide2.QtGui import QPainter, QLinearGradient, QGradient, QPen, QBrush, QColor, QMatrix
+from PySide2.QtGui import QPainter, QLinearGradient, QGradient, QPen, QBrush, QColor
 from PySide2.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGridLayout, QColorDialog, QGraphicsItem
 
 from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision_core.transfer_functions.color import ColorTransferFunction
+from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 from sortedcontainers import SortedList
 
 

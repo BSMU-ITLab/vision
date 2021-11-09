@@ -36,8 +36,8 @@ class App(QApplication):
         from PySide2.QtCore import Qt
         from PySide2.QtGui import QPixmap
         from PySide2.QtWidgets import QGraphicsScene, QGraphicsPixmapItem, QLabel, QShortcut
-        from bsmu.vision_core.converters.image import numpy_rgba_image_to_qimage, converted_to_rgba
-        from bsmu.vision_core.image import FlatImage
+        from bsmu.vision.core.converters.image import numpy_rgba_image_to_qimage, converted_to_rgba
+        from bsmu.vision.core.image.base import FlatImage
         from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
         from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 

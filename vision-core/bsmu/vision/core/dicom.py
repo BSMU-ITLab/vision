@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from bsmu.vision_core.data import Data
+from bsmu.vision.core.data import Data
 
 if TYPE_CHECKING:
     from pydicom.dataset import FileDataset

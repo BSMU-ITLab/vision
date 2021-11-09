@@ -27,13 +27,12 @@ from bsmu.vision.widgets.gender import GenderWidget
 from bsmu.vision.widgets.layer_visibility import LayerVisibilityWidget
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision_core import date
-from bsmu.vision_core.converters import color as color_converter
-from bsmu.vision_core.converters import image as image_converter
-from bsmu.vision_core.data import Data
-from bsmu.vision_core.image.base import FlatImage
-from bsmu.vision_core.image.layered import LayeredImage
-from bsmu.vision_core.transfer_functions.color import ColorTransferFunction
+from bsmu.vision.core import date
+from bsmu.vision.core.converters import color as color_converter, image as image_converter
+from bsmu.vision.core.data import Data
+from bsmu.vision.core.image.base import FlatImage
+from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 
 if TYPE_CHECKING:
     from PySide2.QtCore import QModelIndex, QPoint

@@ -4,7 +4,7 @@ import nibabel as nib
 import numpy as np
 
 from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
-from bsmu.vision_core.image.base import VolumeImage, SpatialAttrs
+from bsmu.vision.core.image.base import VolumeImage, SpatialAttrs
 
 
 class NiftiFileLoaderPlugin(FileLoaderPlugin):

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Callable
 
 from bsmu.vision.plugins.bone_age.skeletal_development_rate_analyzer import SkeletalDevelopmentRate
-from bsmu.vision_core.equations import polynomial
+from bsmu.vision.core.equations import polynomial
 
 
 # See the max-height.xlsx

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from bsmu.vision.plugins.post_load_converters.base import PostLoadConverterPlugin, PostLoadConverter
-from bsmu.vision_core.data import Data
-from bsmu.vision_core.image.base import FlatImage, VolumeImage
-from bsmu.vision_core.image.layered import LayeredImage
+from bsmu.vision.core.data import Data
+from bsmu.vision.core.image.base import FlatImage, VolumeImage
+from bsmu.vision.core.image.layered import LayeredImage
 
 
 class ImageToLayeredImagePostLoadConverterPlugin(PostLoadConverterPlugin):

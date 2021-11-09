@@ -10,7 +10,7 @@ from PySide2.QtCore import QEvent
 from PySide2.QtCore import Qt
 
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool
-from bsmu.vision_core.palette import Palette
+from bsmu.vision.core.palette import Palette
 
 
 class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
-import bsmu.vision_core.converters.image as image_converter
+import bsmu.vision.core.converters.image as image_converter
 
 if TYPE_CHECKING:
     from pathlib import Path

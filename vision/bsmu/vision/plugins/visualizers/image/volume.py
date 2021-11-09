@@ -3,9 +3,9 @@ from __future__ import annotations
 from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin, DataVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.slice import VolumeSliceImageViewer
-from bsmu.vision_core.constants import PlaneAxis
-from bsmu.vision_core.image.base import VolumeImage
-from bsmu.vision_core.image.layered import LayeredImage
+from bsmu.vision.core.constants import PlaneAxis
+from bsmu.vision.core.image.base import VolumeImage
+from bsmu.vision.core.image.layered import LayeredImage
 
 
 class VolumeImageVisualizerPlugin(DataVisualizerPlugin):

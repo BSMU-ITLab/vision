@@ -5,7 +5,7 @@ from PySide2.QtCore import QObject, Signal
 from PySide2.QtGui import QColor
 from sortedcontainers import SortedList
 
-from bsmu.vision_core.data import Data
+from bsmu.vision.core.data import Data
 
 
 class ColorTransferFunctionPoint(QObject):

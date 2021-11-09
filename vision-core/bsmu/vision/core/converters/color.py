@@ -1,8 +1,8 @@
 import numpy as np
 from scipy import interpolate
 
-from bsmu.vision_core.palette import Palette
-from bsmu.vision_core.transfer_functions.color import ColorTransferFunction
+from bsmu.vision.core.palette import Palette
+from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 
 
 def color_transfer_function_to_palette(color_transfer_function: ColorTransferFunction) -> Palette:

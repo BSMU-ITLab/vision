@@ -3,7 +3,7 @@ from __future__ import annotations
 import pydicom
 
 from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
-from bsmu.vision_core.image.base import VolumeImage
+from bsmu.vision.core.image.base import VolumeImage
 
 
 class MultiFrameDicomFileLoaderPlugin(FileLoaderPlugin):

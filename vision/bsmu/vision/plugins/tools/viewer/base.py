@@ -8,8 +8,8 @@ from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.plugins.windows.main import ToolsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
-from bsmu.vision_core.image.base import FlatImage
-from bsmu.vision_core.palette import Palette
+from bsmu.vision.core.image.base import FlatImage
+from bsmu.vision.core.palette import Palette
 
 if TYPE_CHECKING:
     from PySide2.QtCore import Qt

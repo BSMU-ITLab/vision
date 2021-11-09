@@ -6,7 +6,7 @@ from typing import Type
 
 from PySide2.QtCore import QObject, Signal
 
-from bsmu.vision_core.data import Data
+from bsmu.vision.core.data import Data
 from bsmu.vision.app.plugin import Plugin
 
 

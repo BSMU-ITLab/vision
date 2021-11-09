@@ -9,7 +9,7 @@ import skimage.color
 import skimage.io
 import skimage.transform
 
-import bsmu.vision_core.converters.image as image_converter
+import bsmu.vision.core.converters.image as image_converter
 
 
 class DnnModelParams:

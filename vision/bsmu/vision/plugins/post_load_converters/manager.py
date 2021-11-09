@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide2.QtCore import QObject, Signal
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision_core.data import Data
+from bsmu.vision.core.data import Data
 
 
 class PostLoadConversionManagerPlugin(Plugin):

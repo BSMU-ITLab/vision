@@ -7,11 +7,11 @@ from PySide2.QtCore import QObject, Qt, Signal, QRectF, QPointF
 from PySide2.QtGui import QPainter, QImage
 from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
 
-import bsmu.vision_core.converters.image as image_converter
+import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
-from bsmu.vision_core.image.base import Image, FlatImage
-from bsmu.vision_core.image.layered import ImageLayer, LayeredImage
+from bsmu.vision.core.image.base import Image, FlatImage
+from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
 
 
 class IntensityWindowing:

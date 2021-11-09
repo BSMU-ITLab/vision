@@ -35,7 +35,7 @@ setuptools.setup(
         'PySide2',
         'ruamel.yaml',
 
-        'bsmu.vision_core',
+        'bsmu.vision.core',
         'bsmu.vision.widgets'
     ],
     entry_points={

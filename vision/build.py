@@ -26,7 +26,7 @@ from cx_Freeze import setup, Executable
 import bsmu.vision
 import bsmu.vision.plugins
 import bsmu.vision.widgets
-import bsmu.vision_core
+import bsmu.vision.core
 from bsmu.vision.app.plugin import Plugin
 
 FILE_DIR = Path(__file__).parent
@@ -90,7 +90,7 @@ build_exe_options = {
         'skimage.io', 'skimage.util', 'skimage.color',
         'numpy.core',
         'ruamel.yaml',
-        'bsmu.vision_core',
+        'bsmu.vision.core',
         'bsmu.vision_dnn',
         'bsmu.vision.widgets',
         'bsmu.vision.plugins',

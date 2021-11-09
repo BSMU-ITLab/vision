@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 from PySide2.QtCore import QObject
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision_core.image.layered import LayeredImage
-from bsmu.vision_core.palette import Palette
+from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.palette import Palette
 
 if TYPE_CHECKING:
     from bsmu.vision.app import App

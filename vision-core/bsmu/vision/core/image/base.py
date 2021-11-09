@@ -5,7 +5,7 @@ import math
 import numpy as np
 from PySide2.QtCore import Signal
 
-from bsmu.vision_core.data import Data
+from bsmu.vision.core.data import Data
 
 
 MASK_TYPE = np.uint8

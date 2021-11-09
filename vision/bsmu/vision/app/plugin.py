@@ -6,6 +6,7 @@ from bsmu.vision.app.united_config import UnitedConfig
 
 
 class Plugin(QObject):
+    DATA_DIRS = ['DataDir']
     # setup_info = None
 
     enabled = Signal(QObject)  # Have to be a Plugin instead of QObject, but the Plugin is not defined yet

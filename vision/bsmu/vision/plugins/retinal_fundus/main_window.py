@@ -16,10 +16,10 @@ class RetinalFundusMenuBar(MenuBar):
 
 
 class RetinalFundusMainWindow(MainWindow):
-    def __init__(self, title: str = '', menu_bar: MenuBar = RetinalFundusMenuBar()):
-        super().__init__(title, menu_bar)
+    def __init__(self, title: str = '', menu_bar: MenuBar = None):
+        super().__init__(title, RetinalFundusMenuBar() if menu_bar is None else menu_bar)
 
 
 class RetinalFundusMainWindowPlugin(MainWindowPlugin):
-    def __init__(self, app: App, main_window: MainWindow = RetinalFundusMainWindow()):
-        super().__init__(app, main_window)
+    def __init__(self, app: App, main_window: MainWindow = None):
+        super().__init__(app, RetinalFundusMainWindow() if main_window is None else main_window)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import cv2
 from enum import IntEnum
 from pathlib import Path
 from typing import List, Any, Type, Optional
@@ -18,6 +19,8 @@ from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision_core.data import Data
 from bsmu.vision_core.image.base import FlatImage
 from bsmu.vision_core.image.layered import LayeredImage
+from bsmu.vision_core.palette import Palette
+from bsmu.vision_dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
 
 if TYPE_CHECKING:
     from PySide2.QtCore import QAbstractItemModel
@@ -36,7 +39,8 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self.data_visualization_manager = app.enable_plugin(
             'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin').data_visualization_manager
         mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
-        self.table_visualizer = RetinalFundusTableVisualizer(self.data_visualization_manager, mdi)
+        segmenter_model_name = self.config.value('segmenter-model-name')
+        self.table_visualizer = RetinalFundusTableVisualizer(self.data_visualization_manager, mdi, segmenter_model_name)
 
     def _enable(self):
         self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_retinal_fundus_data)
@@ -245,11 +249,14 @@ class PatientRetinalFundusJournalViewer(DataViewer):
 
 
 class RetinalFundusTableVisualizer(QObject):
-    def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi):
+    def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi, segmenter_model_name: str):
         super().__init__()
 
         self._visualization_manager = visualization_manager
         self._mdi = mdi
+
+        self._segmenter = DnnSegmenter(DnnModelParams(Path(__file__).parent / 'dnn-models' / segmenter_model_name,
+                                                      input_image_size=(256, 256)))
 
         self._journal = PatientRetinalFundusJournal()
         self._journal.add_record(PatientRetinalFundusRecord(FlatImage(
@@ -282,6 +289,26 @@ class RetinalFundusTableVisualizer(QObject):
             first_layer = data.layers[0]
 
             image = first_layer.image
+            mask = self._segmenter.segment(image.array)
+
+            mask = np.squeeze(mask)
+            print('ssss', image.array.shape[:2])
+            mask = cv2.resize(mask, (image.array.shape[1], image.array.shape[0]), interpolation=cv2.INTER_LINEAR)
+
+            mask = mask.astype(np.uint8)
+            print('MASK', mask.shape, mask.dtype, mask.min(), mask.max(), '\n', mask)
+            #      - [0, 0, 0, 0, 0]
+            #      - [1, 255, 0, 0, 255]
+            mask_pallete = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
+                                                           [1, 255, 255, 255, 255]])
+
+            # image_small = cv2.resize(image.array, (256, 256), interpolation=cv2.INTER_AREA)
+            # data.add_layer_from_image(FlatImage(array=image_small,
+            #                                     ), name='Image Small')
+
+            data.add_layer_from_image(FlatImage(array=mask,
+                                                palette=mask_pallete
+                                                ), name='Mask')
             record = PatientRetinalFundusRecord(image)
             self.journal.add_record(record)
 

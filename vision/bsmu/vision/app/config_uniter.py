@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 from ruamel.yaml import YAML
 
 
@@ -8,6 +11,10 @@ class ConfigUniter:
         self.child_config_paths = child_config_paths
 
     def unite_configs(self, base_config_dir, config_file_name: str, config_file_full_name: str = ''):
+        if getattr(sys, 'frozen', False):
+            # The application is frozen into *.exe
+            base_config_dir = Path(sys.executable).parent / 'configs'
+
         if not config_file_full_name:
             config_file_full_name = config_file_name
 

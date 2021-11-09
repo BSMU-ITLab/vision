@@ -7,5 +7,10 @@ setuptools.setup(
     author='Ivan Kosik',
     author_email='ivankosik91@gmail.com',
 
-    packages=setuptools.find_namespace_packages(include=('bsmu.*',))
+    packages=setuptools.find_namespace_packages(include=('bsmu.*',)),
+
+    include_package_data=True,
+    package_data={
+        "": ["images/icons/*.svg"],
+    },
 )

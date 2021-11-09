@@ -20,8 +20,8 @@ class BoneAgeMenuBar(MenuBar):
 
 
 class BoneAgeMainWindow(MainWindow):
-    def __init__(self, title: str = '', menu_bar: MenuBar = BoneAgeMenuBar()):
-        super().__init__(title, menu_bar)
+    def __init__(self, title: str = '', menu_bar: MenuBar = None):
+        super().__init__(title, BoneAgeMenuBar() if menu_bar is None else menu_bar)
 
 
 class BoneAgeMainWindowPlugin(MainWindowPlugin):
@@ -29,5 +29,5 @@ class BoneAgeMainWindowPlugin(MainWindowPlugin):
     #                        version=Version(0, 0, 1),
     #                        py_modules=('main',))
 
-    def __init__(self, app: App, main_window: MainWindow = BoneAgeMainWindow()):
-        super().__init__(app, main_window)
+    def __init__(self, app: App, main_window: MainWindow = None):
+        super().__init__(app, BoneAgeMainWindow() if main_window is None else main_window)

@@ -79,14 +79,14 @@ class MenuBar(QMenuBar):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, title: str = '', menu_bar: MenuBar = MenuBar()):
+    def __init__(self, title: str = '', menu_bar: MenuBar = None):
         super().__init__()
 
         self.resize(1200, 800)
         self.move(100, 100)
         self.setWindowTitle(title)
 
-        self.menu_bar = menu_bar
+        self.menu_bar = MenuBar() if menu_bar is None else menu_bar
         self.setMenuBar(self.menu_bar)
 
     def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut=None):
@@ -98,19 +98,14 @@ class MainWindowPlugin(Plugin):
     #                        version=Version(0, 0, 1),
     #                        py_modules=('main',))
 
-    def __init__(self, app: App, main_window: MainWindow = MainWindow()):
+    def __init__(self, app: App, main_window: MainWindow = None):
         super().__init__(app)
 
-        self.main_window = main_window
+        self.main_window = MainWindow() if main_window is None else main_window
 
         title_config = self.config.value('title')
         if title_config is not None:
             self.main_window.setWindowTitle(title_config)
-
-        # self.main_window.add_menu_action(FileMenu, 'Load', None, None)
-        # self.main_window.add_menu_action(FileMenu, 'Export Results', None, None)
-        # self.main_window.add_menu_action(AtlasMenu, 'Male', None, None)
-        # self.main_window.add_menu_action(AtlasMenu, 'Female', None, None)
 
     def _enable(self):
         self.main_window.show()

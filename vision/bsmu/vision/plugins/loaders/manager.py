@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from typing import Type, Optional
 
 from PySide2.QtCore import QObject, Signal
@@ -7,13 +8,31 @@ from PySide2.QtCore import QObject, Signal
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.core.data import Data
 
+if TYPE_CHECKING:
+    from bsmu.vision.plugins.loaders.registry import FileLoaderRegistryPlugin
+
 
 class FileLoadingManagerPlugin(Plugin):
-    def __init__(self, app: App):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'file_loader_registry_plugin': 'bsmu.vision.plugins.loaders.registry.FileLoaderRegistryPlugin',
+    }
 
-        file_loader_registry_plugin = app.enable_plugin('bsmu.vision.plugins.loaders.registry.FileLoaderRegistryPlugin')
-        self.file_loading_manager = FileLoadingManager(file_loader_registry_plugin.file_loader_registry)
+    def __init__(self, file_loader_registry_plugin: FileLoaderRegistryPlugin):
+        super().__init__()
+
+        self._file_loader_registry_plugin = file_loader_registry_plugin
+
+        self._file_loading_manager: FileLoadingManager | None = None
+
+    @property
+    def file_loading_manager(self) -> FileLoadingManager:
+        return self._file_loading_manager
+
+    def _enable(self):
+        self._file_loading_manager = FileLoadingManager(self._file_loader_registry_plugin.processor_registry)
+
+    def _disable(self):
+        self._file_loading_manager = None
 
 
 class FileLoadingManager(QObject):
@@ -48,7 +67,7 @@ class FileLoadingManager(QObject):
         """
         file_format = path.name
         while True:
-            loader_cls = self.file_loader_registry.loader_cls(file_format)
+            loader_cls = self.file_loader_registry.processor_cls(file_format)
             if loader_cls is not None:
                 return loader_cls
 

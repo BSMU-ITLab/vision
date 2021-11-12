@@ -9,28 +9,42 @@ from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 
 if TYPE_CHECKING:
-    from bsmu.vision.app import App
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
-    from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
 
 
 class MdiImageViewerLayerControllerPlugin(Plugin):
-    def __init__(self, app: App):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+    }
 
-        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
-        mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
+    def __init__(self, main_window_plugin: MainWindowPlugin, mdi_plugin: MdiPlugin):
+        super().__init__()
 
-        self.mdi_layer_controller = MdiImageViewerLayerController(mdi)
+        self._main_window_plugin = main_window_plugin
+        self._main_window: MainWindow | None = None
+
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
+
+        self._layer_controller: MdiImageViewerLayerController | None = None
 
     def _enable(self):
-        menu_action = self.main_window.add_menu_action(
-            ViewMenu, 'Active Layer View', self.mdi_layer_controller.toggle_active_layer_view,
-            Qt.CTRL + Qt.Key_I)
+        self._main_window = self._main_window_plugin.main_window
+        self._mdi = self._mdi_plugin.mdi
+
+        self._layer_controller = MdiImageViewerLayerController(self._mdi)
+
+        menu_action = self._main_window.add_menu_action(
+            ViewMenu, 'Active Layer View', self._layer_controller.toggle_active_layer_view, Qt.CTRL + Qt.Key_I)
         # menu_action.setCheckable(True)
         menu_action.setWhatsThis('Show active layer and hide other layers / Restore')
 
     def _disable(self):
+        self._layer_controller = None
+
         raise NotImplementedError
 
 

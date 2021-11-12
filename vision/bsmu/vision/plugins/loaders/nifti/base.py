@@ -3,13 +3,13 @@ from __future__ import annotations
 import nibabel as nib
 import numpy as np
 
-from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
 from bsmu.vision.core.image.base import VolumeImage, SpatialAttrs
+from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
 
 
 class NiftiFileLoaderPlugin(FileLoaderPlugin):
-    def __init__(self, app: App):
-        super().__init__(app, NiftiFileLoader)
+    def __init__(self):
+        super().__init__(NiftiFileLoader)
 
 
 class NiftiFileLoader(FileLoader):

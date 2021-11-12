@@ -5,40 +5,69 @@ from typing import TYPE_CHECKING
 from PySide2.QtCore import QObject
 
 from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.core.image.base import FlatImage
+from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.windows.main import ToolsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
-from bsmu.vision.core.image.base import FlatImage
-from bsmu.vision.core.palette import Palette
 
 if TYPE_CHECKING:
     from PySide2.QtCore import Qt
+    from bsmu.vision.app.united_config import UnitedConfig
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.base import DataViewer
+    from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+    from typing import Type
 
 
 LAYER_NAME_PROPERTY_KEY = 'name'
 
 
 class ViewerToolPlugin(Plugin):
-    def __init__(self, app: App, tool_cls: Type[ViewerTool], action_name: str = '', action_shortcut: Qt.Key = None):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+    }
 
-        self.tool_cls = tool_cls
-        self.action_name = action_name
-        self.action_shortcut = action_shortcut
+    def __init__(
+            self,
+            main_window_plugin: MainWindowPlugin,
+            mdi_plugin: MdiPlugin,
+            tool_cls: Type[ViewerTool],
+            action_name: str = '',
+            action_shortcut: Qt.Key = None,
+    ):
+        super().__init__()
 
-        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
-        self.mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
+        self._main_window_plugin = main_window_plugin
+        self._main_window: MainWindow | None = None
 
-        self.mdi_tool = MdiViewerTool(self.mdi, self.tool_cls, self.config)
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
+
+        self._tool_cls = tool_cls
+        self._action_name = action_name
+        self._action_shortcut = action_shortcut
+
+        self._mdi_viewer_tool: MdiViewerTool | None = None
 
     def _enable(self):
-        if not self.action_name:
+        if not self._action_name:
             return
 
-        self.main_window.add_menu_action(ToolsMenu, self.action_name,
-                                         self.mdi_tool.activate, self.action_shortcut)
+        self._main_window = self._main_window_plugin.main_window
+        self._mdi = self._mdi_plugin.mdi
+
+        self._mdi_viewer_tool = MdiViewerTool(self._mdi, self._tool_cls, self.config)
+
+        self._main_window.add_menu_action(
+            ToolsMenu, self._action_name, self._mdi_viewer_tool.activate, self._action_shortcut)
 
     def _disable(self):
+        self._mdi_viewer_tool = None
+
         raise NotImplemented()
 
 

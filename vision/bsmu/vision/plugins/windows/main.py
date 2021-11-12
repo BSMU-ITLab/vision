@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple, Type
+from typing import Tuple, Type
 
+from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QMainWindow, QMenuBar, QMenu
 from sortedcontainers import SortedDict
 
@@ -65,7 +66,7 @@ class MenuBar(QMenuBar):
 
         return menu
 
-    def menu(self, menu_type: Type[MainMenu], add_nonexistent: bool = True) -> Optional[MainMenu]:
+    def menu(self, menu_type: Type[MainMenu], add_nonexistent: bool = True) -> MainMenu | None:
         menu = self._ordered_added_menus.get(self._menu_order_index(menu_type))
         if menu is None and add_nonexistent:
             menu = self.add_menu(menu_type)
@@ -98,17 +99,22 @@ class MainWindowPlugin(Plugin):
     #                        version=Version(0, 0, 1),
     #                        py_modules=('main',))
 
-    def __init__(self, app: App, main_window: MainWindow = None):
-        super().__init__(app)
+    def __init__(self, main_window_class: Type[MainWindow] | None = None):
+        super().__init__()
 
-        self.main_window = MainWindow() if main_window is None else main_window
+        self.main_window_class = MainWindow if main_window_class is None else main_window_class
+        self.main_window: MainWindow | None = None
+
+    def _enable(self):
+        self.main_window = self.main_window_class()
+        self.main_window.setAttribute(Qt.WA_DeleteOnClose)
 
         title_config = self.config.value('title')
         if title_config is not None:
             self.main_window.setWindowTitle(title_config)
 
-    def _enable(self):
         self.main_window.show()
 
     def _disable(self):
-        self.main_window.hide()
+        self.main_window.close()
+        self.main_window = None

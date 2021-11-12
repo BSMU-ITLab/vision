@@ -6,34 +6,49 @@ from bsmu.vision.app.united_config import UnitedConfig
 
 
 class Plugin(QObject):
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY: dict = {}
+
     DATA_DIRS = ['DataDir']
     # setup_info = None
 
-    enabled = Signal(QObject)  # Have to be a Plugin instead of QObject, but the Plugin is not defined yet
+    enabling = Signal(QObject)  # Have to be a Plugin instead of QObject, but the Plugin is not defined yet
+    enabled = Signal(QObject)  # Same as above
+    disabling = Signal(QObject)  # Same as above
     disabled = Signal(QObject)  # Same as above
 
-    def __init__(self, app: App):
+    def __init__(self):
         super().__init__()
 
-        self.app = app
-        self.config = UnitedConfig(self, Plugin, self.app.config_dir)
+        self.config = UnitedConfig(self, Plugin)
         # TODO: plugin can contain |config_path| field (if some plugin use different place or name for config file)
 
-        self.print_action('init')
+        self._dependency_plugin_by_key: dict = {}
+
+        self.print_action('inited')
 
     def __del__(self):
         self.print_action('del')
 
+    @property
+    def dependency_plugin_by_key(self) -> dict:
+        return self._dependency_plugin_by_key
+
+    @dependency_plugin_by_key.setter
+    def dependency_plugin_by_key(self, value):
+        self._dependency_plugin_by_key = value
+
     def enable(self):
-        self.print_action('enable')
+        self.enabling.emit(self)
         self._enable()
+        self.print_action('enabled')
         self.enabled.emit(self)
 
     def _enable(self):
         pass
 
     def disable(self):
-        self.print_action('disable')
+        self.print_action('disabling')
+        self.disabling.emit(self)
         self._disable()
         self.disabled.emit(self)
 

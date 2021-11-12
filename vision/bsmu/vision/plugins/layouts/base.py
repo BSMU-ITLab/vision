@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import List
+from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide2.QtCore import QObject
@@ -8,21 +9,36 @@ from PySide2.QtCore import QObject
 from bsmu.vision.app.plugin import Plugin
 from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
+if TYPE_CHECKING:
+    from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
+    from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
+    from bsmu.vision.core.data import Data
+    from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+
 
 class MdiLayoutPlugin(Plugin):
-    def __init__(self, app: App):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
+    }
 
-        self.data_visualization_manager = app.enable_plugin(
-            'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin').data_visualization_manager
+    def __init__(self, data_visualization_manager_plugin: DataVisualizationManagerPlugin):
+        super().__init__()
 
-        self.layout = MdiLayout(self.data_visualization_manager.mdi)
+        self._data_visualization_manager_plugin = data_visualization_manager_plugin
+        self._data_visualization_manager: DataVisualizationManager | None = None
+
+        self._mdi_layout: MdiLayout | None = None
 
     def _enable(self):
-        self.data_visualization_manager.data_visualized.connect(self.layout.lay_out_data_sub_windows)
+        self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
+        self._mdi_layout = MdiLayout(self._data_visualization_manager.mdi)
+
+        self._data_visualization_manager.data_visualized.connect(self._mdi_layout.lay_out_data_sub_windows)
 
     def _disable(self):
-        self.data_visualization_manager.data_visualized.disconnect(self.layout.lay_out_data_sub_windows)
+        self._data_visualization_manager.data_visualized.disconnect(self._mdi_layout.lay_out_data_sub_windows)
+
+        self._mdi_layout = None
 
 
 class MdiLayout(QObject):

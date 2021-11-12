@@ -1,21 +1,26 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 import skimage.draw
 import skimage.measure
-from PySide2.QtCore import QEvent
-from PySide2.QtCore import Qt
+from PySide2.QtCore import QEvent, Qt
 
-from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool
 from bsmu.vision.core.palette import Palette
+from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool
+
+if TYPE_CHECKING:
+    from bsmu.vision.app.united_config import UnitedConfig
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
 
 
 class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):
-    def __init__(self, app: App):
-        super().__init__(app, SmartBrushImageViewerTool, 'Smart Brush', Qt.CTRL + Qt.Key_B)
+    def __init__(self, main_window_plugin: MainWindowPlugin, mdi_plugin: MdiPlugin):
+        super().__init__(main_window_plugin, mdi_plugin, SmartBrushImageViewerTool, 'Smart Brush', Qt.CTRL + Qt.Key_B)
 
 
 class Mode(Enum):

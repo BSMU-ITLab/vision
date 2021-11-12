@@ -1,41 +1,66 @@
 from __future__ import annotations
 
 import os
-from typing import Union
+from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
-from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin
-from bsmu.vision.plugins.windows.main import MainWindowPlugin
 from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 
+if TYPE_CHECKING:
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
+    from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
+
 
 class MdiImageLayerFileWalkerPlugin(Plugin):
-    def __init__(self, app: App,
-                 main_window_plugin: Union[str, MainWindowPlugin] = MainWindowPlugin.full_name(),
-                 mdi_plugin: Union[str, MdiPlugin] = MdiPlugin.full_name(),
-                 file_loading_manager_plugin: Union[str, FileLoadingManagerPlugin] = FileLoadingManagerPlugin.full_name(),
-                 ):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+        'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+    }
 
-        self.main_window = app.enable_plugin(main_window_plugin).main_window
-        mdi = app.enable_plugin(mdi_plugin).mdi
-        file_loading_manager = app.enable_plugin(file_loading_manager_plugin).file_loading_manager
+    def __init__(
+            self,
+            main_window_plugin: MainWindowPlugin,
+            mdi_plugin: MdiPlugin,
+            file_loading_manager_plugin: FileLoadingManagerPlugin,
+    ):
+        super().__init__()
 
-        self.mdi_image_layer_file_walker = MdiImageLayerFileWalker(mdi, file_loading_manager)
+        self._main_window_plugin = main_window_plugin
+        self._main_window: MainWindow | None = None
+
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
+
+        self._file_loading_manager_plugin = file_loading_manager_plugin
+        self._file_loading_manager: FileLoadingManager | None = None
+
+        self._mdi_image_layer_file_walker: MdiImageLayerFileWalker | None = None
+
+    @property
+    def mdi_image_layer_file_walker(self) -> MdiImageLayerFileWalker:
+        return self._mdi_image_layer_file_walker
 
     def _enable(self):
-        self.main_window.add_menu_action(ViewMenu, 'Next Image',
-                                         self.mdi_image_layer_file_walker.show_next_image,
-                                         Qt.CTRL + Qt.Key_Right)
-        self.main_window.add_menu_action(ViewMenu, 'Previous Image',
-                                         self.mdi_image_layer_file_walker.show_previous_image,
-                                         Qt.CTRL + Qt.Key_Left)
+        self._main_window = self._main_window_plugin.main_window
+        self._mdi = self._mdi_plugin.mdi
+        self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+
+        self._mdi_image_layer_file_walker = MdiImageLayerFileWalker(self._mdi, self._file_loading_manager)
+
+        self._main_window.add_menu_action(
+            ViewMenu, 'Next Image', self._mdi_image_layer_file_walker.show_next_image, Qt.CTRL + Qt.Key_Right)
+        self._main_window.add_menu_action(
+            ViewMenu, 'Previous Image', self._mdi_image_layer_file_walker.show_previous_image, Qt.CTRL + Qt.Key_Left)
 
     def _disable(self):
+        self._mdi_image_layer_file_walker = None
+
         raise NotImplementedError
 
 

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pydicom
 
-from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
 from bsmu.vision.core.image.base import VolumeImage
+from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
 
 
 class MultiFrameDicomFileLoaderPlugin(FileLoaderPlugin):
-    def __init__(self, app: App):
-        super().__init__(app, MultiFrameDicomFileLoader)
+    def __init__(self):
+        super().__init__(MultiFrameDicomFileLoader)
 
 
 class MultiFrameDicomFileLoader(FileLoader):

@@ -6,35 +6,49 @@ import numpy as np
 from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.core.image.base import VolumeImage
+from bsmu.vision.core.palette import Palette
+from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 from bsmu.vision.plugins.windows.main import AlgorithmsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.transfer_functions.color import ColorTransferFunctionViewer
-from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
-from bsmu.vision.core.image.base import VolumeImage
-from bsmu.vision.core.palette import Palette
 
 if TYPE_CHECKING:
-    from bsmu.vision.app import App
-    from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
 
 
 class ColorContrastPlugin(Plugin):
-    def __init__(self, app: App):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+    }
 
-        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
-        mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
+    def __init__(self, main_window_plugin: MainWindowPlugin, mdi_plugin: MdiPlugin):
+        super().__init__()
 
-        self.color_contrast = ColorContrast(mdi)
+        self._main_window_plugin = main_window_plugin
+        self._main_window: MainWindow | None = None
+
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
+
+        self._color_contrast: ColorContrast | None = None
 
     def _enable(self):
-        menu_action = self.main_window.add_menu_action(
-            AlgorithmsMenu, 'Color Contrast', self.color_contrast.create_colored_image,
-            Qt.CTRL + Qt.Key_H)
+        self._main_window = self._main_window_plugin.main_window
+        self._mdi = self._mdi_plugin.mdi
+
+        self._color_contrast = ColorContrast(self._mdi)
+
+        menu_action = self._main_window.add_menu_action(
+            AlgorithmsMenu, 'Color Contrast', self._color_contrast.create_colored_image, Qt.CTRL + Qt.Key_H)
 
         # self.show_chart()
 
     def _disable(self):
+        self._color_contrast = None
+
         raise NotImplementedError
 
     def show_chart(self):

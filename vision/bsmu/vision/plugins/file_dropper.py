@@ -1,37 +1,75 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Union
+from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, QEvent
 
 from bsmu.vision.app.plugin import Plugin
 
+if TYPE_CHECKING:
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
+    from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
+    from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
+    from bsmu.vision.plugins.post_load_converters.manager import PostLoadConversionManagerPlugin, \
+        PostLoadConversionManager
+
 
 class FileDropperPlugin(Plugin):
-    def __init__(self, app: App,
-             mdi_plugin: Union[str, MdiPlugin] = 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
-             file_loading_manager_plugin: Union[str, FileLoadingManagerPlugin] = 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
-             post_load_conversion_manager_plugin: Union[str, PostLoadConversionManagerPlugin] = 'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
-             data_visualization_manager_plugin: Union[str, DataVisualizationManagerPlugin] = 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
-             ):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+        'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+        'post_load_conversion_manager_plugin':
+            'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
+        'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
+    }
 
-        self.mdi = app.enable_plugin(mdi_plugin).mdi
-        file_loading_manager = app.enable_plugin(file_loading_manager_plugin).file_loading_manager
-        post_load_conversion_manager = app.enable_plugin(post_load_conversion_manager_plugin).post_load_conversion_manager
-        data_visualization_manager = app.enable_plugin(data_visualization_manager_plugin).data_visualization_manager
+    def __init__(
+            self,
+            mdi_plugin: MdiPlugin,
+            file_loading_manager_plugin: FileLoadingManagerPlugin,
+            post_load_conversion_manager_plugin: PostLoadConversionManagerPlugin,
+            data_visualization_manager_plugin: DataVisualizationManagerPlugin,
+    ):
+        super().__init__()
 
-        self.file_dropper = FileDropper(file_loading_manager,
-                                        post_load_conversion_manager,
-                                        data_visualization_manager)
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
+
+        self._file_loading_manager_plugin = file_loading_manager_plugin
+        self._file_loading_manager: FileLoadingManager | None = None
+
+        self._post_load_conversion_manager_plugin = post_load_conversion_manager_plugin
+        self._post_load_conversion_manager: PostLoadConversionManager | None = None
+
+        self._data_visualization_manager_plugin = data_visualization_manager_plugin
+        self._data_visualization_manager: DataVisualizationManager | None = None
+
+        self._file_dropper: FileDropper | None = None
+
+    @property
+    def file_dropper(self) -> FileDropper:
+        return self._file_dropper
 
     def _enable(self):
-        self.mdi.setAcceptDrops(True)
-        self.mdi.installEventFilter(self.file_dropper)
+        self._mdi = self._mdi_plugin.mdi
+        self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+        self._post_load_conversion_manager = self._post_load_conversion_manager_plugin.post_load_conversion_manager
+        self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
+
+        self._file_dropper = FileDropper(
+            self._file_loading_manager,
+            self._post_load_conversion_manager,
+            self._data_visualization_manager,
+        )
+
+        self._mdi.setAcceptDrops(True)
+        self._mdi.installEventFilter(self._file_dropper)
 
     def _disable(self):
-        self.mdi.removeEventFilter(self.file_dropper)
+        self._mdi.removeEventFilter(self._file_dropper)
+
+        self._file_dropper = None
 
 
 class FileDropper(QObject):

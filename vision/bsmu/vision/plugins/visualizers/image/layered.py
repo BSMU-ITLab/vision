@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+from bsmu.vision.core.constants import PlaneAxis
+from bsmu.vision.core.image.base import VolumeImage
+from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin, DataVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow, LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
 from bsmu.vision.widgets.viewers.image.layered.slice import VolumeSliceImageViewer
-from bsmu.vision.core.constants import PlaneAxis
-from bsmu.vision.core.image.base import VolumeImage
-from bsmu.vision.core.image.layered import LayeredImage
 
 
 class LayeredImageVisualizerPlugin(DataVisualizerPlugin):
-    def __init__(self, app: App):
-        super().__init__(app, LayeredImageVisualizer)
+    def __init__(self):
+        super().__init__(LayeredImageVisualizer)
 
 
 class LayeredImageVisualizer(DataVisualizer):

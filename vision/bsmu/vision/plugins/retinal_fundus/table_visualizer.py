@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import cv2
 from enum import IntEnum
 from pathlib import Path
 from typing import List, Any, Type, Optional
 from typing import TYPE_CHECKING
 
+import cv2
 import numpy as np
 from PySide2.QtCore import QObject, Qt, Signal, QAbstractTableModel, QModelIndex, QSize
 from PySide2.QtGui import QImage
@@ -13,39 +13,59 @@ from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemD
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.app.plugin import Plugin
-from bsmu.vision.plugins.windows.main import WindowsMenu
-from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
-from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
+from bsmu.vision.plugins.windows.main import WindowsMenu
+from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+from bsmu.vision.widgets.viewers.base import DataViewer
 
 if TYPE_CHECKING:
     from PySide2.QtCore import QAbstractItemModel
     from PySide2.QtWidgets import QWidget, QStyleOptionViewItem
 
-    from bsmu.vision.app import App
-    from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
-    from bsmu.vision.plugins.visualizers.manager import DataVisualizationManager
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
+    from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
 
 
 class RetinalFundusTableVisualizerPlugin(Plugin):
-    def __init__(self, app: App):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
+        'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+    }
 
-        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
-        self.data_visualization_manager = app.enable_plugin(
-            'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin').data_visualization_manager
-        mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
-        segmenter_model_name = self.config.value('segmenter-model-name')
-        self.table_visualizer = RetinalFundusTableVisualizer(self.data_visualization_manager, mdi, segmenter_model_name)
+    def __init__(
+            self,
+            main_window_plugin: MainWindowPlugin,
+            data_visualization_manager_plugin: DataVisualizationManagerPlugin,
+            mdi_plugin: MdiPlugin,
+    ):
+        super().__init__()
+
+        self._main_window_plugin = main_window_plugin
+        self._main_window: MainWindow | None = None
+
+        self._data_visualization_manager_plugin = data_visualization_manager_plugin
+        self._data_visualization_manager: DataVisualizationManager | None = None
+
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
 
     def _enable(self):
-        self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_retinal_fundus_data)
+        self._main_window = self._main_window_plugin.main_window
+        self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
+        self._mdi = self._mdi_plugin.mdi
 
-        self.main_window.add_menu_action(WindowsMenu, 'Table', self.table_visualizer.raise_journal_sub_window,
+        # segmenter_model_name = self.config.value('segmenter-model-name')
+        # self.table_visualizer = RetinalFundusTableVisualizer(self.data_visualization_manager, mdi, segmenter_model_name)
+
+        # self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_retinal_fundus_data)
+
+        self._main_window.add_menu_action(WindowsMenu, 'Table', self._disable, #% self.table_visualizer.raise_journal_sub_window,
                                          Qt.CTRL + Qt.Key_1)
 
     def _disable(self):

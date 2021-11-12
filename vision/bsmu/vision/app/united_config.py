@@ -7,10 +7,9 @@ from ruamel.yaml import YAML
 
 
 class UnitedConfig:
-    def __init__(self, plugin: Plugin, last_base_plugin_class, config_dir: Path):
+    def __init__(self, plugin: Plugin, last_base_plugin_class):
         self.plugin = plugin
         self.last_base_plugin_class = last_base_plugin_class
-        self.config_dir = config_dir
 
         self._data = {}
 

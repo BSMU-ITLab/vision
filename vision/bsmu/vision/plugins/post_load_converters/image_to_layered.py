@@ -7,8 +7,8 @@ from bsmu.vision.core.image.layered import LayeredImage
 
 
 class ImageToLayeredImagePostLoadConverterPlugin(PostLoadConverterPlugin):
-    def __init__(self, app: App):
-        super().__init__(app, ImageToLayeredImagePostLoadConverter)
+    def __init__(self):
+        super().__init__(ImageToLayeredImagePostLoadConverter)
 
 
 class ImageToLayeredImagePostLoadConverter(PostLoadConverter):

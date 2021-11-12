@@ -6,8 +6,8 @@ from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin, DataVisua
 
 
 class ImageVisualizerPlugin(DataVisualizerPlugin):
-    def __init__(self, app: App, data_visualizer_cls: Type[DataVisualizer]):
-        super().__init__(app, data_visualizer_cls)
+    def __init__(self, data_visualizer_cls: Type[DataVisualizer]):
+        super().__init__(data_visualizer_cls)
 
 
 class ImageVisualizer(DataVisualizer):

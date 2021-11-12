@@ -8,8 +8,8 @@ from bsmu.vision.core.image.base import FlatImage
 
 
 class SimpleImageFileLoaderPlugin(ImageFileLoaderPlugin):
-    def __init__(self, app: App):
-        super().__init__(app, SimpleImageFileLoader)
+    def __init__(self):
+        super().__init__(SimpleImageFileLoader)
 
 
 class SimpleImageFileLoader(ImageFileLoader):

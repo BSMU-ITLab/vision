@@ -4,15 +4,13 @@ import abc
 
 from PySide2.QtCore import QObject, Signal
 
-from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.core.plugin.processor import ProcessorPlugin
 from bsmu.vision.core.data import Data
 
 
-class PostLoadConverterPlugin(Plugin):
-    def __init__(self, app: App, post_load_converter_cls):
-        super().__init__(app)
-
-        self.post_load_converter_cls = post_load_converter_cls
+class PostLoadConverterPlugin(ProcessorPlugin):
+    def __init__(self, post_load_converter_cls):
+        super().__init__(post_load_converter_cls)
 
 
 class PostLoadConverterMeta(abc.ABCMeta, type(QObject)):
@@ -21,6 +19,10 @@ class PostLoadConverterMeta(abc.ABCMeta, type(QObject)):
     @property
     def data_types(cls) -> tuple:
         return cls._DATA_TYPES
+
+    @property
+    def processed_keys(cls) -> tuple:
+        return cls.data_types
 
 
 class PostLoadConverter(QObject, metaclass=PostLoadConverterMeta):

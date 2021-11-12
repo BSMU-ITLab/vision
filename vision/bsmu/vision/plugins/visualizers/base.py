@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import abc
-from typing import List
+from typing import List, Type
 
 from PySide2.QtCore import QObject, Signal
 
-from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.core.plugin.processor import ProcessorPlugin
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 
 
-class DataVisualizerPlugin(Plugin):
-    def __init__(self, app: App, data_visualizer_cls):
-        super().__init__(app)
-
-        self.data_visualizer_cls = data_visualizer_cls
+class DataVisualizerPlugin(ProcessorPlugin):
+    def __init__(self, data_visualizer_cls: Type[DataVisualizer]):
+        super().__init__(data_visualizer_cls)
 
 
 class DataVisualizerMeta(abc.ABCMeta, type(QObject)):
@@ -22,6 +20,10 @@ class DataVisualizerMeta(abc.ABCMeta, type(QObject)):
     @property
     def data_types(cls) -> tuple:
         return cls._DATA_TYPES
+
+    @property
+    def processed_keys(cls) -> tuple:
+        return cls.data_types
 
 
 class DataVisualizer(QObject, metaclass=DataVisualizerMeta):

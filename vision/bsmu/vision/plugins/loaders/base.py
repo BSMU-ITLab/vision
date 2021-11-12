@@ -7,14 +7,12 @@ from typing import Type
 from PySide2.QtCore import QObject, Signal
 
 from bsmu.vision.core.data import Data
-from bsmu.vision.app.plugin import Plugin
+from bsmu.vision.core.plugin.processor import ProcessorPlugin
 
 
-class FileLoaderPlugin(Plugin):
-    def __init__(self, app: App, file_loader_cls: Type[FileLoader]):
-        super().__init__(app)
-
-        self.file_loader_cls = file_loader_cls
+class FileLoaderPlugin(ProcessorPlugin):
+    def __init__(self, file_loader_cls: Type[FileLoader]):
+        super().__init__(file_loader_cls)
 
 
 class FileLoaderMeta(abc.ABCMeta, type(QObject)):
@@ -31,6 +29,10 @@ class FileLoaderMeta(abc.ABCMeta, type(QObject)):
     @property
     def formats(cls) -> tuple:
         return cls._FORMATS
+
+    @property
+    def processed_keys(cls) -> tuple:
+        return cls.formats
 
 
 class FileLoader(QObject, metaclass=FileLoaderMeta):

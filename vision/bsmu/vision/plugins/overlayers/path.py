@@ -9,35 +9,58 @@ from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
 
 if TYPE_CHECKING:
-    from bsmu.vision.app import App
+    from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
+    from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
 
 
 class ImageViewerPathOverlayerPlugin(Plugin):
-    def __init__(self, app: App):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
+        'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+    }
 
-        self.data_visualization_manager = app.enable_plugin(
-            'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin').data_visualization_manager
-        file_loading_manager_plugin = app.enable_plugin('bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin')
+    def __init__(
+            self,
+            data_visualization_manager_plugin: DataVisualizationManagerPlugin,
+            file_loading_manager_plugin: FileLoadingManagerPlugin,
+    ):
+        super().__init__()
 
-        self.overlayer = ImageViewerPathOverlayer(
-            self.data_visualization_manager, file_loading_manager_plugin.file_loading_manager, self.old_config().data)
+        self._data_visualization_manager_plugin = data_visualization_manager_plugin
+        self._data_visualization_manager: DataVisualizationManager | None = None
+
+        self._file_loading_manager_plugin = file_loading_manager_plugin
+        self._file_loading_manager: FileLoadingManager | None = None
+
+        self._overlayer: ImageViewerPathOverlayer | None = None
 
     def _enable(self):
-        self.data_visualization_manager.data_visualized.connect(self.overlayer.overlay_sibling_dirs_images)
+        self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
+        self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+
+        self._overlayer = ImageViewerPathOverlayer(
+            self._data_visualization_manager, self._file_loading_manager, self.config.value('layers'))
+
+        self._data_visualization_manager.data_visualized.connect(self._overlayer.overlay_sibling_dirs_images)
 
     def _disable(self):
-        self.data_visualization_manager.data_visualized.disconnect(self.overlayer.overlay_sibling_dirs_images)
+        self._data_visualization_manager.data_visualized.disconnect(self._overlayer.overlay_sibling_dirs_images)
+
+        self._overlayer = None
 
 
 class ImageViewerPathOverlayer(QObject):
-    def __init__(self, visualization_manager: DataVisualizationManager, loading_manager: FileLoadingManager,
-                 config_data):
+    def __init__(
+            self,
+            visualization_manager: DataVisualizationManager,
+            loading_manager: FileLoadingManager,
+            layers_config_data: dict,
+    ):
         super().__init__()
 
         self.visualization_manager = visualization_manager
         self.loading_manager = loading_manager
-        self.config_data = config_data
+        self.layers_config_data = layers_config_data
 
     def overlay_sibling_dirs_images(self, data: Data, data_viewer_sub_windows: DataViewerSubWindow):
         if isinstance(data, LayeredImage):
@@ -45,7 +68,7 @@ class ImageViewerPathOverlayer(QObject):
             first_layer_image_name = first_layer.image_path.name
             layers_dir = first_layer.path.parent
 
-            for new_layer_name, layer_properties in self.config_data['layers'].items():
+            for new_layer_name, layer_properties in self.layers_config_data.items():
                 new_layer_image_path = layers_dir / new_layer_name / first_layer_image_name
                 if new_layer_image_path.exists():
                     palette_property = layer_properties.get('palette')

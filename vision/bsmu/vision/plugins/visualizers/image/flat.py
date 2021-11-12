@@ -8,8 +8,8 @@ from bsmu.vision.core.image.layered import LayeredImage
 
 
 class FlatImageVisualizerPlugin(ImageVisualizerPlugin):
-    def __init__(self, app: App):
-        super().__init__(app, FlatImageVisualizer)
+    def __init__(self):
+        super().__init__(FlatImageVisualizer)
 
 
 class FlatImageVisualizer(ImageVisualizer):

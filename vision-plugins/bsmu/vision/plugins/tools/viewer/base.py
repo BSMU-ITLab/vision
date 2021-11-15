@@ -4,16 +4,16 @@ from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject
 
-from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.palette import Palette
+from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.plugins.windows.main import ToolsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
 
 if TYPE_CHECKING:
     from PySide2.QtCore import Qt
-    from bsmu.vision.app import UnitedConfig
+    from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer

@@ -1,4 +1,4 @@
-"""Module that allows the user to run `python -m bsmu.vision`."""
+"""Module that allows the user to run `python -m bsmu.vision.app`."""
 
 #from .main import run_main
 from bsmu.vision.app.main import run_app

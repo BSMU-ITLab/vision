@@ -6,7 +6,7 @@ with open('README.md', 'r') as fh:
 
 
 setuptools.setup(
-    name='bsmu.vision',
+    name='bsmu.vision.app',
     version='0.1.0',
     author='Ivan Kosik',
     author_email='ivankosik91@gmail.com',
@@ -36,12 +36,11 @@ setuptools.setup(
         'ruamel.yaml',
 
         'bsmu.vision.core',
-        'bsmu.vision.widgets'
     ],
     entry_points={
         ## 'gui_scripts': [
         'console_scripts': [
-            'bsmu-vision = bsmu.vision.main:run_app',
+            'bsmu-vision-app = bsmu.vision.app.main:run_app',
         ]
     },
     classifiers=[

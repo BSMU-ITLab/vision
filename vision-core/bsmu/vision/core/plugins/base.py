@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide2.QtCore import QObject, Signal
 
-from bsmu.vision.app.united_config import UnitedConfig
+from bsmu.vision.core.config.united import UnitedConfig
 
 
 class Plugin(QObject):

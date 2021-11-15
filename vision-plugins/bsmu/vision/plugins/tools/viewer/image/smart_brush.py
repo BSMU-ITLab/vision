@@ -13,7 +13,7 @@ from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool
 
 if TYPE_CHECKING:
-    from bsmu.vision.app import UnitedConfig
+    from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
 

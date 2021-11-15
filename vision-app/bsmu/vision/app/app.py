@@ -7,8 +7,7 @@ from typing import Union
 from PySide2.QtCore import Signal
 from PySide2.QtWidgets import QApplication
 
-# from bsmu.vision.app.config import Config
-from bsmu.vision.app.config_uniter import ConfigUniter
+from bsmu.vision.core.config.uniter import ConfigUniter
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.app.plugin_manager import PluginManager
 

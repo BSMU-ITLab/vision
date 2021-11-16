@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import collections
 import importlib
 import re
 from functools import partial
-from typing import List, Union
+from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, Signal
 
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.plugins.observer import ObserverPlugin
+
+if TYPE_CHECKING:
+    from typing import List
+
+    from bsmu.vision.app import App
 
 
 class PluginManager(QObject):
@@ -20,24 +26,23 @@ class PluginManager(QObject):
     def __init__(self, app: App):
         super().__init__()
 
-        self.app = app
+        self._app = app
 
-        ### self._plugin_expression_pattern_str = r'((?P<alias>.+)=)?(?P<full_name>[^=\(]+)(\((?P<params>.*)\))?'
         self._plugin_expression_pattern_str = \
-            r'((?P<alias>.+)=)?(?P<full_name>[^->\(]+)(\((?P<params>.*)\))?\s*(->(?P<replace_full_name>.+))?'
+            r'((?P<alias>.+)=)?(?P<full_name>[^->\(]+)(\((?P<args>.*)\))?\s*(->(?P<replace_full_name>.+))?'
         self._plugin_expression_pattern = re.compile(self._plugin_expression_pattern_str)
 
-        self._created_plugins = {}  # { full_name: Plugin }
-        self._enabled_plugins = {}  # { full_name: Plugin }
-        self._aliases_plugins = {}  # { alias: Plugin }
+        self._created_plugin_by_full_name = {}  # { full_name: Plugin }
+        self._enabled_plugin_by_full_name = {}  # { full_name: Plugin }
+        self._created_plugin_by_alias = {}  # { alias: Plugin }
 
     def _enable_created_plugin(self, plugin: Plugin, replace_full_name: str = None):
-        full_name = replace_full_name or plugin.full_name()
+        full_name = plugin.full_name()
 
-        assert full_name in self._created_plugins, \
-            f'Plugin {full_name} have to be in |self._created_plugins|'
+        assert full_name in self._created_plugin_by_full_name, \
+            f'Plugin {full_name} have to be created before enabling'
 
-        if full_name in self._enabled_plugins:
+        if full_name in self._enabled_plugin_by_full_name:
             return
 
         plugin.enabling.connect(self._enable_dependency_plugins)
@@ -49,10 +54,24 @@ class PluginManager(QObject):
         self._setup_observer_plugin_connections(plugin)
 
         plugin.enable()
-        self._enabled_plugins[full_name] = plugin
+        self._enabled_plugin_by_full_name[full_name] = plugin
+        if replace_full_name is not None:
+            self._enabled_plugin_by_full_name[replace_full_name] = plugin
 
-    def _create_plugin(self, full_name: str, params: str = None, replace_full_name: str = None):
-        plugin = self._created_plugins.get(full_name)   #### or self._aliases_plugins.get(full_name)
+    def _create_plugin(
+            self,
+            full_name: str,
+            args: List[str] | None = None,
+            replace_full_name: str | None = None,
+            alias: str | None = None,
+    ) -> Plugin:
+        if replace_full_name is not None:
+            assert replace_full_name not in self._created_plugin_by_full_name, \
+                'Create plugins with a replace property in the beginning before any other plugins, ' \
+                'because the replaced plugin can be created as other plugin dependency ' \
+                'and cannot be used after replacement'
+
+        plugin = self._created_plugin_by_full_name.get(full_name)   #### or self._aliases_plugins.get(full_name)
         if plugin is None:
             module_name, class_name = full_name.rsplit(".", 1)
             plugin_class = getattr(importlib.import_module(module_name), class_name)
@@ -61,54 +80,76 @@ class PluginManager(QObject):
             for plugin_key, plugin_full_name in plugin_class.DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY.items():
                 dependency_plugin_by_key[plugin_key] = self._create_plugin(plugin_full_name)
 
-            plugins_as_params = []
-            if params is not None:
-                params = params.split(',')
-                for p in params:
-                    p = p.replace(' ', '')
-                    plugin_as_param = self._aliases_plugins.get(p)
-                    plugins_as_params.append(plugin_as_param or p)
+            plugins_as_args = [self._created_plugin_by_alias.get(arg) or arg for arg in args] \
+                if args is not None else ()
 
-            plugin = plugin_class(*plugins_as_params, **dependency_plugin_by_key)
+            plugin = plugin_class(*plugins_as_args, **dependency_plugin_by_key)
             plugin.dependency_plugin_by_key = dependency_plugin_by_key
-            self._created_plugins[replace_full_name or plugin.full_name()] = plugin
+
+            self._created_plugin_by_full_name[plugin.full_name()] = plugin
+            if replace_full_name is not None:
+                self._created_plugin_by_full_name[replace_full_name] = plugin
+            if alias is not None:
+                self._created_plugin_by_alias[alias] = plugin
 
         return plugin
 
-    def _enable_plugin_created_from_expression(self, plugin_expression: str):
+    def _create_and_enable_plugin_from_expression(self, plugin_expression: str) -> Plugin:
         plugin_expression = plugin_expression.replace(' ', '')
 
         match = self._plugin_expression_pattern.match(plugin_expression)
         alias = match.group('alias')
         full_name = match.group('full_name')
-        params = match.group('params')
+        args = match.group('args')
         replace_full_name = match.group('replace_full_name')
 
-        plugin = self._enabled_plugins.get(full_name)
+        plugin = self._enabled_plugin_by_full_name.get(full_name)
         if plugin is None:
             if replace_full_name is not None:
                 replace_full_name = replace_full_name.replace(' ', '')
-            plugin = self._create_plugin(full_name, params, replace_full_name)
-            self._enable_created_plugin(plugin, replace_full_name)
 
-        if alias is not None:
-            self._aliases_plugins[alias] = plugin
+            if args is not None:
+                args = [arg.replace(' ', '') for arg in args.split(',')]
+
+            plugin = self._create_plugin(full_name, args, replace_full_name, alias)
+            self._enable_created_plugin(plugin, replace_full_name)
 
         return plugin
 
-    def enable_plugin(self, plugin_expression: Union[str, Plugin]):
-        if isinstance(plugin_expression, Plugin):
-            self._enable_created_plugin(plugin_expression)
-            return plugin_expression
+    def _create_and_enable_plugin_from_mapping(self, plugin_mapping: collections.Mapping) -> Plugin:
+        assert len(plugin_mapping) == 1, 'Mapping has to contain only one element: plugin and its properties'
 
-        return self._enable_plugin_created_from_expression(plugin_expression)
+        full_name, plugin_properties = next(iter(plugin_mapping.items()))
+        assert plugin_properties is not None, \
+            f'Plugin {full_name} is declared as Mapping ' \
+            f'and has to contain properties after colon, but it has no declared properties. ' \
+            f'Remove colon after plugin name or declare plugin properties.'
 
-    def enable_plugins(self, plugin_expressions: List[str]):
-        for plugin_expression in plugin_expressions:
-            self.enable_plugin(plugin_expression)
+        plugin = self._enabled_plugin_by_full_name.get(full_name)
+        if plugin is None:
+            replace_full_name = plugin_properties.get('replace')
+            alias = plugin_properties.get('alias')
+            plugin = self._create_plugin(full_name, replace_full_name=replace_full_name, alias=alias)
+            self._enable_created_plugin(plugin, replace_full_name)
 
-    def enabled_plugin(self, full_name):
-        return self._enabled_plugins.get(full_name)
+        return plugin
+
+    def enable_plugin(self, plugin: str | collections.Mapping | Plugin) -> Plugin:
+        if isinstance(plugin, collections.Mapping):
+            return self._create_and_enable_plugin_from_mapping(plugin)
+
+        if isinstance(plugin, Plugin):
+            self._enable_created_plugin(plugin)
+            return plugin
+
+        return self._create_and_enable_plugin_from_expression(plugin)
+
+    def enable_plugins(self, plugins: List[str | collections.Mapping | Plugin]):
+        for plugin in plugins:
+            self.enable_plugin(plugin)
+
+    def enabled_plugin(self, full_name) -> Plugin | None:
+        return self._enabled_plugin_by_full_name.get(full_name)
 
     def _enable_dependency_plugins(self, plugin: Plugin):
         for dependency_plugin in plugin.dependency_plugin_by_key.values():
@@ -122,7 +163,7 @@ class PluginManager(QObject):
         plugin.disabling.connect(self._on_observer_plugin_disabling)
 
     def _on_observer_plugin_enabled(self, observer_plugin: ObserverPlugin):
-        for enabled_plugin in self._enabled_plugins.values():
+        for enabled_plugin in self._enabled_plugin_by_full_name.values():
             self._notify_observer_about_changed_plugin(
                 observer_plugin, observer_plugin.on_observed_plugin_enabled, enabled_plugin)
 
@@ -137,10 +178,12 @@ class PluginManager(QObject):
             observer_plugin_callback,
             changed_plugin: Plugin,
     ):
-        if isinstance(changed_plugin, observer_plugin.observer_plugin_cls):
+        if isinstance(changed_plugin, observer_plugin.observed_plugin_cls):
             observer_plugin_callback(changed_plugin)
 
     def _on_observer_plugin_disabling(self, observer_plugin: ObserverPlugin):
+        # TODO: check, maybe to we cannot correctly use disconnect using 'partial'
+        #  and have to store references to them during connect
         self.plugin_enabled.disconnect(partial(
             self._notify_observer_about_changed_plugin, observer_plugin, observer_plugin.on_observed_plugin_enabled))
         self.plugin_disabling.disconnect(partial(

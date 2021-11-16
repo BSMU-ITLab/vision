@@ -12,7 +12,7 @@ class ObserverPlugin(Plugin):
         self._observed_plugin_cls = observed_plugin_class
 
     @property
-    def observer_plugin_cls(self) -> Type[Plugin]:
+    def observed_plugin_cls(self) -> Type[Plugin]:
         return self._observed_plugin_cls
 
     def on_observed_plugin_enabled(self, plugin: Plugin):

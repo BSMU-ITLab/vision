@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import Tuple, Type
+from typing import TYPE_CHECKING
 
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QMainWindow, QMenuBar, QMenu
 from sortedcontainers import SortedDict
 
 from bsmu.vision.core.plugins.base import Plugin
+
+if TYPE_CHECKING:
+    from typing import Tuple, Type
 
 
 class MainMenu(QMenu):
@@ -99,14 +102,14 @@ class MainWindowPlugin(Plugin):
     #                        version=Version(0, 0, 1),
     #                        py_modules=('main',))
 
-    def __init__(self, main_window_class: Type[MainWindow] | None = None):
+    def __init__(self, main_window_cls: Type[MainWindow] | None = None):
         super().__init__()
 
-        self.main_window_class = MainWindow if main_window_class is None else main_window_class
+        self.main_window_cls = MainWindow if main_window_cls is None else main_window_cls
         self.main_window: MainWindow | None = None
 
     def _enable(self):
-        self.main_window = self.main_window_class()
+        self.main_window = self.main_window_cls()
         self.main_window.setAttribute(Qt.WA_DeleteOnClose)
 
         title_config = self.config.value('title')

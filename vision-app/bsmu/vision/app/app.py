@@ -86,7 +86,7 @@ class App(QApplication):
         return self.plugin_manager.enable_plugin(full_name)
 
     def enabled_plugins(self):
-        return self.plugin_manager._enabled_plugins
+        return self.plugin_manager._enabled_plugin_by_full_name
 
     def run(self):
         sys.exit(self.exec_())

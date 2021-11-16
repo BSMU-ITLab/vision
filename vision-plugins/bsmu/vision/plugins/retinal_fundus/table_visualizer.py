@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from enum import IntEnum
 from pathlib import Path
-from typing import List, Any, Type, Optional
 from typing import TYPE_CHECKING
 
 import cv2
@@ -12,17 +11,19 @@ from PySide2.QtGui import QImage
 from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate
 
 import bsmu.vision.core.converters.image as image_converter
-from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
+from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
 
 if TYPE_CHECKING:
+    from typing import List, Any, Type
+
     from PySide2.QtCore import QAbstractItemModel
     from PySide2.QtWidgets import QWidget, QStyleOptionViewItem
 
@@ -119,7 +120,7 @@ class TableItemDataRole(IntEnum):
 
 
 class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
-    def __init__(self, data: PatientRetinalFundusJournal, preview_height: Optional[int] = None, parent: QObject = None):
+    def __init__(self, data: PatientRetinalFundusJournal, preview_height: int | None = None, parent: QObject = None):
         super().__init__(parent)
 
         self._data = data
@@ -227,7 +228,7 @@ class ImageCenterAlignmentDelegate(QStyledItemDelegate):
 class PatientRetinalFundusJournalTableView(QTableView):
     record_selected = Signal(PatientRetinalFundusRecord)
 
-    def __init__(self, row_height: Optional[int] = None, parent: QWidget = None):
+    def __init__(self, row_height: int | None = None, parent: QWidget = None):
         super().__init__(parent)
 
         if row_height is not None:

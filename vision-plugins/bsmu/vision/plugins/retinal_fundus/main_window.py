@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow, MenuBar, FileMenu, ViewMenu, ToolsMenu, \
     WindowsMenu, HelpMenu
 
 if TYPE_CHECKING:
-    from bsmu.vision.app import App
     from bsmu.vision.plugins.windows.main import MainMenu
+    from typing import Tuple, Type
 
 
 class RetinalFundusMenuBar(MenuBar):
@@ -21,5 +21,5 @@ class RetinalFundusMainWindow(MainWindow):
 
 
 class RetinalFundusMainWindowPlugin(MainWindowPlugin):
-    def __init__(self, app: App, main_window: MainWindow = None):
-        super().__init__(app, RetinalFundusMainWindow() if main_window is None else main_window)
+    def __init__(self, main_window_cls: Type[MainWindow] | None = None):
+        super().__init__(RetinalFundusMainWindow if main_window_cls is None else main_window_cls)

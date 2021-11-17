@@ -10,20 +10,39 @@ from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.plugins.bone_age.main_window import TableMenu
 
 if TYPE_CHECKING:
-    from bsmu.vision.app import App
+    from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
+    from bsmu.vision.plugins.bone_age.table_visualizer import BoneAgeTableVisualizerPlugin, BoneAgeTableVisualizer
 
 
 class PatientBoneAgeJournalExporterPlugin(Plugin):
-    def __init__(self, app: App):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin',
+        'bone_age_table_visualizer_plugin':
+            'bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin',
+    }
 
-        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
-        self.table_visualizer = app.enable_plugin('bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin').table_visualizer
+    def __init__(
+            self,
+            main_window_plugin: BoneAgeMainWindowPlugin,
+            bone_age_table_visualizer_plugin: BoneAgeTableVisualizerPlugin,
+    ):
+        super().__init__()
 
-        self.journal_exporter = PatientBoneAgeJournalExporter(self.table_visualizer, self.main_window)
+        self._main_window_plugin = main_window_plugin
+        self._main_window: BoneAgeMainWindow | None = None
+
+        self._bone_age_table_visualizer_plugin = bone_age_table_visualizer_plugin
+        self._table_visualizer: BoneAgeTableVisualizer | None = None
+
+        self._journal_exporter: PatientBoneAgeJournalExporter | None = None
 
     def _enable(self):
-        self.main_window.add_menu_action(TableMenu, 'Export to Excel...', self.journal_exporter.export_to_csv)
+        self._main_window = self._main_window_plugin.main_window
+        self._table_visualizer = self._bone_age_table_visualizer_plugin.table_visualizer
+
+        self._journal_exporter = PatientBoneAgeJournalExporter(self._table_visualizer, self._main_window)
+
+        self._main_window.add_menu_action(TableMenu, 'Export to Excel...', self._journal_exporter.export_to_csv)
 
     def _disable(self):
         raise NotImplementedError
@@ -42,7 +61,7 @@ class PatientBoneAgeJournalExporter(QObject):
 
     DATE_STR_FORMAT = 'dd.MM.yyyy'
 
-    def __init__(self, table_visualizer: BoneAgeTableVisualizer, main_window: MainWindow):
+    def __init__(self, table_visualizer: BoneAgeTableVisualizer, main_window: BoneAgeMainWindow):
         super().__init__()
 
         self._table_visualizer = table_visualizer

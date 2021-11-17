@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from enum import IntEnum
 from functools import partial
 from pathlib import Path
-from typing import List, Type
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -16,7 +15,13 @@ from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
     QActionGroup, QAction, QStyledItemDelegate, QStyle, QDoubleSpinBox
 
+from bsmu.vision.core import date
+from bsmu.vision.core.converters import color as color_converter, image as image_converter
+from bsmu.vision.core.data import Data
+from bsmu.vision.core.image.base import FlatImage
+from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 from bsmu.vision.plugins.bone_age.max_height_analyzer import MaxHeightAnalyzer
 from bsmu.vision.plugins.bone_age.predictor import Predictor, DnnModelParams
 from bsmu.vision.plugins.bone_age.skeletal_development_rate_analyzer import SkeletalDevelopmentRate, \
@@ -27,41 +32,67 @@ from bsmu.vision.widgets.gender import GenderWidget
 from bsmu.vision.widgets.layer_visibility import LayerVisibilityWidget
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision.core import date
-from bsmu.vision.core.converters import color as color_converter, image as image_converter
-from bsmu.vision.core.data import Data
-from bsmu.vision.core.image.base import FlatImage
-from bsmu.vision.core.image.layered import LayeredImage
-from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 
 if TYPE_CHECKING:
+    from typing import List, Type
+
     from PySide2.QtCore import QModelIndex, QPoint
     from PySide2.QtGui import QPainter
     from PySide2.QtWidgets import QStyleOptionViewItem
 
-    from bsmu.vision.app import App
-    from bsmu.vision.plugins.visualizers.manager import DataVisualizationManager
-    from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
+    from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
+    from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
 
 
 class BoneAgeTableVisualizerPlugin(Plugin):
-    def __init__(self, app: App):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin',
+        'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+    }
 
-        self.main_window = app.enable_plugin('bsmu.vision.plugins.windows.main.MainWindowPlugin').main_window
-        self.data_visualization_manager = app.enable_plugin(
-            'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin').data_visualization_manager
-        mdi = app.enable_plugin('bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin').mdi
-        self.table_visualizer = BoneAgeTableVisualizer(self.data_visualization_manager, mdi)
+    def __init__(
+            self,
+            main_window_plugin: BoneAgeMainWindowPlugin,
+            data_visualization_manager_plugin: DataVisualizationManagerPlugin,
+            mdi_plugin: MdiPlugin,
+    ):
+        super().__init__()
+
+        self._main_window_plugin = main_window_plugin
+        self._main_window: BoneAgeMainWindow | None = None
+
+        self._data_visualization_manager_plugin = data_visualization_manager_plugin
+        self._data_visualization_manager: DataVisualizationManager | None = None
+
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
+
+        self._table_visualizer: BoneAgeTableVisualizer | None = None
+
+    @property
+    def table_visualizer(self) -> BoneAgeTableVisualizer:
+        return self._table_visualizer
 
     def _enable(self):
-        self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_bone_age_data)
+        self._main_window = self._main_window_plugin.main_window
+        self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
+        self._mdi = self._mdi_plugin.mdi
 
-        self.main_window.add_menu_action(WindowsMenu, 'Table', self.table_visualizer.raise_journal_sub_window,
-                                         Qt.CTRL + Qt.Key_1)
+        self._table_visualizer = BoneAgeTableVisualizer(self._data_visualization_manager, self._mdi)
+
+        self._data_visualization_manager.data_visualized.connect(self._table_visualizer.visualize_bone_age_data)
+
+        self._main_window.add_menu_action(
+            WindowsMenu, 'Table', self._table_visualizer.raise_journal_sub_window, Qt.CTRL + Qt.Key_1)
 
     def _disable(self):
-        self.data_visualization_manager.data_visualized.disconnect(self.table_visualizer.visualize_bone_age_data)
+        self._data_visualization_manager.data_visualized.disconnect(self._table_visualizer.visualize_bone_age_data)
+
+        self._table_visualizer = None
+
+        raise NotImplementedError
 
 
 class PatientBoneAgeRecord(QObject):

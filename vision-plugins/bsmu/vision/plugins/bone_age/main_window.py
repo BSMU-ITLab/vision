@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Tuple
+from typing import TYPE_CHECKING
 
 from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow, MainMenu, MenuBar, FileMenu, ViewMenu, \
     WindowsMenu, HelpMenu
+
+if TYPE_CHECKING:
+    from typing import Tuple, Type
 
 
 class AtlasMenu(MainMenu):
@@ -25,9 +28,5 @@ class BoneAgeMainWindow(MainWindow):
 
 
 class BoneAgeMainWindowPlugin(MainWindowPlugin):
-    # setup_info = SetupInfo(name='bsmu-vision-main-window',
-    #                        version=Version(0, 0, 1),
-    #                        py_modules=('main',))
-
-    def __init__(self, app: App, main_window: MainWindow = None):
-        super().__init__(app, BoneAgeMainWindow() if main_window is None else main_window)
+    def __init__(self, main_window_cls: Type[MainWindow] | None = None):
+        super().__init__(BoneAgeMainWindow if main_window_cls is None else main_window_cls)

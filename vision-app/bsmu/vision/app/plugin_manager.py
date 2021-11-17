@@ -36,6 +36,10 @@ class PluginManager(QObject):
         self._enabled_plugin_by_full_name = {}  # { full_name: Plugin }
         self._created_plugin_by_alias = {}  # { alias: Plugin }
 
+    @property
+    def enabled_plugins(self) -> List[Plugin]:
+        return list(self._enabled_plugin_by_full_name.values())
+
     def _enable_created_plugin(self, plugin: Plugin, replace_full_name: str = None):
         full_name = plugin.full_name()
 

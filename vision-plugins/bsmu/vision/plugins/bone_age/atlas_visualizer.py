@@ -9,56 +9,83 @@ from PySide2.QtCore import QObject, Qt
 from ruamel.yaml import YAML
 from sortedcontainers import SortedDict
 
-from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.plugins.bone_age.table_visualizer import BoneAgeTableVisualizerPlugin, PatientBoneAgeRecord, \
-    PatientBoneAgeRecordAction
 from bsmu.vision.core import date
-
-if TYPE_CHECKING:
-    from bsmu.vision.app import App
-from typing import Union
+from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.plugins.bone_age.main_window import AtlasMenu
+from bsmu.vision.plugins.bone_age.table_visualizer import PatientBoneAgeRecordAction
+from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
-from bsmu.vision.core.image.layered import LayeredImage
-from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin
-from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
-from bsmu.vision.plugins.bone_age.main_window import AtlasMenu
-from bsmu.vision.plugins.windows.main import WindowsMenu, MainWindowPlugin
+
+if TYPE_CHECKING:
+    from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
+    from bsmu.vision.plugins.bone_age.table_visualizer import BoneAgeTableVisualizerPlugin, BoneAgeTableVisualizer, \
+        PatientBoneAgeRecord
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
+    from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
 
 
 class BoneAgeAtlasVisualizerPlugin(Plugin):
-    def __init__(self, app: App,
-                 main_window_plugin=MainWindowPlugin.full_name(),   ## BoneAgeMainWindowPlugin.full_name(),
-                 bone_age_table_visualizer_plugin=BoneAgeTableVisualizerPlugin.full_name(),
-                 mdi_plugin: Union[str, MdiPlugin] = MdiPlugin.full_name(),
-                 file_loading_manager_plugin: Union[str, FileLoadingManagerPlugin] = FileLoadingManagerPlugin.full_name(),
-                 ):
-        super().__init__(app)
+    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin',
+        'bone_age_table_visualizer_plugin':
+            'bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin',
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+        'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+    }
 
-        self.main_window = app.enable_plugin(main_window_plugin).main_window
-        self.bone_age_table_visualizer = app.enable_plugin(bone_age_table_visualizer_plugin).table_visualizer
-        mdi = app.enable_plugin(mdi_plugin).mdi
-        file_loading_manager = app.enable_plugin(file_loading_manager_plugin).file_loading_manager
+    def __init__(
+            self,
+            main_window_plugin: BoneAgeMainWindowPlugin,
+            bone_age_table_visualizer_plugin: BoneAgeTableVisualizerPlugin,
+            mdi_plugin: MdiPlugin,
+            file_loading_manager_plugin: FileLoadingManagerPlugin,
+    ):
+        super().__init__()
 
-        self.bone_age_atlas_visualizer = BoneAgeAtlasVisualizer(mdi, file_loading_manager,
-                                                                self.bone_age_table_visualizer)
+        self._main_window_plugin = main_window_plugin
+        self._main_window: BoneAgeMainWindow | None = None
 
-        self._show_atlas_action = PatientBoneAgeRecordAction('Show Atlas')
-        self._show_atlas_action.triggered_on_record.connect(self.bone_age_atlas_visualizer.show_atlas_for_record)
+        self._bone_age_table_visualizer_plugin = bone_age_table_visualizer_plugin
+        self._bone_age_table_visualizer: BoneAgeTableVisualizer | None = None
+
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
+
+        self._file_loading_manager_plugin = file_loading_manager_plugin
+
+        self._bone_age_atlas_visualizer: BoneAgeAtlasVisualizer | None = None
+        self._show_atlas_action: PatientBoneAgeRecordAction | None = None
 
     def _enable(self):
-        self.bone_age_table_visualizer.add_age_column_context_menu_action(self._show_atlas_action)
+        self._main_window = self._main_window_plugin.main_window
+        self._bone_age_table_visualizer = self._bone_age_table_visualizer_plugin.table_visualizer
+        self._mdi = self._mdi_plugin.mdi
 
-        self.main_window.add_menu_action(WindowsMenu, 'Atlas', self.bone_age_atlas_visualizer.raise_atlas_sub_windows,
-                                         Qt.CTRL + Qt.Key_2)
+        self._bone_age_atlas_visualizer = BoneAgeAtlasVisualizer(
+            self._mdi, self._file_loading_manager_plugin.file_loading_manager, self._bone_age_table_visualizer)
 
-        self.main_window.add_menu_action(AtlasMenu, 'Next Image', self.bone_age_atlas_visualizer.show_next_image,
-                                         Qt.CTRL + Qt.Key_Up)
-        self.main_window.add_menu_action(AtlasMenu, 'Previous Image', self.bone_age_atlas_visualizer.show_prev_image,
-                                         Qt.CTRL + Qt.Key_Down)
+        self._show_atlas_action = PatientBoneAgeRecordAction('Show Atlas')
+        self._show_atlas_action.triggered_on_record.connect(self._bone_age_atlas_visualizer.show_atlas_for_record)
+        self._bone_age_table_visualizer.add_age_column_context_menu_action(self._show_atlas_action)
+
+        self._main_window.add_menu_action(
+            WindowsMenu, 'Atlas', self._bone_age_atlas_visualizer.raise_atlas_sub_windows, Qt.CTRL + Qt.Key_2)
+
+        self._main_window.add_menu_action(
+            AtlasMenu, 'Next Image', self._bone_age_atlas_visualizer.show_next_image, Qt.CTRL + Qt.Key_Up)
+        self._main_window.add_menu_action(
+            AtlasMenu, 'Previous Image', self._bone_age_atlas_visualizer.show_prev_image, Qt.CTRL + Qt.Key_Down)
 
     def _disable(self):
-        self.bone_age_table_visualizer.remove_age_column_context_menu_action(self._show_atlas_action)
+        self._bone_age_table_visualizer.remove_age_column_context_menu_action(self._show_atlas_action)
+        self._show_atlas_action.triggered_on_record.disconnect(self._bone_age_atlas_visualizer.show_atlas_for_record)
+        self._show_atlas_action = None
+
+        self._bone_age_atlas_visualizer = None
+
+        raise NotImplementedError
 
 
 class BoneAgeAtlasVisualizer(QObject):
@@ -67,8 +94,7 @@ class BoneAgeAtlasVisualizer(QObject):
 
     _ATLAS_FILE_NAME_PATTERN_STR = r'(?P<years>\d*)-(?P<months>\d*)\.png'
 
-    def __init__(self, mdi: Mdi, file_loading_manager: FileLoadingManager,
-                 table_visualizer: BoneAgeTableVisualizer):
+    def __init__(self, mdi: Mdi, file_loading_manager: FileLoadingManager, table_visualizer: BoneAgeTableVisualizer):
         super().__init__()
 
         self.mdi = mdi

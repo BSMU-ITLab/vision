@@ -82,7 +82,7 @@ class Plugin(QObject):
         config_file_name = class_name + '.conf.yaml'
         config_file_full_name = f'{self.__module__}.{config_file_name}'
 
-        united_config = self.app.config_uniter.unite_configs(config_dir, config_file_name, config_file_full_name)
+        united_config = self.app._config_uniter.unite_configs(config_dir, config_file_name, config_file_full_name)
         return united_config
 
     @classmethod

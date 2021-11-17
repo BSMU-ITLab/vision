@@ -55,6 +55,9 @@ class ImageLoaderPlugin(Plugin):
 
         self._main_window.add_menu_action(FileMenu, 'Load...', self._show_image_load_dialog, Qt.CTRL + Qt.Key_O)
 
+    def _disable(self):
+        raise NotImplementedError
+
     def _show_image_load_dialog(self):
         file_path_strings, selected_filter = QFileDialog.getOpenFileNames(
             self._main_window, 'Open File', filter='Images (*.png *.jpg *.bmp)')

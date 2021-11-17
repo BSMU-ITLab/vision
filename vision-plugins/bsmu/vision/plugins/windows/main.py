@@ -90,34 +90,34 @@ class MainWindow(QMainWindow):
         self.move(100, 100)
         self.setWindowTitle(title)
 
-        self.menu_bar = MenuBar() if menu_bar is None else menu_bar
-        self.setMenuBar(self.menu_bar)
+        self._menu_bar = MenuBar() if menu_bar is None else menu_bar
+        self.setMenuBar(self._menu_bar)
 
     def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut=None):
-        return self.menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
+        return self._menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
 
 
 class MainWindowPlugin(Plugin):
-    # setup_info = SetupInfo(name='bsmu-vision-main-window',
-    #                        version=Version(0, 0, 1),
-    #                        py_modules=('main',))
-
     def __init__(self, main_window_cls: Type[MainWindow] | None = None):
         super().__init__()
 
-        self.main_window_cls = MainWindow if main_window_cls is None else main_window_cls
-        self.main_window: MainWindow | None = None
+        self._main_window_cls = MainWindow if main_window_cls is None else main_window_cls
+        self._main_window: MainWindow | None = None
+
+    @property
+    def main_window(self) -> MainWindow:
+        return self._main_window
 
     def _enable(self):
-        self.main_window = self.main_window_cls()
-        self.main_window.setAttribute(Qt.WA_DeleteOnClose)
+        self._main_window = self._main_window_cls()
+        self._main_window.setAttribute(Qt.WA_DeleteOnClose)
 
         title_config = self.config.value('title')
         if title_config is not None:
-            self.main_window.setWindowTitle(title_config)
+            self._main_window.setWindowTitle(title_config)
 
-        self.main_window.show()
+        self._main_window.show()
 
     def _disable(self):
-        self.main_window.close()
-        self.main_window = None
+        self._main_window.close()
+        self._main_window = None

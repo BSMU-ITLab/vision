@@ -58,6 +58,10 @@ plugins-old:
 # Retinal Fundus Analyzer
 plugins:
 #  - bsmu.vision.plugins.windows.main.MainWindowPlugin
+  - bsmu.vision.plugins.retinal_fundus.main_window.RetinalFundusMainWindowPlugin:
+      replace: bsmu.vision.plugins.windows.main.MainWindowPlugin
+      alias: main_window
+
   - bsmu.vision.plugins.retinal_fundus.table_visualizer.RetinalFundusTableVisualizerPlugin
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.bone_age.image_loader.ImageLoaderPlugin
@@ -74,7 +78,9 @@ plugins:
   - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
   - bsmu.vision.plugins.overlayers.intersection.ImageViewerIntersectionOverlayerPlugin
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
-  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
+#  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
+
+
 
 #  - bsmu.vision.plugins.retinal_fundus.main_window.RetinalFundusMainWindowPlugin -> bsmu.vision.plugins.windows.main.MainWindowPlugin
 #  - bsmu.vision.plugins.retinal_fundus.table_visualizer.RetinalFundusTableVisualizerPlugin

@@ -29,7 +29,8 @@ class App(QApplication):
         locale.setlocale(locale.LC_NUMERIC, '')
 
         self._config_uniter = ConfigUniter(child_config_paths)
-        self._united_config = self._config_uniter.unite_configs(Path(__file__).parent.resolve(), 'App.conf.yaml')
+        self._united_config = self._config_uniter.unite_configs(
+            Path(__file__).parent.resolve() / 'configs', 'App.conf.yaml')
 
         print(f'App started. Prefix: {sys.prefix}')
 

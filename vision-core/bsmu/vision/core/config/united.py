@@ -50,7 +50,8 @@ class UnitedConfig:
             next_plugin_base_class_config_dir = Path(sys.executable).parent / 'configs'
         else:
             # The application is not frozen
-            next_plugin_base_class_config_dir = Path(sys.modules[next_plugin_base_class.__module__].__file__).parent
+            next_plugin_base_class_config_dir = \
+                Path(sys.modules[next_plugin_base_class.__module__].__file__).parent.resolve() / 'configs'
         next_plugin_base_class_config_file_name = f'{next_plugin_base_class.__name__}.conf.yaml'
         next_plugin_base_class_config_path = next_plugin_base_class_config_dir / next_plugin_base_class_config_file_name
 

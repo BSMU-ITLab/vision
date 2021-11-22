@@ -52,6 +52,9 @@ class BoneAgeTableVisualizerPlugin(Plugin):
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
     }
 
+    _DNN_MODELS_DIR_NAME = 'dnn-models'
+    _DATA_DIRS = (_DNN_MODELS_DIR_NAME,)
+
     def __init__(
             self,
             main_window_plugin: BoneAgeMainWindowPlugin,
@@ -80,7 +83,9 @@ class BoneAgeTableVisualizerPlugin(Plugin):
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
         self._mdi = self._mdi_plugin.mdi
 
-        self._table_visualizer = BoneAgeTableVisualizer(self._data_visualization_manager, self._mdi)
+        dnn_model_name = 'DenseNet169_500x500_b7_AllImages3_MoreAugments_Mae5.80.pb'  # 'DenseNet_withInputShape___weighted.pb'
+        dnn_model_path = self.data_path(self._DNN_MODELS_DIR_NAME, dnn_model_name)
+        self._table_visualizer = BoneAgeTableVisualizer(self._data_visualization_manager, self._mdi, dnn_model_path)
 
         self._data_visualization_manager.data_visualized.connect(self._table_visualizer.visualize_bone_age_data)
 
@@ -658,13 +663,12 @@ class PatientBoneAgeJournalViewer(DataViewer):
 class BoneAgeTableVisualizer(QObject):
     ACTIVATION_MAP_LAYER_NAME = 'Activation Map'
 
-    def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi):
+    def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi, dnn_model_path: Path):
         super().__init__()
 
-        model_name = 'DenseNet169_500x500_b7_AllImages3_MoreAugments_Mae5.80.pb'  # 'DenseNet_withInputShape___weighted.pb'
         self.predictor = Predictor(
             DnnModelParams(
-                Path(__file__).parent / 'dnn-models' / model_name,
+                dnn_model_path,
                 image_input_layer_name='input_1',
                 male_input_layer_name='input_male',
                 age_output_layer_name='output_age/MatMul',

@@ -35,6 +35,9 @@ class BoneAgeAtlasVisualizerPlugin(Plugin):
         'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
     }
 
+    _ATLAS_DIR_NAME = 'greulich-pyle-atlas'
+    _DATA_DIRS = (_ATLAS_DIR_NAME,)
+
     def __init__(
             self,
             main_window_plugin: BoneAgeMainWindowPlugin,
@@ -63,8 +66,13 @@ class BoneAgeAtlasVisualizerPlugin(Plugin):
         self._bone_age_table_visualizer = self._bone_age_table_visualizer_plugin.table_visualizer
         self._mdi = self._mdi_plugin.mdi
 
+        atlas_dir = self.data_path(self._ATLAS_DIR_NAME)
         self._bone_age_atlas_visualizer = BoneAgeAtlasVisualizer(
-            self._mdi, self._file_loading_manager_plugin.file_loading_manager, self._bone_age_table_visualizer)
+            self._mdi,
+            self._file_loading_manager_plugin.file_loading_manager,
+            self._bone_age_table_visualizer,
+            atlas_dir
+        )
 
         self._show_atlas_action = PatientBoneAgeRecordAction('Show Atlas')
         self._show_atlas_action.triggered_on_record.connect(self._bone_age_atlas_visualizer.show_atlas_for_record)
@@ -89,12 +97,17 @@ class BoneAgeAtlasVisualizerPlugin(Plugin):
 
 
 class BoneAgeAtlasVisualizer(QObject):
-    _ATLAS_DIR = Path(__file__).parent / 'greulich-pyle-atlas'
     _ATLAS_INDEX_FILE_NAME = 'autogen-index.yaml'
 
     _ATLAS_FILE_NAME_PATTERN_STR = r'(?P<years>\d*)-(?P<months>\d*)\.png'
 
-    def __init__(self, mdi: Mdi, file_loading_manager: FileLoadingManager, table_visualizer: BoneAgeTableVisualizer):
+    def __init__(
+            self,
+            mdi: Mdi,
+            file_loading_manager: FileLoadingManager,
+            table_visualizer: BoneAgeTableVisualizer,
+            atlas_dir: Path
+    ):
         super().__init__()
 
         self.mdi = mdi
@@ -105,8 +118,8 @@ class BoneAgeAtlasVisualizer(QObject):
 
         self._GENDERS_ATLAS_DIR_NAMES = {True: 'man',
                                          False: 'woman'}
-        self._GENDERS_ATLAS_DIRS = {male: self._ATLAS_DIR / gender_dir_name for (male, gender_dir_name)
-                                    in self._GENDERS_ATLAS_DIR_NAMES.items()}
+        self._GENDERS_ATLAS_DIRS = {male: atlas_dir / gender_dir_name
+                                    for (male, gender_dir_name) in self._GENDERS_ATLAS_DIR_NAMES.items()}
         self._GENDERS_ATLAS_INDEX_FILE_PATHS = {male: gender_atlas_dir / self._ATLAS_INDEX_FILE_NAME
                                                 for (male, gender_atlas_dir) in self._GENDERS_ATLAS_DIRS.items()}
 

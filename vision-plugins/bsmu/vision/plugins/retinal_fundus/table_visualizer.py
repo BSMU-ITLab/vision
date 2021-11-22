@@ -39,7 +39,8 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
     }
 
-    # _DATA_DIRS = ('dnn-models',)
+    _DNN_MODELS_DIR_NAME = 'dnn-models'
+    _DATA_DIRS = (_DNN_MODELS_DIR_NAME,)
 
     def __init__(
             self,
@@ -63,10 +64,12 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
         self._mdi = self._mdi_plugin.mdi
 
-        # segmenter_model_name = self.config.value('segmenter-model-name')
-        # self.table_visualizer = RetinalFundusTableVisualizer(self.data_visualization_manager, mdi, segmenter_model_name)
+        segmenter_model_name = self.config.value('segmenter-model-name')
+        segmenter_model_path = self.data_path(self._DNN_MODELS_DIR_NAME, segmenter_model_name)
+        self.table_visualizer = RetinalFundusTableVisualizer(
+            self._data_visualization_manager, self._mdi, segmenter_model_path)
 
-        # self.data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_retinal_fundus_data)
+        self._data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_retinal_fundus_data)
 
         self._main_window.add_menu_action(WindowsMenu, 'Table', self._disable, #% self.table_visualizer.raise_journal_sub_window,
                                          Qt.CTRL + Qt.Key_1)
@@ -272,14 +275,13 @@ class PatientRetinalFundusJournalViewer(DataViewer):
 
 
 class RetinalFundusTableVisualizer(QObject):
-    def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi, segmenter_model_name: str):
+    def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi, segmenter_model_path: Path):
         super().__init__()
 
         self._visualization_manager = visualization_manager
         self._mdi = mdi
 
-        self._segmenter = DnnSegmenter(DnnModelParams(Path(__file__).parent / 'dnn-models' / segmenter_model_name,
-                                                      input_image_size=(256, 256)))
+        self._segmenter = DnnSegmenter(DnnModelParams(segmenter_model_path, input_image_size=(256, 256)))
 
         self._journal = PatientRetinalFundusJournal()
         self._journal.add_record(PatientRetinalFundusRecord(FlatImage(

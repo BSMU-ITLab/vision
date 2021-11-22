@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class DataStoragePlugin(Plugin):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
     }
 

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class DataVisualizationManagerPlugin(Plugin):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'data_visualizer_registry_plugin': 'bsmu.vision.plugins.visualizers.registry.DataVisualizerRegistryPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
     }

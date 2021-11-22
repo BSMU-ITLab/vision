@@ -81,7 +81,7 @@ class PluginManager(QObject):
             plugin_class = getattr(importlib.import_module(module_name), class_name)
 
             dependency_plugin_by_key = {}
-            for plugin_key, plugin_full_name in plugin_class.DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY.items():
+            for plugin_key, plugin_full_name in plugin_class.default_dependency_plugin_full_name_by_key.items():
                 dependency_plugin_by_key[plugin_key] = self._create_plugin(plugin_full_name)
 
             plugins_as_args = [self._created_plugin_by_alias.get(arg) or arg for arg in args] \

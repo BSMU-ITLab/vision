@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 class RetinalFundusTableVisualizerPlugin(Plugin):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',

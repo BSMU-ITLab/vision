@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class MdiImageLayerFileWalkerPlugin(Plugin):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
         'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',

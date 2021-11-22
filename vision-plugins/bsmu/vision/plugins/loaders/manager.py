@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class FileLoadingManagerPlugin(Plugin):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'file_loader_registry_plugin': 'bsmu.vision.plugins.loaders.registry.FileLoaderRegistryPlugin',
     }
 

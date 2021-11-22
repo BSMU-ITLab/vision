@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class ImageLoaderPlugin(Plugin):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'simple_image_file_loader_plugin': 'bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin',
         'post_load_conversion_manager_plugin':

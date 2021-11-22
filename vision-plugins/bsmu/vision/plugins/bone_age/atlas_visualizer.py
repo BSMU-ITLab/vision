@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 class BoneAgeAtlasVisualizerPlugin(Plugin):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin',
         'bone_age_table_visualizer_plugin':
             'bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin',

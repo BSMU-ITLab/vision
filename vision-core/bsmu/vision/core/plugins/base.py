@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class Plugin(QObject, DataFileProvider):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY: dict = {}
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY: dict = {}
 
     enabling = Signal(QObject)  # Have to be a Plugin instead of QObject, but the Plugin is not defined yet
     enabled = Signal(QObject)  # Same as above
@@ -31,6 +31,11 @@ class Plugin(QObject, DataFileProvider):
 
     def __del__(self):
         self._print_action('del')
+
+    @classmethod
+    @property
+    def default_dependency_plugin_full_name_by_key(cls) -> dict:
+        return cls._DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY
 
     @property
     def dependency_plugin_by_key(self) -> dict:

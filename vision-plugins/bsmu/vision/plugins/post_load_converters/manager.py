@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class PostLoadConversionManagerPlugin(Plugin):
-    DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+    _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'post_load_converter_registry_plugin':
             'bsmu.vision.plugins.post_load_converters.registry.PostLoadConverterRegistryPlugin',
     }

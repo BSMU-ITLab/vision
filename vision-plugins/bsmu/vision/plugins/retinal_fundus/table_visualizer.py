@@ -39,6 +39,8 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
     }
 
+    # _DATA_DIRS = ('dnn-models',)
+
     def __init__(
             self,
             main_window_plugin: MainWindowPlugin,

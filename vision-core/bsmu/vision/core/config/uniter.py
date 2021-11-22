@@ -6,7 +6,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 
-class ConfigUniter:
+class ConfigUniterOld:
     def __init__(self, child_config_paths: tuple = ()):
         self.child_config_paths = child_config_paths
 

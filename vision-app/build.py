@@ -1,8 +1,8 @@
 # To build *.exe use the next command in the terminal:
-#   (vision) D:\Projects\vision>   python vision/build.py build
+#   (vision) D:\Projects\vision>   python vision-app/build.py build
 
 # To create an msi-installer:
-#   (vision) D:\Projects\vision>   python vision/build.py bdist_msi
+#   (vision) D:\Projects\vision>   python vision-app/build.py bdist_msi
 
 # To build app, install all required packages using pip
 # For local dev packages (e.g. bsmu.vision.plugins) use:
@@ -23,11 +23,12 @@ from typing import List
 
 from cx_Freeze import setup, Executable
 
-import bsmu.vision
+import bsmu.vision.app
+import bsmu.vision.core
+import bsmu.vision.dnn
 import bsmu.vision.plugins
 import bsmu.vision.widgets
-import bsmu.vision.core
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.data_file import DataFileProvider
 
 FILE_DIR = Path(__file__).parent
 BUILD_DIR = FILE_DIR / 'build'
@@ -62,25 +63,35 @@ def find_modules_of_packages_recursively(packages: List[ModuleType], indent: int
         yield from find_modules_of_package_recursively(package, indent)
 
 
-def generate_list_of_data_file_tuples():
-    plugin_packages = [bsmu.vision.plugins]
-    for module in find_modules_of_packages_recursively(plugin_packages):
+def generate_list_of_data_file_tuples(packages_with_data: List[ModuleType]):
+    """
+    :param packages_with_data: packages to search DataFileProvider classes
+    :return: e.g. list of such tuples:
+    ('full-path/vision-app/bsmu/vision/app/App.conf.yaml', 'data/bsmu.vision.app/configs/App.conf.yaml')
+    full signature is:
+    [('full path to the data file or dir', 'relative path to the data file or dir in the build folder'), ...]
+    """
+    # Use dictionary to remove duplicate values
+    destination_data_path_by_absolute = {}
+    for module in find_modules_of_packages_recursively(packages_with_data):
         class_name_value_pairs = inspect.getmembers(module, inspect.isclass)
         for cls_name, cls in class_name_value_pairs:
             # Skip classes, which were imported
             if cls.__module__ != module.__name__:
                 continue
 
-            if issubclass(cls, Plugin):
-                print(cls)
-                print(cls.DATA_DIRS)
+            if not issubclass(cls, DataFileProvider):
+                continue
 
+            for absolute_data_dir, frozen_rel_data_dir in cls.frozen_rel_data_dir_by_absolute().items():
+                destination_data_path_by_absolute[absolute_data_dir] = frozen_rel_data_dir
 
-def generate_list_of_config_file_destination_tuples():
-    # Generates list of such tuples: ('full-path/vision/bsmu/vision/app/App.conf.yaml', 'configs/App.conf.yaml')
-    # ('full path to the config file', 'relative path to the config file in the build folder')
-    return [(str(config_file), str(Path('configs') / config_file.name))
-            for config_file in (FILE_DIR / 'bsmu').glob('**/*.conf.yaml')]
+    # Convert |destination_data_path_by_absolute| dict to list of tuples
+    data_file_absolute_path_and_destination_tuples = \
+        [(str(absolute_data_path), str(frozen_rel_data_path))
+         for absolute_data_path, frozen_rel_data_path in destination_data_path_by_absolute.items()]
+
+    return data_file_absolute_path_and_destination_tuples
 
 
 # Dependencies are automatically detected, but it might need fine tuning
@@ -90,15 +101,15 @@ build_exe_options = {
         'skimage.io', 'skimage.util', 'skimage.color',
         'numpy.core',
         'ruamel.yaml',
+        'bsmu.vision.app',
         'bsmu.vision.core',
         'bsmu.vision.dnn',
-        'bsmu.vision.widgets',
         'bsmu.vision.plugins',
+        'bsmu.vision.widgets',
     ],
     'excludes': ['tkinter', 'scipy.spatial.cKDTree'],  # to fix the current bug
     'includes': ['numpy', 'scipy.sparse.csgraph._validation'],
-    # 'include_files': [('vision/bsmu/vision/app/App.conf.yaml', 'configs/App.conf.yaml')],
-    'include_files': generate_list_of_config_file_destination_tuples(),
+    'include_files': generate_list_of_data_file_tuples([bsmu.vision.app, bsmu.vision.plugins]),
     'build_exe': BUILD_DIR,
 }
 

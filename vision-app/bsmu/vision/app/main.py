@@ -1,12 +1,10 @@
-import sys
-
 from bsmu.vision.app import App
 
 
-def run_app(child_config_paths: tuple = ()):
+def run_app():
     print('Run, Vision! Run!')
 
-    app = App(sys.argv, child_config_paths)
+    app = App()
     app.run()
 
 

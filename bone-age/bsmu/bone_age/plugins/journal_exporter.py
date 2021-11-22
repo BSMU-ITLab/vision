@@ -6,19 +6,19 @@ from typing import TYPE_CHECKING
 from PySide2.QtCore import QObject
 from PySide2.QtWidgets import QFileDialog, QMessageBox
 
+from bsmu.bone_age.plugins.main_window import TableMenu
 from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.plugins.bone_age.main_window import TableMenu
 
 if TYPE_CHECKING:
-    from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
-    from bsmu.vision.plugins.bone_age.table_visualizer import BoneAgeTableVisualizerPlugin, BoneAgeTableVisualizer
+    from bsmu.bone_age.plugins.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
+    from bsmu.bone_age.plugins.table_visualizer import BoneAgeTableVisualizerPlugin, BoneAgeTableVisualizer
 
 
 class PatientBoneAgeJournalExporterPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
-        'main_window_plugin': 'bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin',
+        'main_window_plugin': 'bsmu.bone_age.plugins.main_window.BoneAgeMainWindowPlugin',
         'bone_age_table_visualizer_plugin':
-            'bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin',
+            'bsmu.bone_age.plugins.table_visualizer.BoneAgeTableVisualizerPlugin',
     }
 
     def __init__(

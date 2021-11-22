@@ -9,18 +9,18 @@ from PySide2.QtCore import QObject, Qt
 from ruamel.yaml import YAML
 from sortedcontainers import SortedDict
 
+from bsmu.bone_age.plugins.main_window import AtlasMenu
+from bsmu.bone_age.plugins.table_visualizer import PatientBoneAgeRecordAction
 from bsmu.vision.core import date
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.plugins.bone_age.main_window import AtlasMenu
-from bsmu.vision.plugins.bone_age.table_visualizer import PatientBoneAgeRecordAction
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
 
 if TYPE_CHECKING:
-    from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
-    from bsmu.vision.plugins.bone_age.table_visualizer import BoneAgeTableVisualizerPlugin, BoneAgeTableVisualizer, \
+    from bsmu.bone_age.plugins.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
+    from bsmu.bone_age.plugins.table_visualizer import BoneAgeTableVisualizerPlugin, BoneAgeTableVisualizer, \
         PatientBoneAgeRecord
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
@@ -28,9 +28,9 @@ if TYPE_CHECKING:
 
 class BoneAgeAtlasVisualizerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
-        'main_window_plugin': 'bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin',
+        'main_window_plugin': 'bsmu.bone_age.plugins.main_window.BoneAgeMainWindowPlugin',
         'bone_age_table_visualizer_plugin':
-            'bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin',
+            'bsmu.bone_age.plugins.table_visualizer.BoneAgeTableVisualizerPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
         'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
     }

@@ -15,6 +15,10 @@ from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
     QActionGroup, QAction, QStyledItemDelegate, QStyle, QDoubleSpinBox
 
+from bsmu.bone_age.plugins.max_height_analyzer import MaxHeightAnalyzer
+from bsmu.bone_age.plugins.predictor import Predictor, DnnModelParams
+from bsmu.bone_age.plugins.skeletal_development_rate_analyzer import SkeletalDevelopmentRate, \
+    SkeletalDevelopmentRateAnalyzer
 from bsmu.vision.core import date
 from bsmu.vision.core.converters import color as color_converter, image as image_converter
 from bsmu.vision.core.data import Data
@@ -22,10 +26,6 @@ from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
-from bsmu.vision.plugins.bone_age.max_height_analyzer import MaxHeightAnalyzer
-from bsmu.vision.plugins.bone_age.predictor import Predictor, DnnModelParams
-from bsmu.vision.plugins.bone_age.skeletal_development_rate_analyzer import SkeletalDevelopmentRate, \
-    SkeletalDevelopmentRateAnalyzer
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.date import DateEditWidget
 from bsmu.vision.widgets.gender import GenderWidget
@@ -40,14 +40,14 @@ if TYPE_CHECKING:
     from PySide2.QtGui import QPainter
     from PySide2.QtWidgets import QStyleOptionViewItem
 
-    from bsmu.vision.plugins.bone_age.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
+    from bsmu.bone_age.plugins.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
 
 
 class BoneAgeTableVisualizerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
-        'main_window_plugin': 'bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin',
+        'main_window_plugin': 'bsmu.bone_age.plugins.main_window.BoneAgeMainWindowPlugin',
         'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
     }

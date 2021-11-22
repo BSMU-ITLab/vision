@@ -1,9 +1,8 @@
 plugins:
-  - bsmu.vision.plugins.bone_age.main_window.BoneAgeMainWindowPlugin -> bsmu.vision.plugins.windows.main.MainWindowPlugin
+  - bsmu.bone_age.plugins.main_window.BoneAgeMainWindowPlugin -> bsmu.vision.plugins.windows.main.MainWindowPlugin
 #  - mdi_plugin = bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin(main_window_plugin)
 #  - bsmu.vision.plugins.file_dropper.FileDropperPlugin(mdi_plugin)
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
-
 
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
   - bsmu.vision.plugins.loaders.dicom.multi_frame.MultiFrameDicomFileLoaderPlugin
@@ -20,7 +19,7 @@ plugins:
 ##  - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
 ##  - bsmu.vision.plugins.color_contrast.ColorContrastPlugin
 #
-  - bsmu.vision.plugins.bone_age.table_visualizer.BoneAgeTableVisualizerPlugin
-  - bsmu.vision.plugins.bone_age.atlas_visualizer.BoneAgeAtlasVisualizerPlugin
-  - bsmu.vision.plugins.bone_age.journal_exporter.PatientBoneAgeJournalExporterPlugin
-  - bsmu.vision.plugins.bone_age.image_loader.ImageLoaderPlugin
+  - bsmu.bone_age.plugins.table_visualizer.BoneAgeTableVisualizerPlugin
+  - bsmu.bone_age.plugins.atlas_visualizer.BoneAgeAtlasVisualizerPlugin
+  - bsmu.bone_age.plugins.journal_exporter.PatientBoneAgeJournalExporterPlugin
+  - bsmu.bone_age.plugins.image_loader.ImageLoaderPlugin

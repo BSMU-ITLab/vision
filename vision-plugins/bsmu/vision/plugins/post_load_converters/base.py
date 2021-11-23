@@ -31,9 +31,10 @@ class PostLoadConverter(QObject, metaclass=PostLoadConverterMeta):
     def __init__(self):
         super().__init__()
 
+    @classmethod
     @property
-    def data_types(self):
-        return type(self).data_types
+    def data_types(cls):
+        return cls.data_types
 
     def convert_data(self, data: Data) -> Data:
         converted_data = self._convert_data(data)

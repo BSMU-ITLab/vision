@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import abc
 import inspect
-from typing import Type
+from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, Signal
 
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins.processor.base import ProcessorPlugin
+
+if TYPE_CHECKING:
+    from typing import Type
+    from pathlib import Path
 
 
 class FileLoaderPlugin(ProcessorPlugin):
@@ -18,11 +22,11 @@ class FileLoaderPlugin(ProcessorPlugin):
 class FileLoaderMeta(abc.ABCMeta, type(QObject)):
     _FORMATS = ()
 
-    def __new__(mcls, name, bases, namespace):
-        cls = super().__new__(mcls, name, bases, namespace)
+    def __new__(mcs, name, bases, namespace):
+        cls = super().__new__(mcs, name, bases, namespace)
 
         if not inspect.isabstract(cls) and not cls.formats:
-            raise NotImplementedError('Subclass must define formats attribute')
+            raise NotImplementedError('Subclass must define _FORMATS attribute')
 
         return cls
 
@@ -36,13 +40,12 @@ class FileLoaderMeta(abc.ABCMeta, type(QObject)):
 
 
 class FileLoader(QObject, metaclass=FileLoaderMeta):
-    #% _FORMATS = ()
-
     file_loaded = Signal(Data)
 
+    @classmethod
     @property
-    def formats(self):
-        return type(self).formats
+    def formats(cls):
+        return cls.formats
 
     def load_file(self, path: Path, **kwargs) -> Data:
         data = self._load_file(path, **kwargs)

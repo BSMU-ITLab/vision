@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import abc
-from typing import List, Type
+from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, Signal
 
 from bsmu.vision.core.plugins.processor.base import ProcessorPlugin
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+
+if TYPE_CHECKING:
+    from typing import List, Type
+
+    from bsmu.vision.core.data import Data
 
 
 class DataVisualizerPlugin(ProcessorPlugin):
@@ -34,9 +39,10 @@ class DataVisualizer(QObject, metaclass=DataVisualizerMeta):
 
         self.mdi = mdi
 
+    @classmethod
     @property
-    def data_types(self):
-        return type(self).data_types
+    def data_types(cls):
+        return cls.data_types
 
     def visualize_data(self, data: Data) -> List[DataViewerSubWindow]:
         data_viewer_sub_windows = self._visualize_data(data)

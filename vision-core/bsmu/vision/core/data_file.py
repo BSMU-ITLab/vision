@@ -16,12 +16,22 @@ class DataFileProvider:
 
     @classmethod
     def module_dir(cls) -> Path:
-        return Path(sys.modules[cls.__module__].__file__).parent.resolve()
+        module = sys.modules.get(cls.__module__)
+        assert module is not None, \
+            f'{cls.__module__} module is not found in sys.modules. Cannot get module directory for {cls}.'
+        return Path(module.__file__).parent.resolve()
 
     @classmethod
     def frozen_rel_data_path(cls, *rel_path_parts) -> Path:
         """Returns path relative to *.exe."""
-        return cls._FROZEN_DATA_DIR_NAME / Path(sys.modules[cls.__module__].__package__).joinpath(*rel_path_parts)
+        module = sys.modules.get(cls.__module__)
+        assert module is not None, \
+            f'{cls.__module__} module is not found in sys.modules. ' \
+            f'Cannot get frozen relative data path for {rel_path_parts}.'
+        package = module.__package__
+        assert package is not None, \
+            f'{module} has no package. Cannot get frozen relative data path for {rel_path_parts}.'
+        return cls._FROZEN_DATA_DIR_NAME / Path(package).joinpath(*rel_path_parts)
 
     @classmethod
     def frozen_absolute_data_path(cls, *rel_path_parts) -> Path:

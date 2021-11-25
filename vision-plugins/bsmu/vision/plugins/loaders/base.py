@@ -42,11 +42,6 @@ class FileLoaderMeta(abc.ABCMeta, type(QObject)):
 class FileLoader(QObject, metaclass=FileLoaderMeta):
     file_loaded = Signal(Data)
 
-    @classmethod
-    @property
-    def formats(cls):
-        return cls.formats
-
     def load_file(self, path: Path, **kwargs) -> Data:
         data = self._load_file(path, **kwargs)
         self.file_loaded.emit(data)

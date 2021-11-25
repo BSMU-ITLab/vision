@@ -1,4 +1,4 @@
-from bsmu.vision.app import App
+from bsmu.vision.app.base import App
 
 
 def run_app():

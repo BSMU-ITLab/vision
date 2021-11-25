@@ -39,11 +39,6 @@ class DataVisualizer(QObject, metaclass=DataVisualizerMeta):
 
         self.mdi = mdi
 
-    @classmethod
-    @property
-    def data_types(cls):
-        return cls.data_types
-
     def visualize_data(self, data: Data) -> List[DataViewerSubWindow]:
         data_viewer_sub_windows = self._visualize_data(data)
         self.data_visualized.emit(data_viewer_sub_windows)

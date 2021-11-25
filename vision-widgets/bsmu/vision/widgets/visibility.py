@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide2.QtCore import QSize, Signal
 from PySide2.QtGui import QIcon, QColor
 from PySide2.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSizePolicy, QFrame
 
 from bsmu.vision.widgets.combo_slider import ComboSlider
+from bsmu.vision.widgets.images import icons_rc  # noqa
 
 DEFAULT_COLOR = QColor(204, 228, 247)
 
@@ -21,9 +20,8 @@ class VisibilityToggleButton(QPushButton):
 
         self._checked_color = DEFAULT_COLOR
 
-        icons_path = Path(__file__).parent / 'images' / 'icons'
-        self._checked_icon = QIcon(str(icons_path / 'eye.svg'))
-        self._unchecked_icon = QIcon(str(icons_path / 'crossed-out-eye.svg'))
+        self._checked_icon = QIcon(':/icons/eye.svg')
+        self._unchecked_icon = QIcon(':/icons/eye-crossed-out.svg')
 
         self._update_icon()
         self._update_style()

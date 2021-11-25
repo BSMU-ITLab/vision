@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import Qt, Signal, QLocale
-from PySide2.QtGui import QDoubleValidator, QPainter, QColor, QPaintEvent, QIcon, QPalette
+from PySide2.QtGui import QDoubleValidator, QPainter, QColor, QPaintEvent, QIcon
 from PySide2.QtWidgets import QWidget, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QPushButton, QFrame, QApplication
+
+from bsmu.vision.widgets.images import icons_rc  # noqa
 
 if TYPE_CHECKING:
     from PySide2.QtGui import QMouseEvent, QKeyEvent, QWheelEvent
@@ -35,9 +36,8 @@ class ComboSlider(QFrame):
 
         self._button_color = DEFAULT_BUTTON_COLOR
 
-        icons_path = Path(__file__).parent / 'images' / 'icons'
-        self._up_button = self._add_spin_button(str(icons_path / 'up-arrow.svg'), self._on_up_button_clicked)
-        self._down_button = self._add_spin_button(str(icons_path / 'down-arrow.svg'), self._on_down_button_clicked)
+        self._up_button = self._add_spin_button(':/icons/arrow-up.svg', self._on_up_button_clicked)
+        self._down_button = self._add_spin_button(':/icons/arrow-down.svg', self._on_down_button_clicked)
 
         h_layout = QHBoxLayout(self)
         h_layout.setContentsMargins(0, 0, 0, 0)

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import numbers
 from typing import TYPE_CHECKING
 
-import cv2
+import cv2 as cv
 import numpy as np
+import onnxruntime as ort
+
 import bsmu.vision.core.converters.image as image_converter
 
 if TYPE_CHECKING:
+    from typing import Callable, List, Tuple
     from pathlib import Path
 
 
@@ -14,97 +18,148 @@ class ModelParams:
     def __init__(
             self,
             path: Path,
-            input_image_size: tuple = (500, 500),
-            image_net_torch_preprocessing: bool = True):
+            input_size: tuple = (256, 256, 3),
+            preprocessing_mode: str = 'image-net-torch'
+    ):
         self._path = path
-        self._input_image_size = input_image_size
-        self._image_net_torch_preprocessing = image_net_torch_preprocessing
+        self._input_size = input_size
+        self._preprocessing_mode = preprocessing_mode
 
     @property
     def path(self) -> Path:
         return self._path
 
     @property
-    def input_image_size(self) -> tuple:
-        return self._input_image_size
+    def input_size(self) -> tuple:
+        return self._input_size
 
     @property
-    def image_net_torch_preprocessing(self) -> bool:
-        return self._image_net_torch_preprocessing
+    def input_image_size(self) -> tuple:
+        return self.input_size[:2]
+
+    @property
+    def input_channels_qty(self) -> int:
+        return self.input_size[2]
+
+    @property
+    def preprocessing_mode(self) -> str:
+        return self._preprocessing_mode
 
 
-def preprocessed_image(image: np.ndarray, normalize: bool = True, image_net_torch_preprocessing: bool = True) \
+def preprocessed_image(image: np.ndarray, normalize: bool = True, preprocessing_mode: str = 'image-net-torch') \
         -> np.ndarray:
     if normalize:
         image = image_converter.normalized(image).astype(np.float_)
 
-    if image_net_torch_preprocessing:
-        image[..., 0] = (image[..., 0] - 0.485) / 0.229
-        image[..., 1] = (image[..., 1] - 0.456) / 0.224
-        image[..., 2] = (image[..., 2] - 0.406) / 0.225
+    mean = None
+    std = None
+    if preprocessing_mode == 'image-net-torch':
+        # Normalize each channel with respect to the ImageNet dataset
+        mean = [0.485, 0.456, 0.406]
+        std = [0.229, 0.224, 0.225]
+    elif preprocessing_mode == 'image-net-tf':
+        # Scale pixels between -1 and 1, sample-wise
+        image *= 2
+        image -= 1
 
-        # r = (image - 0.485) / 0.229
-        # g = (image - 0.456) / 0.224
-        # b = (image - 0.406) / 0.225
+    if mean is not None:
+        image -= mean
 
-        # image = np.dstack((r, g, b)).astype(np.float32)
-        # image = np.dstack((b, g, r)).astype(np.float32)
+    if std is not None:
+        image /= std
 
     return image
+
+
+def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.ndarray]:
+    """
+    Find a connected component with the largest area (exclude background label, which is 0)
+    :param mask: mask to find connected components
+    :return: Tuple[largest connected component label, labeled mask]
+    If all pixels are background (zeros), then return None as the largest connected component label
+    """
+
+    assert mask.dtype == np.uint8, 'The mask must have np.uint8 type'
+
+    labels_qty, labeled_mask, stats_by_component_label, centroids = cv.connectedComponentsWithStats(mask)
+    largest_area = 0
+    label_with_largest_area = None
+    for label in range(1, labels_qty):
+        label_area = stats_by_component_label[label, cv.CC_STAT_AREA]
+        if label_area > largest_area:
+            largest_area = label_area
+            label_with_largest_area = label
+    return label_with_largest_area, labeled_mask
 
 
 class Segmenter:
     def __init__(self, model_params: ModelParams):
         self._model_params = model_params
 
-        self._model = None
+        self._inference_session: ort.InferenceSession | None = None
 
-    def segment(self, image: np.ndarray):
-        import onnxruntime as ort
+    def segment(
+            self,
+            image: np.ndarray,
+            postprocessing: Callable[[np.ndarray], np.ndarray] | None = None
+    ) -> np.ndarray:
 
-        # # Load the ONNX model
-        # model = onnx.load("alexnet.onnx")
-        # # Check that the IR is well formed
-        # onnx.checker.check_model(model)
+        if self._inference_session is None:
+            self._inference_session = ort.InferenceSession(
+                str(self._model_params.path), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
 
-        session = ort.InferenceSession(str(self._model_params.path))
+        src_image_shape = image.shape
+        image = cv.resize(image, self._model_params.input_image_size, interpolation=cv.INTER_AREA)
+        image = preprocessed_image(image, normalize=True, preprocessing_mode=self._model_params.preprocessing_mode)
 
+        input_image_batch = [image]
 
-        image = cv2.resize(image, self._model_params.input_image_size, interpolation=cv2.INTER_AREA)
-        input_images = [image]
-        input_images = [
-            preprocessed_image(input_image, normalize=True,
-                               image_net_torch_preprocessing=self._model_params.image_net_torch_preprocessing)
-            for input_image in input_images
-        ]
+        model_inputs: List[ort.NodeArg] = self._inference_session.get_inputs()
+        assert len(model_inputs) == 1, 'Segmenter can process only models with one input'
+        input_feed = {model_inputs[0].name: input_image_batch}
+        model_outputs: List[ort.NodeArg] = self._inference_session.get_outputs()
+        output_names = [model_output.name for model_output in model_outputs]
+        outputs = self._inference_session.run(output_names, input_feed)
+        assert len(outputs) == 1, 'Segmenter can process only models with one output'
+        output_mask_batch = outputs[0]
 
-        print('IIII', input_images)
-        # input_images = np.stack(input_images)
-        # input_images = input_images.astype(np.float32)
-        # print('INPUT_IMAGES', input_images.shape, input_images.dtype)
+        mask = output_mask_batch[0]
+        mask = np.squeeze(mask)
 
+        if postprocessing is not None:
+            mask = postprocessing(mask)
 
-        input = {'input_1': input_images}
-        # start = int(time() * 1000)
-        outputs = session.run(input_feed=input, output_names=['sigmoid'])#[0][0]
+        mask = cv.resize(mask, (src_image_shape[1], src_image_shape[0]), interpolation=cv.INTER_LINEAR_EXACT)
 
-        print('Outputs:', outputs)
-        for output in outputs:
-            print('---------', output.shape, output.dtype)
-
-        mask_output_batch = outputs[0]
-        mask0 = mask_output_batch[0]
-        print('mask0', mask0.shape, mask0.dtype, mask0.min(), mask0.max())
-        print('mask0 unique', np.unique(mask0))
+        return mask
 
 
-        # print('Outputs shape:', outputs.shape)
-        # duration = int(time() * 1000) - start
-        # print("MiniLM inference using onnxruntime py {} ms, score={}".format(duration, score))
+def largest_connected_component_soft_mask(soft_mask: np.ndarray) -> np.ndarray:
+    """
+    Erase all pixels, which do not belong to the largest connected component.
+    :return: soft mask with only largest connected component
+    """
 
-        # if self._model is None:
-        #     self._model = cv2.dnn.readNet(str(self._model_params.path))
+    assert issubclass(soft_mask.dtype.type, numbers.Real), 'This function is created for soft mask processing.'
 
-        print('readNet ready')
+    mask = np.round(soft_mask).astype(np.uint8)
+    label_with_largest_area, labeled_mask = largest_connected_component_label(mask)
+    soft_mask_with_largest_connected_component = soft_mask.copy()
+    # Do not erase zero-pixels to get soft mask
+    soft_mask_with_largest_connected_component[
+        np.logical_and(labeled_mask != label_with_largest_area, labeled_mask != 0)] = 0
+    return soft_mask_with_largest_connected_component
 
-        return mask0
+
+def largest_connected_component_mask(soft_mask: np.ndarray) -> np.ndarray:
+    """
+    Erase all pixels, which do not belong to the largest connected component.
+    :return: binarized mask with only largest connected component
+    """
+
+    assert issubclass(soft_mask.dtype.type, numbers.Real), 'This function is created for soft mask processing.'
+
+    mask = np.round(soft_mask).astype(np.uint8)
+    label_with_largest_area, labeled_mask = largest_connected_component_label(mask)
+    mask[labeled_mask != label_with_largest_area] = 0
+    return mask

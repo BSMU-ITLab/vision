@@ -11,6 +11,7 @@ from PySide2.QtGui import QImage
 from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate
 
 import bsmu.vision.core.converters.image as image_converter
+import bsmu.vision.dnn.segmenter as segmenter
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
@@ -64,10 +65,14 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
         self._mdi = self._mdi_plugin.mdi
 
-        segmenter_model_name = self.config.value('segmenter-model-name')
-        segmenter_model_path = self.data_path(self._DNN_MODELS_DIR_NAME, segmenter_model_name)
+        disk_segmenter_model_props = self.config.value('disk-segmenter-model')
+        disk_segmenter_model_params = DnnModelParams(
+            self.data_path(self._DNN_MODELS_DIR_NAME, disk_segmenter_model_props['name']),
+            disk_segmenter_model_props['input-size'],
+            disk_segmenter_model_props['preprocessing-mode'],
+        )
         self.table_visualizer = RetinalFundusTableVisualizer(
-            self._data_visualization_manager, self._mdi, segmenter_model_path)
+            self._data_visualization_manager, self._mdi, disk_segmenter_model_params)
 
         self._data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_retinal_fundus_data)
 
@@ -275,13 +280,18 @@ class PatientRetinalFundusJournalViewer(DataViewer):
 
 
 class RetinalFundusTableVisualizer(QObject):
-    def __init__(self, visualization_manager: DataVisualizationManager, mdi: Mdi, segmenter_model_path: Path):
+    def __init__(
+            self,
+            visualization_manager: DataVisualizationManager,
+            mdi: Mdi,
+            disk_segmenter_model_params: DnnModelParams
+    ):
         super().__init__()
 
         self._visualization_manager = visualization_manager
         self._mdi = mdi
 
-        self._segmenter = DnnSegmenter(DnnModelParams(segmenter_model_path, input_image_size=(256, 256)))
+        self._segmenter = DnnSegmenter(disk_segmenter_model_params)
 
         self._journal = PatientRetinalFundusJournal()
         self._journal.add_record(PatientRetinalFundusRecord(FlatImage(
@@ -312,28 +322,12 @@ class RetinalFundusTableVisualizer(QObject):
 
         if isinstance(data, LayeredImage):
             first_layer = data.layers[0]
-
             image = first_layer.image
-            mask = self._segmenter.segment(image.array)
+            mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_mask)
+            mask_palette = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
+                                                           [1, 0, 255, 0, 100]])
+            data.add_layer_from_image(FlatImage(array=mask_pixels, palette=mask_palette), name='Mask')
 
-            mask = np.squeeze(mask)
-            print('ssss', image.array.shape[:2])
-            mask = cv2.resize(mask, (image.array.shape[1], image.array.shape[0]), interpolation=cv2.INTER_LINEAR)
-
-            mask = mask.astype(np.uint8)
-            print('MASK', mask.shape, mask.dtype, mask.min(), mask.max(), '\n', mask)
-            #      - [0, 0, 0, 0, 0]
-            #      - [1, 255, 0, 0, 255]
-            mask_pallete = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
-                                                           [1, 255, 255, 255, 255]])
-
-            # image_small = cv2.resize(image.array, (256, 256), interpolation=cv2.INTER_AREA)
-            # data.add_layer_from_image(FlatImage(array=image_small,
-            #                                     ), name='Image Small')
-
-            data.add_layer_from_image(FlatImage(array=mask,
-                                                palette=mask_pallete
-                                                ), name='Mask')
             record = PatientRetinalFundusRecord(image)
             self.journal.add_record(record)
 

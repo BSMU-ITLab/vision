@@ -1,1 +1,4 @@
-segmenter-model-name: '015_saved_model.onnx'
+disk-segmenter-model:
+  name: '005_saved_model.onnx'
+  input-size: [352, 352, 3]
+  preprocessing-mode: 'image-net-tf'

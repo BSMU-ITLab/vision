@@ -21,7 +21,7 @@ if __name__ == '__main__':
         app_name='Bone Age Analyzer',
         app_version='1.0.0',
         app_description='Application to predict bone age on hand X-ray images.',
-        app_base=None,
+        # app_base=None,
 
         add_packages=['bsmu.bone_age.app', 'bsmu.bone_age.plugins'],
         add_packages_with_data=[bsmu.bone_age.app, bsmu.bone_age.plugins],

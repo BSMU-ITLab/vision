@@ -68,15 +68,31 @@ class ImageViewerPathOverlayer(QObject):
             first_layer_image_name = first_layer.image_path.name
             layers_dir = first_layer.path.parent
 
-            for new_layer_name, layer_properties in self.layers_config_data.items():
+            for new_layer_name, layer_props in self.layers_config_data.items():
                 new_layer_image_path = layers_dir / new_layer_name / first_layer_image_name
                 if new_layer_image_path.exists():
-                    palette_property = layer_properties.get('palette')
-                    palette = palette_property and Palette.from_sparse_index_list(list(palette_property))
+                    palette_prop = layer_props.get('palette')
+                    rgb_color_prop = layer_props.get('rgb-color')
+                    assert rgb_color_prop is None or palette_prop is None, \
+                        'Layer cannot use "rgb-color" and "palette" properties simultaneously'
+
+                    if rgb_color_prop is not None:
+                        from bsmu.vision.core.converters import color as color_converter   ###
+                        from bsmu.vision.core.transfer_functions.color import ColorTransferFunction  ###
+
+                        palette = color_converter.color_transfer_function_to_palette(
+                            ColorTransferFunction.default_from_opaque_colored_to_transparent_mask(rgb_color_prop)
+                        )
+                    elif palette_prop is not None:
+                        palette = Palette.from_sparse_index_list(list(palette_prop))   # why we need 'list' here
+                    else:
+                        palette = None
+
+                    print('pppalette', palette.array)
                     new_image = self.loading_manager.load_file(new_layer_image_path, palette=palette)
                     new_image_layer = data.add_layer_from_image(new_image, new_layer_name)
 
-                    layer_opacity = layer_properties['opacity']
+                    layer_opacity = layer_props['opacity']
                     for data_viewer_sub_window in data_viewer_sub_windows:
                         layered_image_viewer = data_viewer_sub_window.viewer
                         layered_image_viewer.layer_view_by_model(new_image_layer).opacity = layer_opacity

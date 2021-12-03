@@ -4,7 +4,6 @@ from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import cv2
 import numpy as np
 from PySide2.QtCore import QObject, Qt, Signal, QAbstractTableModel, QModelIndex, QSize
 from PySide2.QtGui import QImage
@@ -12,11 +11,13 @@ from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemD
 
 import bsmu.vision.core.converters.image as image_converter
 import bsmu.vision.dnn.segmenter as segmenter
+from bsmu.vision.core.converters import color as color_converter
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
@@ -293,6 +294,9 @@ class RetinalFundusTableVisualizer(QObject):
 
         self._segmenter = DnnSegmenter(disk_segmenter_model_params)
 
+        self._mask_palette = color_converter.color_transfer_function_to_palette(
+            ColorTransferFunction.default_from_opaque_colored_to_transparent_mask([0, 255, 0]))
+
         self._journal = PatientRetinalFundusJournal()
         self._journal.add_record(PatientRetinalFundusRecord(FlatImage(
             array=np.random.randint(low=0, high=256, size=(50, 50), dtype=np.uint8),
@@ -323,10 +327,15 @@ class RetinalFundusTableVisualizer(QObject):
         if isinstance(data, LayeredImage):
             first_layer = data.layers[0]
             image = first_layer.image
-            mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_mask)
-            mask_palette = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
-                                                           [1, 0, 255, 0, 100]])
-            data.add_layer_from_image(FlatImage(array=mask_pixels, palette=mask_palette), name='Mask')
+            mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
+            # mask_palette = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
+            #                                                [1, 0, 255, 0, 100]])
+            print('bef mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))
+            mask_pixels = image_converter.normalized_uint8(mask_pixels)
+            print('aft mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))
+
+            mask_layer = data.add_layer_from_image(
+                FlatImage(array=mask_pixels, palette=self._mask_palette), name='masks')
 
             record = PatientRetinalFundusRecord(image)
             self.journal.add_record(record)
@@ -336,6 +345,9 @@ class RetinalFundusTableVisualizer(QObject):
             for sub_window in data_viewer_sub_windows:
                 sub_window.layout_anchors = np.array([[0.6, 0], [1, 1]])
                 sub_window.lay_out_to_anchors()
+
+                mask_layer_view = sub_window.viewer.layer_view_by_model(mask_layer)
+                mask_layer_view.opacity = 0.4
 
     def raise_journal_sub_window(self):
         self._journal_sub_window.show_normal()

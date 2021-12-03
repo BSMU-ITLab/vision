@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 from PySide2.QtCore import QObject, Signal
 from PySide2.QtGui import QColor
 from sortedcontainers import SortedList
 
 from bsmu.vision.core.data import Data
+
+if TYPE_CHECKING:
+    from typing import List, Tuple
+
+    from pathlib import Path
 
 
 class ColorTransferFunctionPoint(QObject):
@@ -60,7 +67,11 @@ class ColorTransferFunction(Data):
 
     @classmethod
     def from_x_fractions_colors_array(
-            cls, x_fractions_colors_array: np.ndarray, max_x: int = 255) -> ColorTransferFunction:
+            cls,
+            x_fractions_colors_array: List[List[float | int]] | np.ndarray,
+            max_x: int = 255,
+    ) -> ColorTransferFunction:
+
         color_transfer_function = cls()
         for row in x_fractions_colors_array:
             x_fraction = row[0]
@@ -71,11 +82,45 @@ class ColorTransferFunction(Data):
     @classmethod
     def default_jet(cls, max_x: int = 255) -> ColorTransferFunction:
         return ColorTransferFunction.from_x_fractions_colors_array(
-            np.array([[0, 0, 0, 255, 255],
-                      [0.25, 0, 255, 255, 255],
-                      [0.5, 0, 255, 0, 255],
-                      [0.75, 255, 255, 0, 255],
-                      [1, 255, 0, 0, 255]]),
+            [[0, 0, 0, 255, 255],
+             [0.25, 0, 255, 255, 255],
+             [0.5, 0, 255, 0, 255],
+             [0.75, 255, 255, 0, 255],
+             [1, 255, 0, 0, 255]],
+            max_x)
+
+    @classmethod
+    def default_from_color_to_color(
+            cls,
+            from_color: Tuple[int] | List[int] | np.ndarray = (255, 255, 255, 0),
+            to_color: Tuple[int] | List[int] | np.ndarray = (255, 255, 255, 255),
+            max_x: int = 255,
+    ) -> ColorTransferFunction:
+        return ColorTransferFunction.from_x_fractions_colors_array(
+            [[0, *from_color],
+             [1, *to_color]],
+            max_x)
+
+    @classmethod
+    def default_from_opaque_colored_to_transparent_mask(
+            cls,
+            rgb_color: Tuple[int] | List[int] | np.ndarray = (255, 255, 255),
+            max_x: int = 255,
+    ) -> ColorTransferFunction:
+        return ColorTransferFunction.from_x_fractions_colors_array(
+            [[0, *rgb_color, 0],
+             [1, *rgb_color, 255]],
+            max_x)
+
+    @classmethod
+    def default_from_opaque_colored_to_transparent_black_mask(
+            cls,
+            rgb_color: Tuple[int] | List[int] | np.ndarray = (255, 255, 255),
+            max_x: int = 255,
+    ) -> ColorTransferFunction:
+        return ColorTransferFunction.from_x_fractions_colors_array(
+            [[0, 0, 0, 0, 0],
+             [1, *rgb_color, 255]],
             max_x)
 
     def add_point(self, point: ColorTransferFunctionPoint):

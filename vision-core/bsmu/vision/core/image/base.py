@@ -35,6 +35,8 @@ class Image(Data):
                  spatial: SpatialAttrs = None):
         super().__init__(path)
 
+        assert palette is None or array.dtype == np.uint8, 'Indexed images (with palette) have to be of np.uint8 type'
+
         self.array = array
         self._palette = palette
         self.spatial = spatial or SpatialAttrs.default_for_ndim(self.n_dims)

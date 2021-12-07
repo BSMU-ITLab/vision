@@ -4,13 +4,17 @@ from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject
 
-from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
+from bsmu.vision.core.plugins.base import Plugin
 
 if TYPE_CHECKING:
+    from typing import List
+
+    from bsmu.vision.core.data import Data
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
+    from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 
 
 class ImageViewerPathOverlayerPlugin(Plugin):
@@ -62,37 +66,40 @@ class ImageViewerPathOverlayer(QObject):
         self.loading_manager = loading_manager
         self.layers_config_data = layers_config_data
 
-    def overlay_sibling_dirs_images(self, data: Data, data_viewer_sub_windows: DataViewerSubWindow):
-        if isinstance(data, LayeredImage):
-            first_layer = data.layers[0]
-            first_layer_image_name = first_layer.image_path.name
-            layers_dir = first_layer.path.parent
+    def overlay_sibling_dirs_images(self, data: Data, data_viewer_sub_windows: List[DataViewerSubWindow]):
+        if not isinstance(data, LayeredImage):
+            return
 
-            for new_layer_name, layer_props in self.layers_config_data.items():
-                new_layer_image_path = layers_dir / new_layer_name / first_layer_image_name
-                if new_layer_image_path.exists():
-                    palette_prop = layer_props.get('palette')
-                    rgb_color_prop = layer_props.get('rgb-color')
-                    assert rgb_color_prop is None or palette_prop is None, \
-                        'Layer cannot use "rgb-color" and "palette" properties simultaneously'
+        first_layer = data.layers[0]
+        first_layer_image_name = first_layer.image_path.name
+        layers_dir = first_layer.path.parent
 
-                    if rgb_color_prop is not None:
-                        from bsmu.vision.core.converters import color as color_converter   ###
-                        from bsmu.vision.core.transfer_functions.color import ColorTransferFunction  ###
+        for new_layer_name, layer_props in self.layers_config_data.items():
+            new_layer_image_path = layers_dir / new_layer_name / first_layer_image_name
+            if not new_layer_image_path.exists():
+                continue
 
-                        palette = color_converter.color_transfer_function_to_palette(
-                            ColorTransferFunction.default_from_opaque_colored_to_transparent_mask(rgb_color_prop)
-                        )
-                    elif palette_prop is not None:
-                        palette = Palette.from_sparse_index_list(list(palette_prop))   # why we need 'list' here
-                    else:
-                        palette = None
+            palette_prop = layer_props.get('palette')
+            rgb_color_prop = layer_props.get('rgb-color')
+            assert rgb_color_prop is None or palette_prop is None, \
+                f'"{new_layer_name}" layer cannot use "rgb-color" and "palette" properties simultaneously'
 
-                    print('pppalette', palette.array)
-                    new_image = self.loading_manager.load_file(new_layer_image_path, palette=palette)
-                    new_image_layer = data.add_layer_from_image(new_image, new_layer_name)
+            if rgb_color_prop is not None:
+                foreground_value_prop = layer_props.get('foreground-value')
+                if foreground_value_prop is None:
+                    palette = Palette.default_soft(rgb_color_prop)
+                else:
+                    palette = Palette.default_binary(foreground_value_prop, rgb_color_prop)
+            elif palette_prop is not None:
+                palette = Palette.from_sparse_index_list(palette_prop)
+            else:
+                palette = None
 
-                    layer_opacity = layer_props['opacity']
-                    for data_viewer_sub_window in data_viewer_sub_windows:
-                        layered_image_viewer = data_viewer_sub_window.viewer
-                        layered_image_viewer.layer_view_by_model(new_image_layer).opacity = layer_opacity
+            new_image = self.loading_manager.load_file(new_layer_image_path, palette=palette)
+            new_image_layer = data.add_layer_from_image(new_image, new_layer_name)
+
+            layer_opacity = layer_props.get('opacity')
+            if layer_opacity is not None:
+                for data_viewer_sub_window in data_viewer_sub_windows:
+                    layered_image_viewer = data_viewer_sub_window.viewer
+                    layered_image_viewer.layer_view_by_model(new_image_layer).opacity = layer_opacity

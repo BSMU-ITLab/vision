@@ -11,13 +11,11 @@ from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemD
 
 import bsmu.vision.core.converters.image as image_converter
 import bsmu.vision.dnn.segmenter as segmenter
-from bsmu.vision.core.converters import color as color_converter
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
@@ -294,8 +292,7 @@ class RetinalFundusTableVisualizer(QObject):
 
         self._segmenter = DnnSegmenter(disk_segmenter_model_params)
 
-        self._mask_palette = color_converter.color_transfer_function_to_palette(
-            ColorTransferFunction.default_from_opaque_colored_to_transparent_mask([0, 255, 0]))
+        self._mask_palette = Palette.default_soft([0, 255, 0])
 
         self._journal = PatientRetinalFundusJournal()
         self._journal.add_record(PatientRetinalFundusRecord(FlatImage(

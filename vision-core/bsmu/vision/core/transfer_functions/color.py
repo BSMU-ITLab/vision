@@ -102,7 +102,7 @@ class ColorTransferFunction(Data):
             max_x)
 
     @classmethod
-    def default_from_opaque_colored_to_transparent_mask(
+    def default_from_transparent_to_opaque_colored_mask(
             cls,
             rgb_color: Tuple[int] | List[int] | np.ndarray = (255, 255, 255),
             max_x: int = 255,
@@ -113,7 +113,7 @@ class ColorTransferFunction(Data):
             max_x)
 
     @classmethod
-    def default_from_opaque_colored_to_transparent_black_mask(
+    def default_from_transparent_black_to_opaque_colored_mask(
             cls,
             rgb_color: Tuple[int] | List[int] | np.ndarray = (255, 255, 255),
             max_x: int = 255,

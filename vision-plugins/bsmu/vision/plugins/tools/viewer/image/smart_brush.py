@@ -47,11 +47,11 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         self.paint_connected_component = True
 
         layers_properties = self.config.value('layers')
-        self.mask_palette = Palette.from_names_rows_dict(layers_properties['mask']['palette'])
+        self.mask_palette = Palette.from_row_by_name(layers_properties['mask']['palette'])
         self.mask_background_class = self.mask_palette.row_index_by_name('background')
         self.mask_foreground_class = self.mask_palette.row_index_by_name('foreground')
 
-        self.tool_mask_palette = Palette.from_names_rows_dict(layers_properties['tool_mask']['palette'])
+        self.tool_mask_palette = Palette.from_row_by_name(layers_properties['tool_mask']['palette'])
         self.tool_background_class = self.tool_mask_palette.row_index_by_name('background')
         self.tool_foreground_class = self.tool_mask_palette.row_index_by_name('foreground')
         self.tool_eraser_class = self.tool_mask_palette.row_index_by_name('eraser')

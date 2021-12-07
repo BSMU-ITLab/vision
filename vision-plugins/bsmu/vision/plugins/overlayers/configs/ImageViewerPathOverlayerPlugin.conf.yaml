@@ -1,15 +1,24 @@
 layers:
   masks:
     rgb-color: [0, 255, 0]
+    # Set "foreground-value" to create a binary palette, else a soft palette will be used
+#    foreground-value: 1
+
+    # Custom palette can be used instead of the "rgb-color" property
 #    palette:
 #      - [0, 0, 0, 0, 0]
 #      - [1, 0, 255, 0, 255]
-#      - [6, 255, 0, 0, 255]
+#      - [2, 255, 0, 0, 255]
+
     opacity: 0.5
+
   predictions:
     rgb-color: [255, 0, 0]
+#    foreground-value: 1
+
 #    palette:
 #      - [0, 0, 0, 0, 0]
 #      - [1, 0, 255, 255, 255]
-#      - [6, 255, 0, 255, 255]
+#      - [2, 255, 0, 255, 255]
+
     opacity: 0.4

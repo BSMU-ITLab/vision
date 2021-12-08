@@ -80,20 +80,7 @@ class ImageViewerPathOverlayer(QObject):
                 continue
 
             palette_prop = layer_props.get('palette')
-            rgb_color_prop = layer_props.get('rgb-color')
-            assert rgb_color_prop is None or palette_prop is None, \
-                f'"{new_layer_name}" layer cannot use "rgb-color" and "palette" properties simultaneously'
-
-            if rgb_color_prop is not None:
-                foreground_value_prop = layer_props.get('foreground-value')
-                if foreground_value_prop is None:
-                    palette = Palette.default_soft(rgb_color_prop)
-                else:
-                    palette = Palette.default_binary(foreground_value_prop, rgb_color_prop)
-            elif palette_prop is not None:
-                palette = Palette.from_sparse_index_list(palette_prop)
-            else:
-                palette = None
+            palette = Palette.from_config(palette_prop)
 
             new_image = self.loading_manager.load_file(new_layer_image_path, palette=palette)
             new_image_layer = data.add_layer_from_image(new_image, new_layer_name)

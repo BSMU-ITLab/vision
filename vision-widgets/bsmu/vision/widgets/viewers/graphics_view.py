@@ -123,7 +123,7 @@ class GraphicsView(QGraphicsView):
         self._viewport_anchoring_scheduled = True
 
     def _reset_viewport_anchors(self):
-        self._viewport_anchors = np.array([[0, 0], [1, 1]], dtype=np.float)
+        self._viewport_anchors = np.array([[0, 0], [1, 1]], dtype=float)
         self._schedule_viewport_anchoring()
 
     def _anchor_viewport(self):

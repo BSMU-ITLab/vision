@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import locale
 import sys
+import traceback
+import warnings
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import Signal
@@ -28,6 +30,9 @@ class App(QApplication, DataFileProvider):
         # Set to users preferred locale to output correct decimal point (comma or point):
         locale.setlocale(locale.LC_NUMERIC, '')
 
+        warnings.showwarning = warn_with_traceback
+        warnings.simplefilter('always')
+
         self._plugin_manager = PluginManager(self)
         self._plugin_manager.plugin_enabled.connect(self.plugin_enabled)
         self._plugin_manager.plugin_disabled.connect(self.plugin_disabled)
@@ -42,3 +47,9 @@ class App(QApplication, DataFileProvider):
 
     def run(self):
         sys.exit(self.exec_())
+
+
+def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+    log = file if hasattr(file, 'write') else sys.stderr
+    traceback.print_stack(file=log)
+    log.write(warnings.formatwarning(message, category, filename, lineno, line))

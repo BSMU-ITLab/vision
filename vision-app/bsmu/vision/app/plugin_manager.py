@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import collections
+import collections.abc
 import importlib
 import re
 from functools import partial
@@ -14,7 +14,7 @@ from bsmu.vision.core.plugins.observer import ObserverPlugin
 if TYPE_CHECKING:
     from typing import List
 
-    from bsmu.vision.app import App
+    from bsmu.vision.app.base import App
 
 
 class PluginManager(QObject):
@@ -139,7 +139,7 @@ class PluginManager(QObject):
         return plugin
 
     def enable_plugin(self, plugin: str | collections.Mapping | Plugin) -> Plugin:
-        if isinstance(plugin, collections.Mapping):
+        if isinstance(plugin, collections.abc.Mapping):
             return self._create_and_enable_plugin_from_mapping(plugin)
 
         if isinstance(plugin, Plugin):

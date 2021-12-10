@@ -15,13 +15,14 @@ Or add them to the system path, e.g. using:
 
 from pathlib import Path
 
+import bsmu.vision.app as app
 from bsmu.vision.app.builder import AppBuilder
 
 if __name__ == '__main__':
     app_builder = AppBuilder(
         file_dir=Path(__file__).parent,
 
-        app_version='1.0.0',
+        app_version=app.__version__,
         app_base=None,
     )
     app_builder.build()

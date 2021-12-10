@@ -16,10 +16,10 @@ from bsmu.vision.app.builder import AppBuilder
 if __name__ == '__main__':
     app_builder = AppBuilder(
         file_dir=Path(__file__).parent,
-        script_path_relative_to_file_dir=Path('bsmu/retinal_fundus/app/__main__.py'),
+        script_path_relative_to_file_dir=Path('src/bsmu/retinal_fundus/app/__main__.py'),
 
         app_name='Retinal Fundus Analyzer',
-        app_version='0.1.0',
+        app_version=bsmu.retinal_fundus.app.__version__,
         app_description='Application to analyze disk, cup, vessels parameters '
                         'and to detect multiple sclerosis features on retinal fundus images.',
         app_base=None,

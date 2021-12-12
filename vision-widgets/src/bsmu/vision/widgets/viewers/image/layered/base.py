@@ -198,6 +198,9 @@ class _LayeredImageView(QObject):
 
 
 class _LayeredImageGraphicsObject(QGraphicsObject):
+    layer_view_adding = Signal(ImageLayerView)
+    layer_view_added = Signal(ImageLayerView)
+
     active_layer_view_changed = Signal(ImageLayerView, ImageLayerView)
     bounding_rect_changed = Signal(QRectF)
 
@@ -230,6 +233,8 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         return self._layered_image_view.layer_view_by_model(image_layer)
 
     def add_layer_view(self, layer_view: ImageLayerView):
+        self.layer_view_adding.emit(layer_view)
+
         self._layered_image_view.add_layer_view(layer_view)
 
         # Calling update() several times normally results in just one paintEvent() call.
@@ -246,6 +251,8 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         self._update_view_min_spacing()
 
         self._reset_bounding_rect_cache()  # self.prepareGeometryChange() will call update() if this is necessary.
+
+        self.layer_view_added.emit(layer_view)
 
     def boundingRect(self):
         if self._bounding_rect_cache is None:
@@ -326,6 +333,9 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
 
 class LayeredImageViewer(DataViewer):
+    layer_view_adding = Signal(ImageLayerView)
+    layer_view_added = Signal(ImageLayerView)
+
     data_name_changed = Signal(str)
 
     def __init__(self, data: LayeredImage = None, zoomable: bool = True):
@@ -342,6 +352,8 @@ class LayeredImageViewer(DataViewer):
             self.graphics_view.setSceneRect)
         # self.layered_image_graphics_object.bounding_rect_changed.connect(
         #     self.graphics_scene.setSceneRect)
+        self.layered_image_graphics_object.layer_view_adding.connect(self.layer_view_adding)
+        self.layered_image_graphics_object.layer_view_added.connect(self.layer_view_added)
 
         self.graphics_scene.addItem(self.layered_image_graphics_object)
 

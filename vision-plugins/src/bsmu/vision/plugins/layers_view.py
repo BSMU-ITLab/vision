@@ -10,16 +10,16 @@ from bsmu.vision.core.abc import QABCMeta
 from bsmu.vision.core.image.layered import ImageLayer
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
+from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
 
 if TYPE_CHECKING:
     from typing import Type, List, Tuple, Any
 
     from PySide2.QtWidgets import QWidget, QMdiSubWindow
 
-    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
-    from bsmu.vision.core.data import Data
-    from bsmu.vision.core.image.layered import LayeredImage
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
 
 class LayersTableViewPlugin(Plugin):
@@ -69,7 +69,7 @@ class LayersTableViewPlugin(Plugin):
         if not isinstance(sub_window, LayeredImageViewerSubWindow):
             return
 
-        layers_table_model = LayersTableModel(sub_window.viewer.data)
+        layers_table_model = LayersTableModel(sub_window.viewer)
         self._layers_table_view.setModel(layers_table_model)
 
 
@@ -89,7 +89,7 @@ class TableModelDataWrapper(QObject, metaclass=QABCMeta):
     record_adding = Signal(QObject)
     record_added = Signal(QObject)
 
-    def __init__(self, data: Data, record_type: Type[QObject]):
+    def __init__(self, data: QObject, record_type: Type[QObject]):
         super().__init__()
 
         self._data = data
@@ -187,27 +187,27 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
 
 class LayersTableModelDataWrapper(TableModelDataWrapper):
-    def __init__(self, data: LayeredImage):
-        super().__init__(data, ImageLayer)
+    def __init__(self, data: LayeredImageViewer):
+        super().__init__(data, ImageLayerView)
 
-        self._data.layer_adding.connect(self.record_adding)
-        self._data.layer_added.connect(self.record_added)
+        self._data.layer_view_adding.connect(self.record_adding)
+        self._data.layer_view_added.connect(self.record_added)
 
     @property
-    def records(self) -> List[ImageLayer]:
-        return self._data.layers
+    def records(self) -> List[ImageLayerView]:
+        return self._data.layer_views
 
 
 class LayersTableModel(DataTableModel):
-    def __init__(self, data: LayeredImage, parent: QObject = None):
+    def __init__(self, data: LayeredImageViewer, parent: QObject = None):
         super().__init__(LayersTableModelDataWrapper(data), (NameTableColumn, VisibilityTableColumn), parent)
 
     def _record_data(self, record: ImageLayer, index: QModelIndex, role: int = Qt.DisplayRole):
         if role == Qt.DisplayRole:
             if index.column() == self.column_number(NameTableColumn):
                 return record.name
-            # elif index.column() == self.column_number(VisibilityTableColumn):
-            #     return record.
+            elif index.column() == self.column_number(VisibilityTableColumn):
+                return str(record.opacity)
 
 
 class LayersTableView(QTableView):

@@ -14,7 +14,7 @@ class ImageLayer(QObject):
     image_updated = Signal(Image)
     image_pixels_modified = Signal()
 
-    def __init__(self, image: Image, name: str = ''):
+    def __init__(self, image: Image | None = None, name: str = ''):
         super().__init__()
         self.id = ImageLayer.max_id
         ImageLayer.max_id += 1
@@ -62,6 +62,7 @@ class ImageLayer(QObject):
 
 
 class LayeredImage(Data):
+    layer_adding = Signal(ImageLayer)
     layer_added = Signal(ImageLayer)
     layer_removed = Signal(ImageLayer)
 
@@ -79,6 +80,7 @@ class LayeredImage(Data):
         return self._names_layers.get(name)
 
     def add_layer(self, layer: ImageLayer):
+        self.layer_adding.emit(layer)
         self._layers.append(layer)
         self._names_layers[layer.name] = layer
         self.layer_added.emit(layer)

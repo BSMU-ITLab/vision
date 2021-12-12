@@ -7,10 +7,11 @@ plugins:
   - bsmu.vision.plugins.visualizers.image.flat.FlatImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.volume.VolumeImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin
-#  - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
-  - bsmu.vision.plugins.overlayers.intersection.ImageViewerIntersectionOverlayerPlugin
+  - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
+#  - bsmu.vision.plugins.overlayers.intersection.ImageViewerIntersectionOverlayerPlugin
   - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
   - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
   - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
   - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
+  - bsmu.vision.plugins.layers_view.LayersTableViewPlugin

@@ -4,13 +4,14 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex, Signal
-from PySide2.QtWidgets import QTableView, QDockWidget
+from PySide2.QtWidgets import QTableView, QDockWidget, QAbstractItemView
 
 from bsmu.vision.core.abc import QABCMeta
 from bsmu.vision.core.image.layered import ImageLayer
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
+from bsmu.vision.widgets.visibility_new import Visibility, VisibilityDelegate
 
 if TYPE_CHECKING:
     from typing import Type, List, Tuple, Any
@@ -71,6 +72,8 @@ class LayersTableViewPlugin(Plugin):
 
         layers_table_model = LayersTableModel(sub_window.viewer)
         self._layers_table_view.setModel(layers_table_model)
+        visibility_column_number = layers_table_model.column_number(VisibilityTableColumn)
+        self._layers_table_view.setItemDelegateForColumn(visibility_column_number, VisibilityDelegate())
 
 
 class TableColumn:
@@ -207,9 +210,13 @@ class LayersTableModel(DataTableModel):
             if index.column() == self.column_number(NameTableColumn):
                 return record.name
             elif index.column() == self.column_number(VisibilityTableColumn):
-                return str(record.opacity)
+                #% return str(record.opacity)
+                return Visibility(record.visible, record.opacity)
 
 
 class LayersTableView(QTableView):
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
+
+        self.setEditTriggers(
+            QAbstractItemView.CurrentChanged | QAbstractItemView.SelectedClicked | QAbstractItemView.DoubleClicked)

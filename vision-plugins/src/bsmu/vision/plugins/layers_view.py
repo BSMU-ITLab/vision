@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from functools import partial
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex, Signal
+from PySide2.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
 from PySide2.QtWidgets import QTableView, QDockWidget, QAbstractItemView
 
 from bsmu.vision.core.abc import QABCMeta
@@ -88,44 +89,18 @@ class VisibilityTableColumn(TableColumn):
     TITLE = 'Visibility'
 
 
-class TableModelDataWrapper(QObject, metaclass=QABCMeta):
-    record_adding = Signal(QObject)
-    record_added = Signal(QObject)
-
-    def __init__(self, data: QObject, record_type: Type[QObject]):
-        super().__init__()
-
-        self._data = data
-        self._record_type = record_type
-
-    @property
-    @abstractmethod
-    def records(self) -> List:
-        pass
-
-    @property
-    def record_type(self) -> Type[QObject]:
-        return self._record_type
-
-    def add_record(self, record: QObject):
-        self.record_adding.emit(record)
-        self.records.append(record)
-        self.record_added.emit(record)
-
-
 class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
     def __init__(
             self,
-            data: TableModelDataWrapper,
+            data: QObject,
+            record_type: Type[QObject],
             columns: List[Type[TableColumn]] | Tuple[Type[TableColumn]] = (),
-            parent: QObject = None
+            parent: QObject = None,
     ):
         super().__init__(parent)
 
         self._data = data
-        self._data.record_adding.connect(self._on_data_record_adding)
-        self._data.record_added.connect(self.endInsertRows)
-
+        self._record_type = record_type
         self._columns = columns
         self._number_by_column = {column: number for number, column in enumerate(self._columns)}
 
@@ -133,10 +108,18 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
         return self._number_by_column[column]
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 0 if parent.isValid() else len(self._data.records)
+        return 0 if parent.isValid() else len(self.data_records)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self._columns)
+
+    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+        if not index.isValid():
+            return Qt.ItemIsEnabled
+
+        flags = super().flags(index)
+        flags |= Qt.ItemIsEditable
+        return flags
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
         if role != Qt.DisplayRole:
@@ -151,10 +134,10 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
         if not index.isValid():
             return
 
-        if index.row() >= len(self._data.records) or index.row() < 0:
+        if index.row() >= len(self.data_records) or index.row() < 0:
             return
 
-        record = self._data.records[index.row()]
+        record = self.data_records[index.row()]
         return self._record_data(record, index, role)
 
     def insertRows(self, row: int, count: int, parent: QModelIndex = QModelIndex()) -> bool:
@@ -166,7 +149,7 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self.beginInsertRows(QModelIndex(), row, row + count - 1)
 
         for i in range(count):
-            self._data.records.insert(row, self._data.record_type())
+            self.data_records.insert(row, self._record_type())
 
         self.endInsertRows()
         return True
@@ -174,7 +157,7 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
     def removeRows(self, row: int, count: int, parent: QModelIndex = QModelIndex()) -> bool:
         self.beginRemoveRows(QModelIndex(), row, row + count - 1)
 
-        del self._data.records[row: row + count]
+        del self.data_records[row: row + count]
 
         self.endRemoveRows()
         return True
@@ -184,34 +167,50 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
         row_count = self.rowCount()
         self.beginInsertRows(QModelIndex(), row_count, row_count)
 
+    def _on_data_record_added(self):
+        self.endInsertRows()
+        row = self.rowCount() - 1
+        self._on_record_added(self.data_records[row], row)
+
     @abstractmethod
-    def _record_data(self, record, index: QModelIndex, role: int = Qt.DisplayRole):
+    def _record_data(self, record, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         pass
 
-
-class LayersTableModelDataWrapper(TableModelDataWrapper):
-    def __init__(self, data: LayeredImageViewer):
-        super().__init__(data, ImageLayerView)
-
-        self._data.layer_view_adding.connect(self.record_adding)
-        self._data.layer_view_added.connect(self.record_added)
-
     @property
-    def records(self) -> List[ImageLayerView]:
-        return self._data.layer_views
+    @abstractmethod
+    def data_records(self) -> List[QObject]:
+        pass
+
+    @abstractmethod
+    def _on_record_added(self, record: QObject, row: int):
+        pass
 
 
 class LayersTableModel(DataTableModel):
     def __init__(self, data: LayeredImageViewer, parent: QObject = None):
-        super().__init__(LayersTableModelDataWrapper(data), (NameTableColumn, VisibilityTableColumn), parent)
+        super().__init__(data, ImageLayerView, (NameTableColumn, VisibilityTableColumn), parent)
 
-    def _record_data(self, record: ImageLayer, index: QModelIndex, role: int = Qt.DisplayRole):
+        self._data.layer_view_adding.connect(self._on_data_record_adding)
+        self._data.layer_view_added.connect(self._on_data_record_added)
+
+    def _record_data(self, record: ImageLayer, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if role == Qt.DisplayRole:
             if index.column() == self.column_number(NameTableColumn):
                 return record.name
             elif index.column() == self.column_number(VisibilityTableColumn):
-                #% return str(record.opacity)
                 return Visibility(record.visible, record.opacity)
+
+    @property
+    def data_records(self) -> List[QObject]:
+        return self._data.layer_views
+
+    def _on_record_added(self, record: ImageLayerView, row: int):
+        print('_on_record_added', record.name)
+        record.visibility_changed.connect(partial(self._on_row_visibility_changed, row))
+
+    def _on_row_visibility_changed(self, row, visible: bool):
+        visibility_model_index = self.index(row, self.column_number(VisibilityTableColumn))
+        self.dataChanged.emit(visibility_model_index, visibility_model_index)
 
 
 class LayersTableView(QTableView):

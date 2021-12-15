@@ -20,8 +20,8 @@ class VisibilityToggleButton(QPushButton):
 
         self._checked_color = DEFAULT_COLOR
 
-        self._checked_icon = QIcon(':/icons/eye.svg')
-        self._unchecked_icon = QIcon(':/icons/eye-crossed-out.svg')
+        self._checked_icon = QIcon(':/icons/eye-outlined.svg')
+        self._unchecked_icon = QIcon(':/icons/eye-outlined-crossed-out.svg')
 
         self._update_icon()
         self._update_style()

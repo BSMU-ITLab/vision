@@ -1,6 +1,6 @@
 <!--
 To generate a *.py file use the next command in the terminal:
-D:\Projects\vision\vision-widgets\bsmu\vision\widgets\images> pyside2-rcc icons.qrc -o icons_rc.py
+D:\Projects\vision\vision-widgets\src\bsmu\vision\widgets\images> pyside2-rcc icons.qrc -o icons_rc.py
 -->
 
 <!DOCTYPE RCC>
@@ -10,5 +10,7 @@ D:\Projects\vision\vision-widgets\bsmu\vision\widgets\images> pyside2-rcc icons.
     <file>icons/arrow-up.svg</file>
     <file>icons/eye.svg</file>
     <file>icons/eye-crossed-out.svg</file>
+    <file>icons/eye-outlined.svg</file>
+    <file>icons/eye-outlined-crossed-out.svg</file>
 </qresource>
 </RCC>

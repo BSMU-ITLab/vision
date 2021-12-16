@@ -8,7 +8,6 @@ from PySide2.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
 from PySide2.QtWidgets import QTableView, QDockWidget, QAbstractItemView
 
 from bsmu.vision.core.abc import QABCMeta
-from bsmu.vision.core.image.layered import ImageLayer
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
@@ -42,6 +41,9 @@ class LayersTableViewPlugin(Plugin):
         self._layers_table_view: LayersTableView | None = None
         self._layers_table_view_dock_widget: QDockWidget | None = None
 
+        self._layers_table_model: LayersTableModel | None = None
+        self._visibility_delegate: VisibilityDelegate | None = None
+
     def _enable(self):
         self._main_window = self._main_window_plugin.main_window
         self._mdi = self._mdi_plugin.mdi
@@ -49,6 +51,13 @@ class LayersTableViewPlugin(Plugin):
         self._layers_table_view = LayersTableView()
         self._layers_table_view_dock_widget = QDockWidget('Layers View', self._main_window)
         self._layers_table_view_dock_widget.setWidget(self._layers_table_view)
+
+        self._layers_table_model = LayersTableModel()
+        self._layers_table_view.setModel(self._layers_table_model)
+
+        self._visibility_delegate = VisibilityDelegate()
+        visibility_column_number = self._layers_table_model.column_number(VisibilityTableColumn)
+        self._layers_table_view.setItemDelegateForColumn(visibility_column_number, self._visibility_delegate)
 
         self._mdi.subWindowActivated.connect(self._on_mdi_sub_window_activated)
 
@@ -68,13 +77,12 @@ class LayersTableViewPlugin(Plugin):
         raise NotImplementedError
 
     def _on_mdi_sub_window_activated(self, sub_window: QMdiSubWindow):
-        if not isinstance(sub_window, LayeredImageViewerSubWindow):
-            return
+        print('_on_mdi_sub_window_activated', sub_window)
 
-        layers_table_model = LayersTableModel(sub_window.viewer)
-        self._layers_table_view.setModel(layers_table_model)
-        visibility_column_number = layers_table_model.column_number(VisibilityTableColumn)
-        self._layers_table_view.setItemDelegateForColumn(visibility_column_number, VisibilityDelegate())
+        if isinstance(sub_window, LayeredImageViewerSubWindow):
+            self._layers_table_model.record_storage = sub_window.viewer
+        else:
+            self._layers_table_model.record_storage = None
 
 
 class TableColumn:
@@ -89,29 +97,59 @@ class VisibilityTableColumn(TableColumn):
     TITLE = 'Visibility'
 
 
-class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
+class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
     def __init__(
             self,
-            data: QObject,
+            record_storage: QObject,
             record_type: Type[QObject],
             columns: List[Type[TableColumn]] | Tuple[Type[TableColumn]] = (),
             parent: QObject = None,
     ):
         super().__init__(parent)
 
-        self._data = data
+        self._record_storage = None
+        self.record_storage = record_storage
+
         self._record_type = record_type
         self._columns = columns
         self._number_by_column = {column: number for number, column in enumerate(self._columns)}
+
+    def clean_up(self):
+        self.record_storage = None
+
+    @property
+    def record_storage(self) -> QObject:
+        return self._record_storage
+
+    @record_storage.setter
+    def record_storage(self, value: QObject):
+        if self._record_storage == value:
+            return
+
+        self.beginResetModel()
+
+        if self._record_storage is not None:
+            self._on_record_storage_changing()
+            for i, record in enumerate(self.storage_records):
+                self._on_record_removed(record, i)
+
+        self._record_storage = value
+
+        if self._record_storage is not None:
+            for i, record in enumerate(self.storage_records):
+                self._on_record_added(record, i)
+            self._on_record_storage_changed()
+
+        self.endResetModel()
 
     def column_number(self, column: Type[TableColumn]) -> int:
         return self._number_by_column[column]
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 0 if parent.isValid() else len(self.data_records)
+        return 0 if parent.isValid() or self.record_storage is None else len(self.storage_records)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 0 if parent.isValid() else len(self._columns)
+        return 0 if parent.isValid() or self.record_storage is None else len(self._columns)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         if not index.isValid():
@@ -134,11 +172,21 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
         if not index.isValid():
             return
 
-        if index.row() >= len(self.data_records) or index.row() < 0:
+        if index.row() >= len(self.storage_records) or index.row() < 0:
             return
 
-        record = self.data_records[index.row()]
+        record = self.storage_records[index.row()]
         return self._record_data(record, index, role)
+
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.EditRole) -> bool:
+        successfully_set = False
+        if index.isValid() and role == Qt.EditRole:
+            row = index.row()
+            record = self.storage_records[row]
+            successfully_set = self._set_record_data(record, index, value)
+            if successfully_set:
+                self.dataChanged.emit(index, index)
+        return successfully_set
 
     def insertRows(self, row: int, count: int, parent: QModelIndex = QModelIndex()) -> bool:
         """
@@ -149,7 +197,7 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self.beginInsertRows(QModelIndex(), row, row + count - 1)
 
         for i in range(count):
-            self.data_records.insert(row, self._record_type())
+            self.storage_records.insert(row, self._record_type())
 
         self.endInsertRows()
         return True
@@ -157,60 +205,117 @@ class DataTableModel(QAbstractTableModel, metaclass=QABCMeta):
     def removeRows(self, row: int, count: int, parent: QModelIndex = QModelIndex()) -> bool:
         self.beginRemoveRows(QModelIndex(), row, row + count - 1)
 
-        del self.data_records[row: row + count]
+        del self.storage_records[row: row + count]
 
         self.endRemoveRows()
         return True
 
-    def _on_data_record_adding(self):
+    def _on_storage_record_adding(self):
         # Append one row
         row_count = self.rowCount()
         self.beginInsertRows(QModelIndex(), row_count, row_count)
 
-    def _on_data_record_added(self):
+    def _on_storage_record_added(self):
         self.endInsertRows()
         row = self.rowCount() - 1
-        self._on_record_added(self.data_records[row], row)
+        self._on_record_added(self.storage_records[row], row)
 
     @abstractmethod
-    def _record_data(self, record, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+    def _record_data(self, record: QObject, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+        pass
+
+    @abstractmethod
+    def _set_record_data(self, record: QObject, index: QModelIndex, value: Any) -> bool:
+        pass
+
+    @abstractmethod
+    def _on_record_storage_changing(self):
+        pass
+
+    @abstractmethod
+    def _on_record_storage_changed(self):
         pass
 
     @property
     @abstractmethod
-    def data_records(self) -> List[QObject]:
+    def storage_records(self) -> List[QObject]:
         pass
 
     @abstractmethod
     def _on_record_added(self, record: QObject, row: int):
         pass
 
+    @abstractmethod
+    def _on_record_removed(self, record: QObject, row: int):
+        pass
 
-class LayersTableModel(DataTableModel):
-    def __init__(self, data: LayeredImageViewer, parent: QObject = None):
-        super().__init__(data, ImageLayerView, (NameTableColumn, VisibilityTableColumn), parent)
 
-        self._data.layer_view_adding.connect(self._on_data_record_adding)
-        self._data.layer_view_added.connect(self._on_data_record_added)
+class LayersTableModel(RecordTableModel):
+    def __init__(self, record_storage: LayeredImageViewer = None, parent: QObject = None):
+        self.visibility_changed_handler_by_record = {}
 
-    def _record_data(self, record: ImageLayer, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+        super().__init__(record_storage, ImageLayerView, (NameTableColumn, VisibilityTableColumn), parent)
+
+        self.columnsInserted.connect(self._on_columns_inserted)
+        self.dataChanged.connect(self._on_data_changed)
+        self.layoutChanged.connect(self._on_layout_changed)
+        self.modelReset.connect(self._on_model_reset)
+
+    def _record_data(self, record: ImageLayerView, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if role == Qt.DisplayRole:
             if index.column() == self.column_number(NameTableColumn):
                 return record.name
             elif index.column() == self.column_number(VisibilityTableColumn):
                 return Visibility(record.visible, record.opacity)
 
+    def _set_record_data(self, record: ImageLayerView, index: QModelIndex, value: Any) -> bool:
+        if index.column() == self.column_number(NameTableColumn):
+            record.name = value
+        elif index.column() == self.column_number(VisibilityTableColumn):
+            record.visible = value.visible
+            record.opacity = value.opacity
+        else:
+            return False
+        return True
+
     @property
-    def data_records(self) -> List[QObject]:
-        return self._data.layer_views
+    def storage_records(self) -> List[QObject]:
+        return self.record_storage.layer_views
+
+    @abstractmethod
+    def _on_record_storage_changing(self):
+        self.record_storage.layer_view_adding.disconnect(self._on_storage_record_adding)
+        self.record_storage.layer_view_added.disconnect(self._on_storage_record_added)
+
+    @abstractmethod
+    def _on_record_storage_changed(self):
+        self.record_storage.layer_view_adding.connect(self._on_storage_record_adding)
+        self.record_storage.layer_view_added.connect(self._on_storage_record_added)
 
     def _on_record_added(self, record: ImageLayerView, row: int):
-        print('_on_record_added', record.name)
-        record.visibility_changed.connect(partial(self._on_row_visibility_changed, row))
+        visibility_changed_handler = partial(self._on_visibility_changed, record, row)
+        self.visibility_changed_handler_by_record[record] = visibility_changed_handler
+        record.visibility_changed.connect(visibility_changed_handler)
 
-    def _on_row_visibility_changed(self, row, visible: bool):
+    def _on_record_removed(self, record: ImageLayerView, row: int):
+        visibility_changed_handler = self.visibility_changed_handler_by_record.pop(record)
+        record.visibility_changed.disconnect(visibility_changed_handler)
+
+    def _on_visibility_changed(self, record: ImageLayerView, row: int, visible: bool):
         visibility_model_index = self.index(row, self.column_number(VisibilityTableColumn))
-        self.dataChanged.emit(visibility_model_index, visibility_model_index)
+        self.setData(visibility_model_index, Visibility(record.visible, record.opacity))
+
+    def _on_columns_inserted(self, parent: QModelIndex, first: int, last: int):
+        print('_on_columns_inserted', first, last)
+
+    def _on_data_changed(self, topLeft: QModelIndex, bottomRight: QModelIndex, roles):
+        print('_on_data_changed', topLeft.row(), topLeft.column(), '      ', bottomRight.row(), bottomRight.column())
+
+    def _on_layout_changed(self, parents, hint):
+        print('_on_layout_changed')
+
+    def _on_model_reset(self):
+        print('_on_model_reset')
 
 
 class LayersTableView(QTableView):

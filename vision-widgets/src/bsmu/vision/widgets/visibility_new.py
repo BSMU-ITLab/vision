@@ -4,14 +4,14 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import Qt, QObject, Signal, QSize, QPointF, QRectF, QMarginsF
-from PySide2.QtGui import QPainter, QPixmap
+from PySide2.QtGui import QPainter, QPixmap, QPalette
 from PySide2.QtWidgets import QWidget, QStyledItemDelegate, QStyle
 
 from bsmu.vision.widgets.images import icons_rc  # noqa: F401
 
 if TYPE_CHECKING:
     from PySide2.QtCore import QAbstractItemModel, QModelIndex, QRect
-    from PySide2.QtGui import QPaintEvent, QMouseEvent, QPalette
+    from PySide2.QtGui import QPaintEvent, QMouseEvent
     from PySide2.QtWidgets import QStyleOptionViewItem
 
 
@@ -33,12 +33,22 @@ class Visibility(QObject):
     def visible(self) -> bool:
         return self._visible
 
+    @visible.setter
+    def visible(self, value: bool):
+        self._visible = value
+
     @property
     def opacity(self) -> float:
         return self._opacity
 
     def paint(self, painter: QPainter, rect: QRect, palette: QPalette, mode: EditMode):
         painter.save()
+
+        background_color_group = QPalette.Normal if mode == Visibility.EditMode.EDITABLE else QPalette.Disabled
+        background_color = palette.color(background_color_group, QPalette.Base)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(background_color)
+        painter.drawRect(rect)
 
         icon = self._checked_icon if self._visible else self._unchecked_icon
         icon_rect_f = QRectF(rect.x(), rect.y(), rect.width() / 3, rect.height())
@@ -77,7 +87,9 @@ class VisibilityEditor(QWidget):
 
     @visibility.setter
     def visibility(self, value: Visibility):
-        self._visibility = value
+        if self._visibility != value:
+            self._visibility = value
+            self.update()
 
     def paintEvent(self, event: QPaintEvent):
         painter = QPainter(self)
@@ -88,6 +100,10 @@ class VisibilityEditor(QWidget):
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         print('VisibilityEditor.mouseReleaseEvent')
+
+        self.visibility.visible = not self.visibility.visible
+        self.update()
+
         self.editing_finished.emit()
         super().mouseReleaseEvent(event)
 
@@ -126,17 +142,21 @@ class VisibilityDelegate(QStyledItemDelegate):
         return super().createEditor(parent, option, index)
 
     def setEditorData(self, editor: QWidget, index: QModelIndex):
+        print('setEditorData', index.row(), index.column())
         if isinstance(index.data(), Visibility):
-            visibility = index.data()
-            editor.visibility = visibility
+            print('sed', index.data().visible, index.data().opacity)
+            editor.visibility = index.data()
         else:
             super().setEditorData(editor, index)
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
+        print('setModelData', index.row(), index.column())
         if isinstance(index.data(), Visibility):
             model.setData(index, editor.visibility)
         else:
             super().setModelData(editor, model, index)
 
     def _commit_and_close_editor(self):
-        ...
+        editor = self.sender()
+        self.commitData.emit(editor)
+        # self.closeEditor.emit(editor)

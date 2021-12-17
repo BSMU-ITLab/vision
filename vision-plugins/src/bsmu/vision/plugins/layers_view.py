@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import typing
 from abc import abstractmethod
 from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
-from PySide2.QtWidgets import QTableView, QDockWidget, QAbstractItemView
+from PySide2.QtWidgets import QTableView, QDockWidget
 
 from bsmu.vision.core.abc import QABCMeta
 from bsmu.vision.core.plugins.base import Plugin
@@ -16,6 +17,7 @@ from bsmu.vision.widgets.visibility_new import Visibility, VisibilityDelegate
 if TYPE_CHECKING:
     from typing import Type, List, Tuple, Any
 
+    from PySide2.QtCore import QAbstractItemModel
     from PySide2.QtWidgets import QWidget, QMdiSubWindow
 
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
@@ -252,7 +254,11 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
 class LayersTableModel(RecordTableModel):
     def __init__(self, record_storage: LayeredImageViewer = None, parent: QObject = None):
+        # Store handlers to disconnect signals.
+        # When https://bugreports.qt.io/projects/PYSIDE/issues/PYSIDE-1334?filter=allissues will be fixed
+        # we will be able to store connection objects instead.
         self.visibility_changed_handler_by_record = {}
+        self.opacity_changed_handler_by_record = {}
 
         super().__init__(record_storage, ImageLayerView, (NameTableColumn, VisibilityTableColumn), parent)
 
@@ -297,11 +303,22 @@ class LayersTableModel(RecordTableModel):
         self.visibility_changed_handler_by_record[record] = visibility_changed_handler
         record.visibility_changed.connect(visibility_changed_handler)
 
+        opacity_changed_handler = partial(self._on_opacity_changed, record, row)
+        self.opacity_changed_handler_by_record[record] = opacity_changed_handler
+        record.opacity_changed.connect(opacity_changed_handler)
+
     def _on_record_removed(self, record: ImageLayerView, row: int):
         visibility_changed_handler = self.visibility_changed_handler_by_record.pop(record)
         record.visibility_changed.disconnect(visibility_changed_handler)
 
+        opacity_changed_handler = self.opacity_changed_handler_by_record.pop(record)
+        record.opacity_changed.disconnect(opacity_changed_handler)
+
     def _on_visibility_changed(self, record: ImageLayerView, row: int, visible: bool):
+        visibility_model_index = self.index(row, self.column_number(VisibilityTableColumn))
+        self.setData(visibility_model_index, Visibility(record.visible, record.opacity))
+
+    def _on_opacity_changed(self, record: ImageLayerView, row: int, opacity: float):
         visibility_model_index = self.index(row, self.column_number(VisibilityTableColumn))
         self.setData(visibility_model_index, Visibility(record.visible, record.opacity))
 
@@ -322,5 +339,52 @@ class LayersTableView(QTableView):
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
 
-        self.setEditTriggers(
-            QAbstractItemView.CurrentChanged | QAbstractItemView.SelectedClicked | QAbstractItemView.DoubleClicked)
+    def setModel(self, model: QAbstractItemModel):
+        if self.model() is not None:
+            self.model().modelReset.disconnect(self._open_persistent_editors)
+            self.model().modelAboutToBeReset.disconnect(self._close_persistent_editors)
+
+            self._close_persistent_editors()
+
+        super().setModel(model)
+
+        if self.model() is not None:
+            self._open_persistent_editors()
+
+            self.model().modelAboutToBeReset.connect(self._close_persistent_editors)
+            self.model().modelReset.connect(self._open_persistent_editors)
+
+    def _open_persistent_editors(self):
+        self._open_persistent_editors_for_rows(range(self.model().rowCount()))
+
+    def _close_persistent_editors(self):
+        self._close_persistent_editors_for_rows(range(self.model().rowCount()))
+
+    def dataChanged(self, topLeft: QModelIndex, bottomRight: QModelIndex, roles: List=...) -> None:
+        print('VIEW www dataChanged', topLeft.row(), topLeft.column(), '    ', bottomRight.row(), bottomRight.column())
+
+        super().dataChanged(topLeft, bottomRight, roles)
+
+    def rowsInserted(self, parent: QModelIndex, start: int, end: int):
+        print('VIEW www rowsInserted', start, end)
+
+        self._open_persistent_editors_for_rows(range(start, end + 1))
+
+        super().rowsInserted(parent, start, end)
+
+    def rowsAboutToBeRemoved(self, parent: QModelIndex, start: int, end: int):
+        print('VIEW www rowsAboutToBeRemoved')
+
+        self._close_persistent_editors_for_rows(range(start, end + 1))
+
+        super().rowsAboutToBeRemoved(parent, start, end)
+
+    def _open_persistent_editors_for_rows(self, rows: typing.Iterable):
+        visibility_column_number = self.model().column_number(VisibilityTableColumn)
+        for row in rows:
+            self.openPersistentEditor(self.model().index(row, visibility_column_number))
+
+    def _close_persistent_editors_for_rows(self, rows: typing.Iterable):
+        visibility_column_number = self.model().column_number(VisibilityTableColumn)
+        for row in rows:
+            self.closePersistentEditor(self.model().index(row, visibility_column_number))

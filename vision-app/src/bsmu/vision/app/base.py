@@ -6,7 +6,7 @@ import traceback
 import warnings
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import Signal
+from PySide2.QtCore import Qt, Signal
 from PySide2.QtWidgets import QApplication
 
 from bsmu.vision.app.plugin_manager import PluginManager
@@ -26,6 +26,8 @@ class App(QApplication, DataFileProvider):
         super().__init__(sys.argv)
 
         print(f'App started. Prefix: {sys.prefix}')
+
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 
         # Set to users preferred locale to output correct decimal point (comma or point):
         locale.setlocale(locale.LC_NUMERIC, '')

@@ -40,18 +40,37 @@ class Visibility(QObject):
 
 
 class VisibilityDrawer:
+    SLIDER_FOREGROUND_COLOR = QColor(213, 226, 240)
+    SLIDER_THUMB_ALPHA = 155
+    SLIDER_THUMB_PEN_COLOR = QColor(167, 194, 224, SLIDER_THUMB_ALPHA)
+    SLIDER_THUMB_BRUSH_COLOR = QColor(182, 204, 228, SLIDER_THUMB_ALPHA)
+
+    class Element(Enum):
+        TOGGLE_ICON = auto()
+        SLIDER = auto()
+        TEXT = auto()
+        VALUE_TEXT = auto()
+        VALUE_BUTTON_UP = auto()
+        VALUE_BUTTON_DOWN = auto()
+
     class EditMode(Enum):
         EDITABLE = auto()
         READ_ONLY = auto()
 
-    def __init__(self, visibility: Visibility | None = None):
+    def __init__(self, visibility: Visibility | None = None, draw_slider_thumb: bool = False):
         self._visibility = visibility
+        self._draw_slider_thumb = draw_slider_thumb
 
-        self._checked_icon = QPixmap(':/icons/eye-outlined.svg')
-        self._unchecked_icon = QPixmap(':/icons/eye-outlined-crossed-out.svg')
+        self._checked_toggle_icon = QPixmap(':/icons/eye-outlined.svg')
+        self._unchecked_toggle_icon = QPixmap(':/icons/eye-outlined-crossed-out.svg')
 
-        self._drawn_icon_rect_f = QRectF()
-        self._drawn_text_rect_f = QRectF()
+        self._value_up_icon = QPixmap(':/icons/arrow-outlined-up.svg')
+        self._value_down_icon = QPixmap(':/icons/arrow-outlined-down.svg')
+
+        self._drawn_toggle_icon_rect_f = QRectF()
+        self._drawn_value_text_rect_f = QRectF()
+        self._drawn_value_up_button = QRectF()
+        self._drawn_value_down_button = QRectF()
 
     @property
     def visibility(self) -> Visibility:
@@ -63,68 +82,108 @@ class VisibilityDrawer:
 
     @property
     def drawn_text_rect_f(self) -> QRectF:
-        return self._drawn_text_rect_f
+        return self._drawn_value_text_rect_f
 
     def paint(self, painter: QPainter, rect: QRect, palette: QPalette, mode: EditMode):
         painter.save()
 
-        # background_color_group = QPalette.Normal if mode == VisibilityDrawer.EditMode.EDITABLE else QPalette.Disabled
-        # background_color = palette.color(background_color_group, QPalette.Base)
-        # painter.setPen(Qt.NoPen)
-        # painter.setBrush(background_color)
-        # painter.drawRect(rect)
-
-        thumb_alpha = 155
         if self._visibility.visible:
-            opacity_background_color = QColor(213, 226, 240)
-            thumb_pen_color = QColor(167, 194, 224, thumb_alpha)
-            thumb_brush_color = QColor(182, 204, 228, thumb_alpha)
+            toggle_icon = self._checked_toggle_icon
         else:
-            opacity_background_color = QColor(240, 240, 240)
-            thumb_pen_color = QColor(200, 200, 200, thumb_alpha)
-            thumb_brush_color = QColor(218, 218, 218, thumb_alpha)
+            toggle_icon = self._unchecked_toggle_icon
 
+        # Draw slider foreground
         painter.setPen(Qt.NoPen)
-        painter.setBrush(opacity_background_color)
-        opacity_background_width = self._visibility.opacity * rect.width()
-        painter.drawRect(QRectF(rect.x(), rect.y(), opacity_background_width, rect.height()))
+        painter.setBrush(self.SLIDER_FOREGROUND_COLOR)
+        value_slider_foreground_rect_f = QRectF(rect)
+        value_slider_foreground_width = self._visibility.opacity * value_slider_foreground_rect_f.width()
+        value_slider_foreground_rect_f.setWidth(value_slider_foreground_width)
+        painter.drawRect(value_slider_foreground_rect_f)
 
-        icon = self._checked_icon if self._visibility.visible else self._unchecked_icon
-        icon_rect_f = QRectF(rect.x(), rect.y(), rect.width() / 3, rect.height())
         margin_factor = 12
-        margin = min(icon_rect_f.width() / margin_factor, icon_rect_f.height() / margin_factor)
-        # Add margins around icon
-        icon_rect_f -= QMarginsF(margin, margin, margin, margin)
-        icon = icon.scaled(
-            int(icon_rect_f.width()), int(icon_rect_f.height()), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        draw_top_left_y = icon_rect_f.y() + (icon_rect_f.height() - icon.height()) / 2
-        icon_top_left_f = QPointF(icon_rect_f.x(), draw_top_left_y)
-        painter.drawPixmap(icon_top_left_f, icon)
-        self._drawn_icon_rect_f = QRectF(icon_top_left_f, icon.size())
+        margin = min(rect.width() / margin_factor, rect.height() / margin_factor)
+        rect_f_without_margins = QRectF(rect)
+        rect_f_without_margins -= QMarginsF(margin, margin, margin, margin)
 
+        # Draw toggle icon
+        toggle_icon_rect_f = QRectF(rect_f_without_margins)
+        toggle_icon_rect_f.setWidth(toggle_icon_rect_f.width() / 4)
+        toggle_icon = toggle_icon.scaled(
+            int(toggle_icon_rect_f.width()),
+            int(toggle_icon_rect_f.height()),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation)
+        toggle_icon_top_left_y = toggle_icon_rect_f.y() + (toggle_icon_rect_f.height() - toggle_icon.height()) / 2
+        toggle_icon_top_left_point_f = QPointF(toggle_icon_rect_f.x(), toggle_icon_top_left_y)
+        painter.drawPixmap(toggle_icon_top_left_point_f, toggle_icon)
+        self._drawn_toggle_icon_rect_f = QRectF(toggle_icon_top_left_point_f, toggle_icon.size())
+
+        # Draw value up/down buttons
+        value_up_down_buttons_rect_f = QRectF(rect_f_without_margins)
+        value_up_down_buttons_rect_width = \
+            min(rect_f_without_margins.width() / 6, rect_f_without_margins.height() / 1.5)
+        value_up_down_buttons_rect_f.setX(value_up_down_buttons_rect_f.right() - value_up_down_buttons_rect_width)
+
+        value_up_down_button_vert_space_from_center = margin / 2
+        value_up_down_button_height = \
+            value_up_down_buttons_rect_f.height() / 2 - value_up_down_button_vert_space_from_center
+
+        value_up_button_rect_f = QRectF(value_up_down_buttons_rect_f)
+        value_up_button_rect_f.setHeight(value_up_down_button_height)
+
+        value_down_button_rect_f = QRectF(value_up_down_buttons_rect_f)
+        value_down_button_rect_f.setTop(value_down_button_rect_f.bottom() - value_up_down_button_height)
+
+        value_up_icon = self._value_up_icon.scaled(
+            int(value_up_button_rect_f.width()),
+            int(value_up_button_rect_f.height()),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation)
+        value_up_top_left_y = value_up_button_rect_f.bottom() - value_up_icon.height()
+        value_up_top_left_point_f = QPointF(value_up_button_rect_f.x(), value_up_top_left_y)
+        painter.drawPixmap(value_up_top_left_point_f, value_up_icon)
+        self._drawn_value_up_button = QRectF(value_up_top_left_point_f, value_up_icon.size())
+
+        value_down_icon = self._value_down_icon.scaled(
+            int(value_down_button_rect_f.width()),
+            int(value_down_button_rect_f.height()),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation)
+        painter.drawPixmap(value_down_button_rect_f.topLeft(), value_down_icon)
+        self._drawn_value_down_button = QRectF(value_down_button_rect_f.topLeft(), value_down_icon.size())
+
+        # Draw value text
         painter.setPen(QPen())
-        text_rect = QRectF(rect.x(), rect.y(), rect.width() - margin, rect.height())
-        self._drawn_text_rect_f = painter.drawText(
-            text_rect, int(Qt.AlignRight | Qt.AlignVCenter), str(round(100 * self._visibility.opacity)))
+        text_rect = QRectF(rect_f_without_margins)
+        text_rect.setRight(value_up_down_buttons_rect_f.left() - margin)
+        self._drawn_value_text_rect_f = painter.drawText(
+            text_rect, Qt.AlignRight | Qt.AlignVCenter, str(round(100 * self._visibility.opacity)))
 
-        if mode == VisibilityDrawer.EditMode.EDITABLE:
+        # Draw slider thumb
+        if mode == VisibilityDrawer.EditMode.EDITABLE and self._draw_slider_thumb:
             thumb_pen_width = 1
-            painter.setPen(QPen(thumb_pen_color, thumb_pen_width, Qt.SolidLine))
-            painter.setBrush(thumb_brush_color)
-            thumb_width = 14
+            painter.setPen(QPen(self.SLIDER_THUMB_PEN_COLOR, thumb_pen_width, Qt.SolidLine))
+            painter.setBrush(self.SLIDER_THUMB_BRUSH_COLOR)
+            thumb_height = min(4 * margin, rect_f_without_margins.width() / 8)
+            thumb_width = 0.8 * thumb_height
             half_thumb_width = thumb_width / 2
-            thumb_height = 4 * margin
             thumb_straight_part_height = 0.6 * thumb_height
-            top_thumb_points = [QPointF(opacity_background_width - half_thumb_width, -thumb_pen_width),
-                                QPointF(opacity_background_width - half_thumb_width, thumb_straight_part_height),
-                                QPointF(opacity_background_width, thumb_height),
-                                QPointF(opacity_background_width + half_thumb_width, thumb_straight_part_height),
-                                QPointF(opacity_background_width + half_thumb_width, -thumb_pen_width)]
+            top_thumb_points = [QPointF(value_slider_foreground_width - half_thumb_width, -thumb_pen_width),
+                                QPointF(value_slider_foreground_width - half_thumb_width, thumb_straight_part_height),
+                                QPointF(value_slider_foreground_width, thumb_height),
+                                QPointF(value_slider_foreground_width + half_thumb_width, thumb_straight_part_height),
+                                QPointF(value_slider_foreground_width + half_thumb_width, -thumb_pen_width)]
             bottom_thumb_points = [QPointF(p.x(), rect.height() - p.y()) for p in top_thumb_points]
 
             painter.setRenderHint(QPainter.Antialiasing)
             painter.drawConvexPolygon(QPolygonF(top_thumb_points))
             painter.drawConvexPolygon(QPolygonF(bottom_thumb_points))
+
+        # Draw white translucent overlay, to emulate disabled editor
+        if not self._visibility.visible:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(255, 255, 255, 128))
+            painter.drawRect(rect)
 
         painter.restore()
 
@@ -132,7 +191,7 @@ class VisibilityDrawer:
         """
         Returns true, if pos is not in the icon or editable value rectangle
         """
-        return not (self._drawn_icon_rect_f.contains(pos) or self._drawn_text_rect_f.contains(pos))
+        return not (self._drawn_toggle_icon_rect_f.contains(pos) or self._drawn_value_text_rect_f.contains(pos))
 
     def sizeHint(self) -> QSize:
         return QSize(96, 32)

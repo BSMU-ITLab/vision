@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import Qt, QObject, Signal, QSize, QPointF, QRectF, QMarginsF, QElapsedTimer, QPoint
-from PySide2.QtGui import QPainter, QPixmap, QPalette, QColor, QPen, QPolygonF
+from PySide2.QtGui import QPainter, QPixmap, QPalette, QColor, QPen, QPolygonF, QIntValidator
 from PySide2.QtWidgets import QWidget, QStyledItemDelegate, QStyle, QLineEdit
 
 from bsmu.vision.widgets.images import icons_rc  # noqa: F401
@@ -68,6 +68,7 @@ class VisibilityDrawer:
         self._value_down_icon = QPixmap(':/icons/arrow-outlined-down.svg')
 
         self._drawn_toggle_icon_rect_f = QRectF()
+        self._drawn_text_rect_f = QRectF()
         self._drawn_value_text_rect_f = QRectF()
         self._drawn_value_up_button = QRectF()
         self._drawn_value_down_button = QRectF()
@@ -84,7 +85,14 @@ class VisibilityDrawer:
     def drawn_text_rect_f(self) -> QRectF:
         return self._drawn_value_text_rect_f
 
-    def paint(self, painter: QPainter, rect: QRect, palette: QPalette, mode: EditMode):
+    def paint(
+            self,
+            painter: QPainter,
+            rect: QRect,
+            palette: QPalette,
+            mode: EditMode,
+            used_control: Element | None = None
+    ):
         painter.save()
 
         if self._visibility.visible:
@@ -152,12 +160,13 @@ class VisibilityDrawer:
         painter.drawPixmap(value_down_button_rect_f.topLeft(), value_down_icon)
         self._drawn_value_down_button = QRectF(value_down_button_rect_f.topLeft(), value_down_icon.size())
 
-        # Draw value text
-        painter.setPen(QPen())
-        text_rect = QRectF(rect_f_without_margins)
-        text_rect.setRight(value_up_down_buttons_rect_f.left() - margin)
-        self._drawn_value_text_rect_f = painter.drawText(
-            text_rect, Qt.AlignRight | Qt.AlignVCenter, str(round(100 * self._visibility.opacity)))
+        # Draw value text (if we do not edit value using QLineEdit now)
+        if used_control != self.Element.VALUE_TEXT:
+            painter.setPen(QPen())
+            text_rect = QRectF(rect_f_without_margins)
+            text_rect.setRight(value_up_down_buttons_rect_f.left() - margin)
+            self._drawn_value_text_rect_f = painter.drawText(
+                text_rect, Qt.AlignRight | Qt.AlignVCenter, str(round(100 * self._visibility.opacity)))
 
         # Draw slider thumb
         if mode == VisibilityDrawer.EditMode.EDITABLE and self._draw_slider_thumb:
@@ -187,14 +196,41 @@ class VisibilityDrawer:
 
         painter.restore()
 
-    def free_pos(self, pos: QPointF) -> bool:
-        """
-        Returns true, if pos is not in the icon or editable value rectangle
-        """
-        return not (self._drawn_toggle_icon_rect_f.contains(pos) or self._drawn_value_text_rect_f.contains(pos))
+    def element_in_pos(self, pos: QPointF) -> Element:
+        if self._drawn_toggle_icon_rect_f.contains(pos):
+            return self.Element.TOGGLE_ICON
 
-    def sizeHint(self) -> QSize:
-        return QSize(96, 32)
+        if self._drawn_text_rect_f.contains(pos):
+            return self.Element.TEXT
+
+        if self._drawn_value_text_rect_f.contains(pos):
+            return self.Element.VALUE_TEXT
+
+        if self._drawn_value_up_button.contains(pos):
+            return self.Element.VALUE_BUTTON_UP
+
+        if self._drawn_value_down_button.contains(pos):
+            return self.Element.VALUE_BUTTON_DOWN
+
+        return self.Element.SLIDER
+
+    def size_hint(self) -> QSize:
+        return QSize(128, 32)
+
+
+class _ValueIntValidator(QIntValidator):
+    def __init__(self, minimum: int, maximum: int, parent: QObject = None):
+        super().__init__(minimum, maximum, parent)
+
+    def fixup(self, str_input: str) -> str:
+        try:
+            int_input = int(str_input)
+            if abs(int_input - self.bottom()) < abs(int_input - self.top()):
+                return str(self.bottom())
+            else:
+                return str(self.top())
+        except ValueError:
+            return str_input
 
 
 class VisibilityEditor(QWidget):
@@ -206,35 +242,49 @@ class VisibilityEditor(QWidget):
     editing = Signal()
     editing_finished = Signal()
 
-    def __init__(self, parent: QWidget = None):
+    def __init__(
+            self,
+            min_value: float = 0,
+            max_value: float = 1,
+            displayed_value_factor: float = 1,
+            parent: QWidget = None
+    ):
         super().__init__(parent)
 
+        self._min_value = min_value
+        self._max_value = max_value
+        self._displayed_value_factor = displayed_value_factor
         self._visibility = None
 
         self._visibility_drawer = VisibilityDrawer()
 
-        self.line_edit = QLineEdit(self)
-        self.line_edit.setFrame(False)
+        self._value_line_edit = QLineEdit(self)
+        self._value_line_edit.setValidator(
+            _ValueIntValidator(
+                self._value_to_displayed_value(min_value),
+                self._value_to_displayed_value(max_value),
+                parent=self._value_line_edit))
+        self._value_line_edit.setFrame(False)
 
-        line_edit_palette = QPalette()
-        line_edit_palette.setColor(QPalette.Base, Qt.transparent)
-        self.line_edit.setPalette(line_edit_palette)
+        value_line_edit_palette = QPalette()
+        value_line_edit_palette.setColor(QPalette.Base, Qt.transparent)
+        self._value_line_edit.setPalette(value_line_edit_palette)
         # self.line_edit.setAttribute(Qt.WA_TranslucentBackground)
 
-        self.line_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.line_edit.hide()
+        self._value_line_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._value_line_edit.hide()
 
-        self._pressed_on_free_space = False
         self._press_pos = QPoint()
+        self._pressed_element: VisibilityDrawer.Element | None = None
         self._click_duration_timer = QElapsedTimer()
+        self._slider_movement_started: bool = False
 
-        self._edited_parameter = self.EditedParameter.CHECK_BOX
+        self._used_control: VisibilityDrawer.Element | None = None
 
-        #% self.setMouseTracking(True)
         self.setAutoFillBackground(True)
 
     def sizeHint(self) -> QSize:
-        return self._visibility_drawer.sizeHint()
+        return self._visibility_drawer.size_hint()
 
     @property
     def visibility(self) -> Visibility:
@@ -249,36 +299,50 @@ class VisibilityEditor(QWidget):
     def paintEvent(self, event: QPaintEvent):
         painter = QPainter(self)
         self._visibility_drawer.visibility = self._visibility
-        self._visibility_drawer.paint(painter, self.rect(), self.palette(), VisibilityDrawer.EditMode.EDITABLE)
+        self._visibility_drawer.paint(
+            painter, self.rect(), self.palette(), VisibilityDrawer.EditMode.EDITABLE, self._used_control)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self._press_pos = event.pos()
         self._click_duration_timer.start()
 
-        self._pressed_on_free_space = self._visibility_drawer.free_pos(event.pos())
-        if self._pressed_on_free_space:
+        self._pressed_element = self._visibility_drawer.element_in_pos(event.pos())
+        if self._pressed_element == VisibilityDrawer.Element.SLIDER:
+            self._slider_movement_started = True
             self._edit_opacity_using_pos(event.x())
-            self._edited_parameter = self.EditedParameter.SLIDER
         else:
-            self._edited_parameter = self.EditedParameter.CHECK_BOX
+            self._slider_movement_started = False
 
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
-        if self._pressed_on_free_space \
+        if self._slider_movement_started \
                 or self._click_duration_timer.elapsed() > 500 \
                 or (event.pos() - self._press_pos).manhattanLength() > 10:
+            self._slider_movement_started = True
             self._edit_opacity_using_pos(event.x())
-            self._edited_parameter = self.EditedParameter.SLIDER
 
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         print('VisibilityEditor.mouseReleaseEvent')
 
-        if self._edited_parameter == self.EditedParameter.CHECK_BOX:
-            self.visibility.visible = not self.visibility.visible
-            self.update()
+        if not self._slider_movement_started:
+            value_shift = 0
+            if self._pressed_element == VisibilityDrawer.Element.TOGGLE_ICON:
+                self.visibility.visible = not self.visibility.visible
+                self.update()
+            elif self._pressed_element == VisibilityDrawer.Element.VALUE_BUTTON_UP:
+                value_shift = 0.01
+            elif self._pressed_element == VisibilityDrawer.Element.VALUE_BUTTON_DOWN:
+                value_shift = -0.01
+
+            if value_shift != 0:
+                new_value = self._clamped_value(self.visibility.opacity + value_shift)
+                self.visibility.opacity = new_value
+                self.update()
+
+        self._slider_movement_started = False
 
         self.editing_finished.emit()
 
@@ -287,17 +351,28 @@ class VisibilityEditor(QWidget):
     def mouseDoubleClickEvent(self, event: QMouseEvent):
         print('VisibilityEditor.mouseDoubleClickEvent')
 
-        self.line_edit.setText(str(round(100 * self._visibility.opacity)))
-        self.line_edit.editingFinished.connect(self._finish_opacity_editing)
+        if self._pressed_element == VisibilityDrawer.Element.VALUE_TEXT:
+            self._start_opacity_editing()
+
+        super().mouseDoubleClickEvent(event)
+
+    def _start_opacity_editing(self):
+        self._used_control = VisibilityDrawer.Element.VALUE_TEXT
+        self._value_line_edit.setText(str(round(self._value_to_displayed_value(self._visibility.opacity))))
+        self._value_line_edit.editingFinished.connect(self._finish_opacity_editing)
         text_rect = self._visibility_drawer.drawn_text_rect_f.toAlignedRect()
-        text_rect.setX(text_rect.x() - text_rect.width())
-        self.line_edit.setGeometry(text_rect)
-        self.line_edit.selectAll()
-        self.line_edit.show()
-        self.line_edit.setFocus()
+        # Increase size of the |text_rect| to fit all characters
+        text_rect.setX(text_rect.x() - 2 * text_rect.width())
+        self._value_line_edit.setGeometry(text_rect)
+        self._value_line_edit.selectAll()
+        self._value_line_edit.show()
+        self._value_line_edit.setFocus()
 
     def _finish_opacity_editing(self):
-        self.line_edit.close()
+        new_value = self._displayed_value_to_value(int(self._value_line_edit.text()))
+        self.visibility.opacity = new_value
+        self._used_control = None
+        self._value_line_edit.close()
 
     def _edit_opacity_using_pos(self, x: int):
         self.visibility.opacity = self._opacity_at_pos(x)
@@ -305,8 +380,17 @@ class VisibilityEditor(QWidget):
 
         self.editing.emit()
 
+    def _value_to_displayed_value(self, value_to_convert: float) -> float:
+        return self._displayed_value_factor * value_to_convert
+
+    def _displayed_value_to_value(self, displayed_value: float) -> float:
+        return displayed_value / self._displayed_value_factor
+
     def _opacity_at_pos(self, x: int) -> float:
-        return min(max(0, x / self.rect().width()), 1)
+        return self._clamped_value(x / self.rect().width())
+
+    def _clamped_value(self, value_to_clamp: float):
+        return min(max(self._min_value, value_to_clamp), self._max_value)
 
 
 class VisibilityDelegate(QStyledItemDelegate):
@@ -328,14 +412,14 @@ class VisibilityDelegate(QStyledItemDelegate):
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
         if isinstance(index.data(), Visibility):
             self._visibility_drawer.visibility = index.data()
-            return self._visibility_drawer.sizeHint()
+            return self._visibility_drawer.size_hint()
         return super().sizeHint(option, index)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         print('createEditor')
         if isinstance(index.data(), Visibility):
             print('createEditor for Visibility')
-            visibility_editor = VisibilityEditor(parent)
+            visibility_editor = VisibilityEditor(displayed_value_factor=100, parent=parent)
             visibility_editor.editing.connect(self._commit)
             visibility_editor.editing_finished.connect(self._commit_and_close_editor)
             return visibility_editor

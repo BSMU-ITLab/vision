@@ -39,7 +39,7 @@ class Visibility(QObject):
         self._opacity = value
 
 
-class VisibilityDrawer:
+class _VisibilityDrawer:
     SLIDER_FOREGROUND_COLOR = QColor(213, 226, 240)
     SLIDER_THUMB_ALPHA = 155
     SLIDER_THUMB_PEN_COLOR = QColor(167, 194, 224, SLIDER_THUMB_ALPHA)
@@ -82,7 +82,7 @@ class VisibilityDrawer:
         self._visibility = value
 
     @property
-    def drawn_text_rect_f(self) -> QRectF:
+    def drawn_value_text_rect_f(self) -> QRectF:
         return self._drawn_value_text_rect_f
 
     def paint(
@@ -169,7 +169,7 @@ class VisibilityDrawer:
                 text_rect, Qt.AlignRight | Qt.AlignVCenter, str(round(100 * self._visibility.opacity)))
 
         # Draw slider thumb
-        if mode == VisibilityDrawer.EditMode.EDITABLE and self._draw_slider_thumb:
+        if mode == self.EditMode.EDITABLE and self._draw_slider_thumb:
             thumb_pen_width = 1
             painter.setPen(QPen(self.SLIDER_THUMB_PEN_COLOR, thumb_pen_width, Qt.SolidLine))
             painter.setBrush(self.SLIDER_THUMB_BRUSH_COLOR)
@@ -234,11 +234,6 @@ class _ValueIntValidator(QIntValidator):
 
 
 class VisibilityEditor(QWidget):
-    class EditedParameter(Enum):
-        CHECK_BOX = auto()
-        SLIDER = auto()
-        VALUE = auto()
-
     editing = Signal()
     editing_finished = Signal()
 
@@ -254,32 +249,18 @@ class VisibilityEditor(QWidget):
         self._min_value = min_value
         self._max_value = max_value
         self._displayed_value_factor = displayed_value_factor
+
         self._visibility = None
+        self._visibility_drawer = _VisibilityDrawer()
 
-        self._visibility_drawer = VisibilityDrawer()
-
-        self._value_line_edit = QLineEdit(self)
-        self._value_line_edit.setValidator(
-            _ValueIntValidator(
-                self._value_to_displayed_value(min_value),
-                self._value_to_displayed_value(max_value),
-                parent=self._value_line_edit))
-        self._value_line_edit.setFrame(False)
-
-        value_line_edit_palette = QPalette()
-        value_line_edit_palette.setColor(QPalette.Base, Qt.transparent)
-        self._value_line_edit.setPalette(value_line_edit_palette)
-        # self.line_edit.setAttribute(Qt.WA_TranslucentBackground)
-
-        self._value_line_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._value_line_edit.hide()
+        self._value_line_edit = self._create_value_line_edit()
 
         self._press_pos = QPoint()
-        self._pressed_element: VisibilityDrawer.Element | None = None
+        self._pressed_element: _VisibilityDrawer.Element | None = None
         self._click_duration_timer = QElapsedTimer()
         self._slider_movement_started: bool = False
 
-        self._used_control: VisibilityDrawer.Element | None = None
+        self._used_control: _VisibilityDrawer.Element | None = None
 
         self.setAutoFillBackground(True)
 
@@ -300,14 +281,14 @@ class VisibilityEditor(QWidget):
         painter = QPainter(self)
         self._visibility_drawer.visibility = self._visibility
         self._visibility_drawer.paint(
-            painter, self.rect(), self.palette(), VisibilityDrawer.EditMode.EDITABLE, self._used_control)
+            painter, self.rect(), self.palette(), _VisibilityDrawer.EditMode.EDITABLE, self._used_control)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         self._press_pos = event.pos()
         self._click_duration_timer.start()
 
         self._pressed_element = self._visibility_drawer.element_in_pos(event.pos())
-        if self._pressed_element == VisibilityDrawer.Element.SLIDER:
+        if self._pressed_element == _VisibilityDrawer.Element.SLIDER:
             self._slider_movement_started = True
             self._edit_opacity_using_pos(event.x())
         else:
@@ -325,16 +306,14 @@ class VisibilityEditor(QWidget):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        print('VisibilityEditor.mouseReleaseEvent')
-
         if not self._slider_movement_started:
             value_shift = 0
-            if self._pressed_element == VisibilityDrawer.Element.TOGGLE_ICON:
+            if self._pressed_element == _VisibilityDrawer.Element.TOGGLE_ICON:
                 self.visibility.visible = not self.visibility.visible
                 self.update()
-            elif self._pressed_element == VisibilityDrawer.Element.VALUE_BUTTON_UP:
+            elif self._pressed_element == _VisibilityDrawer.Element.VALUE_BUTTON_UP:
                 value_shift = 0.01
-            elif self._pressed_element == VisibilityDrawer.Element.VALUE_BUTTON_DOWN:
+            elif self._pressed_element == _VisibilityDrawer.Element.VALUE_BUTTON_DOWN:
                 value_shift = -0.01
 
             if value_shift != 0:
@@ -349,21 +328,37 @@ class VisibilityEditor(QWidget):
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
-        print('VisibilityEditor.mouseDoubleClickEvent')
-
-        if self._pressed_element == VisibilityDrawer.Element.VALUE_TEXT:
+        if self._pressed_element == _VisibilityDrawer.Element.VALUE_TEXT:
             self._start_opacity_editing()
 
         super().mouseDoubleClickEvent(event)
 
+    def _create_value_line_edit(self) -> QLineEdit:
+        value_line_edit = QLineEdit(self)
+        value_line_edit.setValidator(
+            _ValueIntValidator(
+                self._value_to_displayed_value(self._min_value),
+                self._value_to_displayed_value(self._max_value),
+                parent=value_line_edit))
+
+        value_line_edit.setFrame(False)
+        value_line_edit_palette = QPalette()
+        value_line_edit_palette.setColor(QPalette.Base, Qt.transparent)
+        value_line_edit.setPalette(value_line_edit_palette)
+        # value_line_edit.setAttribute(Qt.WA_TranslucentBackground)
+
+        value_line_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        value_line_edit.hide()
+        return value_line_edit
+
     def _start_opacity_editing(self):
-        self._used_control = VisibilityDrawer.Element.VALUE_TEXT
+        self._used_control = _VisibilityDrawer.Element.VALUE_TEXT
         self._value_line_edit.setText(str(round(self._value_to_displayed_value(self._visibility.opacity))))
         self._value_line_edit.editingFinished.connect(self._finish_opacity_editing)
-        text_rect = self._visibility_drawer.drawn_text_rect_f.toAlignedRect()
-        # Increase size of the |text_rect| to fit all characters
-        text_rect.setX(text_rect.x() - 2 * text_rect.width())
-        self._value_line_edit.setGeometry(text_rect)
+        value_text_rect = self._visibility_drawer.drawn_value_text_rect_f.toAlignedRect()
+        # Increase size of the |value_text_rect| to fit all characters
+        value_text_rect.setX(value_text_rect.x() - 2 * value_text_rect.width())
+        self._value_line_edit.setGeometry(value_text_rect)
         self._value_line_edit.selectAll()
         self._value_line_edit.show()
         self._value_line_edit.setFocus()
@@ -397,7 +392,7 @@ class VisibilityDelegate(QStyledItemDelegate):
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
 
-        self._visibility_drawer = VisibilityDrawer()
+        self._visibility_drawer = _VisibilityDrawer()
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
         if isinstance(index.data(), Visibility):
@@ -405,7 +400,7 @@ class VisibilityDelegate(QStyledItemDelegate):
                 painter.fillRect(option.rect, option.palette.highlight())
 
             self._visibility_drawer.visibility = index.data()
-            self._visibility_drawer.paint(painter, option.rect, option.palette, VisibilityDrawer.EditMode.READ_ONLY)
+            self._visibility_drawer.paint(painter, option.rect, option.palette, _VisibilityDrawer.EditMode.READ_ONLY)
         else:
             super().paint(painter, option, index)
 
@@ -416,9 +411,7 @@ class VisibilityDelegate(QStyledItemDelegate):
         return super().sizeHint(option, index)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
-        print('createEditor')
         if isinstance(index.data(), Visibility):
-            print('createEditor for Visibility')
             visibility_editor = VisibilityEditor(displayed_value_factor=100, parent=parent)
             visibility_editor.editing.connect(self._commit)
             visibility_editor.editing_finished.connect(self._commit_and_close_editor)
@@ -426,15 +419,12 @@ class VisibilityDelegate(QStyledItemDelegate):
         return super().createEditor(parent, option, index)
 
     def setEditorData(self, editor: QWidget, index: QModelIndex):
-        print('setEditorData', index.row(), index.column())
         if isinstance(index.data(), Visibility):
-            print('sed', index.data().visible, index.data().opacity)
             editor.visibility = index.data()
         else:
             super().setEditorData(editor, index)
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex):
-        print('setModelData', index.row(), index.column())
         if isinstance(index.data(), Visibility):
             model.setData(index, editor.visibility)
         else:

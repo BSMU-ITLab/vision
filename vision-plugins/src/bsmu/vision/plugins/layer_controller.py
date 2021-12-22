@@ -96,7 +96,8 @@ class ImageViewerLayerController(QObject):
             for layer_view in self.image_viewer.layer_views:
                 # Save initial state
                 self._initial_layers_visibilities[layer_view] = layer_view.visible
-                layer_view.visible = False
+                if layer_view != self.image_viewer.active_layer_view:
+                    layer_view.visible = False
             self.image_viewer.active_layer_view.visible = True
 
         self._active_layer_view_toggled = not self._active_layer_view_toggled

@@ -74,7 +74,7 @@ class PatientBoneAgeJournalExporter(QObject):
             return
 
         try:
-            csv_file = open(file_name, 'w', newline='')
+            csv_file = open(file_name, 'w', encoding='utf-8-sig', newline='')
         except PermissionError:
             QMessageBox.warning(self._main_window, 'File Open Error',
                                 'Cannot open the file due to a permission error.\n'

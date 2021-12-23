@@ -15,3 +15,7 @@ plugins:
   - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
   - bsmu.vision.plugins.layers_view.LayersTableViewPlugin
+
+enable-high-dpi-scaling: true
+
+warn-with-traceback: true

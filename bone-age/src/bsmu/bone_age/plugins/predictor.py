@@ -62,7 +62,17 @@ class Predictor:
         if self._dnn_model is None:
             self._dnn_model = cv2.dnn.readNet(str(self._dnn_model_params.path))
 
-        image = skimage.color.rgb2gray(image.array)
+        image = np.squeeze(image.array)
+        if image.ndim == 3:
+            if image.shape[-1] == 4:
+                # RGBA image
+                image = skimage.color.rgba2rgb(image, background=(0, 0, 0))
+            if image.shape[-1] == 3:
+                # RGB image
+                image = skimage.color.rgb2gray(image)
+        if image.ndim != 2:
+            print('Unsupported image dimension. The behaviour is unpredicted!')
+
         image = cv2.resize(image, self._dnn_model_params.input_image_size, interpolation=cv2.INTER_AREA)
 
         input_images = [image]

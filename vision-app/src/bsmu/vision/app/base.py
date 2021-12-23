@@ -27,19 +27,22 @@ class App(QApplication, DataFileProvider):
 
         print(f'App started. Prefix: {sys.prefix}')
 
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+        self._config = UnitedConfig(type(self), App)
+
+        if self._config.value('enable-high-dpi-scaling'):
+            QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 
         # Set to users preferred locale to output correct decimal point (comma or point):
         locale.setlocale(locale.LC_NUMERIC, '')
 
-        warnings.showwarning = warn_with_traceback
-        warnings.simplefilter('always')
+        if self._config.value('warn-with-traceback'):
+            warnings.showwarning = warn_with_traceback
+            warnings.simplefilter('always')
 
         self._plugin_manager = PluginManager(self)
         self._plugin_manager.plugin_enabled.connect(self.plugin_enabled)
         self._plugin_manager.plugin_disabled.connect(self.plugin_disabled)
 
-        self._config = UnitedConfig(type(self), App)
         configured_plugins = self._config.value('plugins')
         if configured_plugins is not None:
             self._plugin_manager.enable_plugins(configured_plugins)

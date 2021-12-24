@@ -40,7 +40,13 @@ class Visibility(QObject):
 
 
 class _VisibilityDrawer:
-    SLIDER_FOREGROUND_COLOR = QColor(213, 226, 240)
+    # TODO:
+    #  Draw text label (editable or readonly).
+    #  Increase rectangle sizes of UI elements to make it easier to hit with a click.
+    #  Add some indication, when table cell is highlighted.
+    #  Adapt the design for a dark mode theme.
+
+    SLIDER_FOREGROUND_COLOR = QColor(204, 228, 247)
     SLIDER_THUMB_ALPHA = 155
     SLIDER_THUMB_PEN_COLOR = QColor(167, 194, 224, SLIDER_THUMB_ALPHA)
     SLIDER_THUMB_BRUSH_COLOR = QColor(182, 204, 228, SLIDER_THUMB_ALPHA)
@@ -234,6 +240,8 @@ class _ValueIntValidator(QIntValidator):
 
 
 class VisibilityEditor(QWidget):
+    # TODO: Activate value line edit, when get focus using keyboard (e.g. using Tab).
+
     editing = Signal()
     editing_finished = Signal()
 

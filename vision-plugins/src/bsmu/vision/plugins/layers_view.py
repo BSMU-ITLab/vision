@@ -11,7 +11,7 @@ from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
-from bsmu.vision.widgets.visibility_new import Visibility, VisibilityDelegate
+from bsmu.vision.widgets.visibility_v2 import Visibility, VisibilityDelegate
 
 if TYPE_CHECKING:
     from typing import List, Tuple, Any

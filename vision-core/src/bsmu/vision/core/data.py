@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from typing import Protocol
+from typing import TYPE_CHECKING
+
 from PySide2.QtCore import QObject, Signal
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class Data(QObject):
@@ -21,3 +27,23 @@ class Data(QObject):
 
     def update(self):
         self.updated.emit()
+
+
+class DataHolder(Protocol):
+    @property
+    def data(self) -> Data:
+        pass
+
+    @data.setter
+    def data(self, value: Data):
+        pass
+
+    @property
+    def data_path_name(self) -> str:
+        pass
+
+    def _on_data_changing(self):
+        pass
+
+    def _on_data_changed(self):
+        pass

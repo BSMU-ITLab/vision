@@ -6,7 +6,7 @@ from PySide2.QtCore import QObject, Qt
 
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.plugins.windows.main import ViewMenu
-from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
+from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewerHolder
 
 if TYPE_CHECKING:
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
@@ -63,12 +63,12 @@ class MdiImageViewerLayerController(QObject):
 
     def _sub_window_layer_controller(self):
         active_sub_window = self.mdi.activeSubWindow()
-        if not isinstance(active_sub_window, LayeredImageViewerSubWindow):
+        if not isinstance(active_sub_window, LayeredImageViewerHolder):
             return None
 
         layer_controller = self.sub_windows_layer_controllers.get(active_sub_window)
         if layer_controller is None:
-            layer_controller = ImageViewerLayerController(active_sub_window.viewer)
+            layer_controller = ImageViewerLayerController(active_sub_window.layered_image_viewer)
             self.sub_windows_layer_controllers[active_sub_window] = layer_controller
         return layer_controller
 

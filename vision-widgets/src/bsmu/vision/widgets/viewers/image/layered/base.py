@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Protocol, runtime_checkable
 
 import numpy as np
 from PySide2.QtCore import QObject, Qt, Signal, QRectF, QPointF
@@ -8,14 +8,14 @@ from PySide2.QtGui import QPainter, QImage
 from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
 
 import bsmu.vision.core.converters.image as image_converter
-from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
 from bsmu.vision.core.image.base import Image, FlatImage
 from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
+from bsmu.vision.widgets.viewers.base import DataViewer
+from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
 
 
 class IntensityWindowing:
-    def __init__(self, pixels: np.ndarray, window_width: Optional[float] = None, window_level: Optional[float] = None):
+    def __init__(self, pixels: np.ndarray, window_width: float | None = None, window_level: float | None = None):
         self.pixels = pixels
         # Use explicit conversion from numpy type (e.g. np.uint8) to int, to prevent possible overflow
         pixels_min = int(pixels.min())
@@ -196,10 +196,17 @@ class _LayeredImageView(QObject):
         self._names_layer_views[layer_view.name] = layer_view
         self._layers_views[layer_view.image_layer] = layer_view
 
+    def remove_layer_view(self, layer_view: ImageLayer):
+        del self._layers_views[layer_view.image_layer]
+        del self._names_layer_views[layer_view.name]
+        self._layer_views.remove(layer_view)
+
 
 class _LayeredImageGraphicsObject(QGraphicsObject):
     layer_view_adding = Signal(ImageLayerView)
     layer_view_added = Signal(ImageLayerView)
+    layer_view_removing = Signal(ImageLayerView)
+    layer_view_removed = Signal(ImageLayerView)
 
     active_layer_view_changed = Signal(ImageLayerView, ImageLayerView)
     bounding_rect_changed = Signal(QRectF)
@@ -211,12 +218,20 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         self._active_layer_view = None
 
         self._bounding_rect_cache = None
+        self._bounding_rect_cache_before_reset = None
 
         self._view_min_spacing: float = float('inf')
 
     @property
     def active_layer_view(self) -> ImageLayerView:
         return self._active_layer_view
+
+    @active_layer_view.setter
+    def active_layer_view(self, value: ImageLayerView):
+        if self._active_layer_view != value:
+            prev_active_layer_view = self._active_layer_view
+            self._active_layer_view = value
+            self.active_layer_view_changed.emit(prev_active_layer_view, self._active_layer_view)
 
     @property
     def layer_views(self):
@@ -241,12 +256,11 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         # See QWidget::update() documentation.
         layer_view.image_changed.connect(self._on_layer_image_changed)
         layer_view.image_view_updated.connect(self._on_layer_image_view_updated)
-        layer_view.visibility_changed.connect(lambda: self.update())
-        layer_view.opacity_changed.connect(lambda: self.update())
+        layer_view.visibility_changed.connect(self._on_layer_view_visibility_changed)
+        layer_view.opacity_changed.connect(self._on_layer_view_opacity_changed)
 
         if len(self.layer_views) == 1:  # If was added first layer view
-            self._active_layer_view = layer_view
-            self.active_layer_view_changed.emit(None, self.active_layer_view)
+            self.active_layer_view = layer_view
 
         self._update_view_min_spacing()
 
@@ -254,10 +268,33 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
         self.layer_view_added.emit(layer_view)
 
+    def remove_layer_view(self, layer_view: ImageLayerView):
+        self.layer_view_removing.emit(layer_view)
+
+        self._layered_image_view.remove_layer_view(layer_view)
+
+        layer_view.image_changed.disconnect(self._on_layer_image_changed)
+        layer_view.image_view_updated.disconnect(self._on_layer_image_view_updated)
+        layer_view.visibility_changed.disconnect(self._on_layer_view_visibility_changed)
+        layer_view.opacity_changed.disconnect(self._on_layer_view_opacity_changed)
+
+        if len(self.layer_views) == 0:
+            self.active_layer_view = None
+
+        self._update_view_min_spacing()
+
+        self._reset_bounding_rect_cache()  # self.prepareGeometryChange() will call update() if this is necessary.
+
+        self.layer_view_removed.emit(layer_view)
+
+    def remove_layer_view_by_model(self, image_layer):
+        self.remove_layer_view(self._layered_image_view.layer_view_by_model(image_layer))
+
     def boundingRect(self):
         if self._bounding_rect_cache is None:
             self._bounding_rect_cache = self._calculate_bounding_rect()
-            self.bounding_rect_changed.emit(self._bounding_rect_cache)
+            if self._bounding_rect_cache != self._bounding_rect_cache_before_reset:
+                self.bounding_rect_changed.emit(self._bounding_rect_cache)
         return self._bounding_rect_cache
 
     def _calculate_bounding_rect(self) -> QRectF:
@@ -308,6 +345,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
     def _reset_bounding_rect_cache(self):
         if self._bounding_rect_cache is not None:
             self.prepareGeometryChange()
+            self._bounding_rect_cache_before_reset = self._bounding_rect_cache
             self._bounding_rect_cache = None
 
     def _update_view_min_spacing(self):
@@ -331,10 +369,18 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
         self.update()
 
+    def _on_layer_view_visibility_changed(self, visible: bool):
+        self.update()
+
+    def _on_layer_view_opacity_changed(self, opacity: float):
+        self.update()
+
 
 class LayeredImageViewer(DataViewer):
     layer_view_adding = Signal(ImageLayerView)
     layer_view_added = Signal(ImageLayerView)
+    layer_view_removing = Signal(ImageLayerView)
+    layer_view_removed = Signal(ImageLayerView)
 
     data_name_changed = Signal(str)
 
@@ -349,11 +395,13 @@ class LayeredImageViewer(DataViewer):
         self.layered_image_graphics_object.active_layer_view_changed.connect(
             self._on_active_layer_view_changed)
         self.layered_image_graphics_object.bounding_rect_changed.connect(
-            self.graphics_view.setSceneRect)
+            self._on_graphics_object_bounding_rect_changed)
         # self.layered_image_graphics_object.bounding_rect_changed.connect(
         #     self.graphics_scene.setSceneRect)
         self.layered_image_graphics_object.layer_view_adding.connect(self.layer_view_adding)
         self.layered_image_graphics_object.layer_view_added.connect(self.layer_view_added)
+        self.layered_image_graphics_object.layer_view_removing.connect(self.layer_view_removing)
+        self.layered_image_graphics_object.layer_view_removed.connect(self.layer_view_removed)
 
         self.graphics_scene.addItem(self.layered_image_graphics_object)
 
@@ -361,8 +409,6 @@ class LayeredImageViewer(DataViewer):
         grid_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout.addWidget(self.graphics_view)
         self.setLayout(grid_layout)
-
-        self.data.layer_added.connect(self._add_layer_view_from_model)
 
     @property
     def active_layer_view(self) -> ImageLayerView:
@@ -397,13 +443,34 @@ class LayeredImageViewer(DataViewer):
         self.add_layer(layer)
         return layer
 
+    def _on_data_changing(self):
+        if self.data is None:
+            return
+
+        self.data.layer_added.disconnect(self._add_layer_view_from_model)
+
+        for layer in self.layers:
+            self._remove_layer_view_by_model(layer)
+
+    def _on_data_changed(self):
+        if self.data is None:
+            return
+
+        self.data.layer_added.connect(self._add_layer_view_from_model)
+
+        for layer in self.layers:
+            self._add_layer_view_from_model(layer)
+
     def _add_layer_view(self, layer_view: ImageLayerView):
         self.layered_image_graphics_object.add_layer_view(layer_view)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer) -> ImageLayerView:
         pass
 
-    def _add_layer_views_from_model(self):
+    def _remove_layer_view_by_model(self, image_layer: ImageLayer):
+        self.layered_image_graphics_object.remove_layer_view_by_model(image_layer)
+
+    def _add_layer_views_from_model(self): #% temp
         if self.data is not None:
             for layer in self.data.layers:
                 self._add_layer_view_from_model(layer)
@@ -431,8 +498,8 @@ class LayeredImageViewer(DataViewer):
         viewport_pos = self.viewport.mapFrom(self.graphics_view, graphics_view_pos)
         return self.viewport_pos_to_layered_image_item_pos(viewport_pos)
 
-    def center(self):
-        self.graphics_view.centerOn(self.layered_image_graphics_object)
+    def fit_image_in(self):
+        self.graphics_view.fit_in_view(self.layered_image_graphics_object.boundingRect(), Qt.KeepAspectRatio)
 
     def _on_active_layer_view_changed(self, old_active_layer_view: ImageLayerView,
                                       new_active_layer_view: ImageLayerView):
@@ -440,6 +507,9 @@ class LayeredImageViewer(DataViewer):
             old_active_layer_view.image_view_updated.disconnect(self._on_active_layer_image_view_updated)
         if new_active_layer_view is not None:
             new_active_layer_view.image_view_updated.connect(self._on_active_layer_image_view_updated)
+
+    def _on_graphics_object_bounding_rect_changed(self, rect: QRectF):
+        self.graphics_view.set_visualized_scene_rect(rect)
 
     def _on_active_layer_image_view_updated(self, image_view: FlatImage):
         self.data_name_changed.emit(image_view.path_name)
@@ -450,3 +520,10 @@ class LayeredImageViewer(DataViewer):
     def print_layer_views(self):
         for index, layer_view in enumerate(self.layer_views):
             print(f'Layer {index}: {layer_view.name} opacity={layer_view.opacity}')
+
+
+@runtime_checkable
+class LayeredImageViewerHolder(Protocol):
+    @property
+    def layered_image_viewer(self) -> LayeredImageViewer:
+        pass

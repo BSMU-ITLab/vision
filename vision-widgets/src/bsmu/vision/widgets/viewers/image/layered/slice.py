@@ -89,7 +89,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
         first_layer_image_center_slice_number = math.floor(self.data.layers[0].image_pixels.shape[self.plane_axis] / 2)
         self.slice_number = slice_number if slice_number is not None else first_layer_image_center_slice_number
 
-        self._add_layer_views_from_model()
+        #%self._add_layer_views_from_model()
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer) -> VolumeSliceImageLayerView:
         if isinstance(image_layer.image, VolumeImage):

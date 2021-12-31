@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PySide2.QtCore import QObject, Qt, Signal, QAbstractTableModel, QModelIndex, QSize
 from PySide2.QtGui import QImage
-from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate
+from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter
 
 import bsmu.vision.core.converters.image as image_converter
 import bsmu.vision.dnn.segmenter as segmenter
@@ -20,6 +20,8 @@ from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as 
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
+from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
+from bsmu.vision.widgets.visibility_v2 import Visibility
 
 if TYPE_CHECKING:
     from typing import List, Any, Type
@@ -30,12 +32,16 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
+    from bsmu.vision.plugins.post_load_converters.manager import PostLoadConversionManagerPlugin, \
+        PostLoadConversionManager
 
 
 class RetinalFundusTableVisualizerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
+        'post_load_conversion_manager_plugin':
+            'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
     }
 
@@ -46,6 +52,7 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             self,
             main_window_plugin: MainWindowPlugin,
             data_visualization_manager_plugin: DataVisualizationManagerPlugin,
+            post_load_conversion_manager_plugin: PostLoadConversionManagerPlugin,
             mdi_plugin: MdiPlugin,
     ):
         super().__init__()
@@ -56,12 +63,16 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self._data_visualization_manager_plugin = data_visualization_manager_plugin
         self._data_visualization_manager: DataVisualizationManager | None = None
 
+        self._post_load_conversion_manager_plugin = post_load_conversion_manager_plugin
+        self._post_load_conversion_manager: PostLoadConversionManager | None = None
+
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
 
     def _enable(self):
         self._main_window = self._main_window_plugin.main_window
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
+        self._post_load_conversion_manager = self._post_load_conversion_manager_plugin.post_load_conversion_manager
         self._mdi = self._mdi_plugin.mdi
 
         disk_segmenter_model_props = self.config.value('disk-segmenter-model')
@@ -73,24 +84,34 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self.table_visualizer = RetinalFundusTableVisualizer(
             self._data_visualization_manager, self._mdi, disk_segmenter_model_params)
 
-        self._data_visualization_manager.data_visualized.connect(self.table_visualizer.visualize_retinal_fundus_data)
+        self._post_load_conversion_manager.data_converted.connect(self.table_visualizer.visualize_retinal_fundus_data)
 
         self._main_window.add_menu_action(WindowsMenu, 'Table', self._disable, #% self.table_visualizer.raise_journal_sub_window,
                                          Qt.CTRL + Qt.Key_1)
 
     def _disable(self):
-        self.data_visualization_manager.data_visualized.disconnect(self.table_visualizer.visualize_retinal_fundus_data)
+        self._post_load_conversion_manager.data_converted.disconnect(self.table_visualizer.visualize_retinal_fundus_data)
 
 
 class PatientRetinalFundusRecord(QObject):
-    def __init__(self, image: FlatImage):
+    def __init__(self, layered_image: LayeredImage):
         super().__init__()
 
-        self._image = image
+        self._layered_image = layered_image
+
+    @classmethod
+    def from_flat_image(cls, image: FlatImage) -> PatientRetinalFundusRecord:
+        layered_image = LayeredImage()
+        layered_image.add_layer_from_image(image, 'image')
+        return cls(layered_image)
+
+    @property
+    def layered_image(self) -> LayeredImage:
+        return self._layered_image
 
     @property
     def image(self) -> FlatImage:
-        return self._image
+        return self._layered_image.layers[0].image
 
 
 class PatientRetinalFundusJournal(Data):
@@ -134,7 +155,9 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
 
         self._data = data
         self._data.record_adding.connect(self._on_data_record_adding)
-        self._data.record_added.connect(self.endInsertRows)
+        self._data.record_added.connect(self._on_data_record_added)
+
+        self._row_by_record = {}
 
         self._preview_height = preview_height
 
@@ -144,6 +167,9 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
         # Store numpy array's data for preview images, because QImage uses it without copying,
         # and QImage will crash if it's data buffer will be deleted
         self._preview_data_buffer_by_row = {}
+
+    def record_row(self, record) -> int:
+        return self._row_by_record[record]
 
     def column_number(self, column: Type[TableColumn]) -> int:
         return self._number_by_column[column]
@@ -214,10 +240,14 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
         preview_model_index = self.index(row, self.column_number(PreviewTableColumn))
         return self.data(preview_model_index, TableItemDataRole.RECORD_REF)
 
-    def _on_data_record_adding(self):
+    def _on_data_record_adding(self, record):
         # Append one row
         row_count = self.rowCount()
         self.beginInsertRows(QModelIndex(), row_count, row_count)
+
+    def _on_data_record_added(self, record):
+        self.endInsertRows()
+        self._row_by_record[record] = self.rowCount() - 1
 
 
 class ImageCenterAlignmentDelegate(QStyledItemDelegate):
@@ -277,11 +307,85 @@ class PatientRetinalFundusJournalViewer(DataViewer):
         grid_layout.addWidget(self._table_view)
         self.setLayout(grid_layout)
 
+    def select_record(self, record: PatientRetinalFundusRecord):
+        row = self._table_model.record_row(record)
+        self._table_view.selectRow(row)
+
+
+class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
+    def __init__(self, data: PatientRetinalFundusJournal = None, parent: QWidget = None):
+        self._journal_viewer = PatientRetinalFundusJournalViewer(data)
+        self._journal_viewer.record_selected.connect(self._on_journal_record_selected)
+
+        super().__init__(parent)
+
+        self._layered_image_viewer = LayeredFlatImageViewer()
+        self._layer_visibility_by_name = {}
+
+        self._splitter = QSplitter()
+        self._splitter.addWidget(self._journal_viewer)
+        self._splitter.addWidget(self._layered_image_viewer)
+        # Divide the width equally between the two widgets
+        splitter_widget_size = max(
+            self._journal_viewer.minimumSizeHint().width(), self._layered_image_viewer.minimumSizeHint().width())
+        self._splitter.setSizes([splitter_widget_size, splitter_widget_size])
+
+        grid_layout = QGridLayout()
+        grid_layout.setContentsMargins(0, 0, 0, 0)
+        grid_layout.addWidget(self._splitter)
+        self.setLayout(grid_layout)
+
+    @property
+    def journal_viewer(self) -> PatientRetinalFundusJournalViewer:
+        return self._journal_viewer
+
+    @property
+    def layered_image_viewer(self) -> LayeredFlatImageViewer:
+        return self._layered_image_viewer
+
+    @property
+    def data(self) -> Data:
+        return self._journal_viewer.data
+
+    @data.setter
+    def data(self, value: Data):
+        self._journal_viewer.data = value
+
+    @property
+    def data_path_name(self):
+        return self._journal_viewer.data_path_name
+
+    def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
+        # Save previous visibility of layers
+        for layer_view in self.layered_image_viewer.layer_views:
+            layer_view_visibility = Visibility(layer_view.visible, layer_view.opacity)
+            self._layer_visibility_by_name[layer_view.name] = layer_view_visibility
+
+        self._layered_image_viewer.data = record.layered_image
+
+        # Restore previous visibility of layers
+        for layer_view in self.layered_image_viewer.layer_views:
+            prev_layer_visibility = self._layer_visibility_by_name.get(layer_view.name)
+            if prev_layer_visibility is not None:
+                layer_view.visible = prev_layer_visibility.visible
+                layer_view.opacity = prev_layer_visibility.opacity
+
+        self.layered_image_viewer.fit_image_in()
+
+
+class IllustratedJournalSubWindow(DataViewerSubWindow):
+    def __init__(self, viewer: DataViewer):
+        super().__init__(viewer)
+
+    @property
+    def layered_image_viewer(self) -> LayeredImageViewer:
+        return self.viewer.layered_image_viewer
+
 
 class RetinalFundusTableVisualizer(QObject):
     def __init__(
             self,
-            visualization_manager: DataVisualizationManager,
+            visualization_manager: DataVisualizationManager,  #% Temp
             mdi: Mdi,
             disk_segmenter_model_params: DnnModelParams
     ):
@@ -295,56 +399,62 @@ class RetinalFundusTableVisualizer(QObject):
         self._mask_palette = Palette.default_soft([0, 255, 0])
 
         self._journal = PatientRetinalFundusJournal()
-        self._journal.add_record(PatientRetinalFundusRecord(FlatImage(
+        self._journal.add_record(PatientRetinalFundusRecord.from_flat_image(FlatImage(
             array=np.random.randint(low=0, high=256, size=(50, 50), dtype=np.uint8),
             path=Path(r'D:\Temp\Void-1.png'))))
-        self._journal.add_record(PatientRetinalFundusRecord(FlatImage(
+        self._journal.add_record(PatientRetinalFundusRecord.from_flat_image(FlatImage(
             array=np.random.randint(low=0, high=256, size=(50, 50), dtype=np.uint8),
             path=Path(r'D:\Temp\Void-2.png'))))
-        self._journal_viewer = PatientRetinalFundusJournalViewer(self.journal)
-        self._journal_viewer.record_selected.connect(self._on_journal_record_selected)
 
         self._image_sub_windows_by_record = {}
 
-        self._journal_sub_window = DataViewerSubWindow(self.journal_viewer)
-        self._journal_sub_window.layout_anchors = np.array([[0, 0], [0.6, 1]])
+        self._illustrated_journal_viewer = PatientRetinalFundusIllustratedJournalViewer(self._journal)
+
+        self._journal_sub_window = IllustratedJournalSubWindow(self._illustrated_journal_viewer)
+        self._journal_sub_window.setWindowFlag(Qt.FramelessWindowHint)
+
         self._mdi.addSubWindow(self._journal_sub_window)
+        self._journal_sub_window.showMaximized()
 
     @property
     def journal(self) -> PatientRetinalFundusJournal:
         return self._journal
 
     @property
+    def illustrated_journal_viewer(self) -> PatientRetinalFundusIllustratedJournalViewer:
+        return self._illustrated_journal_viewer
+
+    @property
     def journal_viewer(self) -> PatientRetinalFundusJournalViewer:
-        return self._journal_viewer
+        return self._illustrated_journal_viewer.journal_viewer
 
-    def visualize_retinal_fundus_data(self, data: Data, data_viewer_sub_windows: List[DataViewerSubWindow]):
-        print('visualize_retinal_fundus_data', type(data))
+    @property
+    def layered_image_viewer(self) -> LayeredFlatImageViewer:
+        return self._illustrated_journal_viewer.layered_image_viewer
 
-        if isinstance(data, LayeredImage):
-            first_layer = data.layers[0]
-            image = first_layer.image
-            mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
-            # mask_palette = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
-            #                                                [1, 0, 255, 0, 100]])
-            print('bef mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))
-            mask_pixels = image_converter.normalized_uint8(mask_pixels)
-            print('aft mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))
+    def visualize_retinal_fundus_data(self, data: Data):
+        if not isinstance(data, LayeredImage):
+            return
 
-            mask_layer = data.add_layer_from_image(
-                FlatImage(array=mask_pixels, palette=self._mask_palette), name='masks')
+        first_layer = data.layers[0]
+        image = first_layer.image
+        mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
+        # mask_palette = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
+        #                                                [1, 0, 255, 0, 100]])
+        print('bef mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))
+        mask_pixels = image_converter.normalized_uint8(mask_pixels)
+        print('aft mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))
 
-            record = PatientRetinalFundusRecord(image)
-            self.journal.add_record(record)
+        mask_layer = data.add_layer_from_image(
+            FlatImage(array=mask_pixels, palette=self._mask_palette), name='mask')
 
-            self._image_sub_windows_by_record[record] = data_viewer_sub_windows
+        record = PatientRetinalFundusRecord(data)
+        self.journal.add_record(record)
 
-            for sub_window in data_viewer_sub_windows:
-                sub_window.layout_anchors = np.array([[0.6, 0], [1, 1]])
-                sub_window.lay_out_to_anchors()
+        self.journal_viewer.select_record(record)
 
-                mask_layer_view = sub_window.viewer.layer_view_by_model(mask_layer)
-                mask_layer_view.opacity = 0.4
+        # mask_layer_view = self.layered_image_viewer.layer_view_by_model(mask_layer)
+        # mask_layer_view.opacity = 0.4
 
     def raise_journal_sub_window(self):
         self._journal_sub_window.show_normal()

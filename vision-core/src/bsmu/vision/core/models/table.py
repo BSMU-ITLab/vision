@@ -49,7 +49,7 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         if self._record_storage is not None:
             self._on_record_storage_changing()
             for i, record in enumerate(self.storage_records):
-                self._on_record_removed(record, i)
+                self._on_record_removing(record, i)
 
         self._record_storage = value
 
@@ -135,15 +135,23 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self.endRemoveRows()
         return True
 
-    def _on_storage_record_adding(self):
+    def _on_storage_record_adding(self, record: QObject):
         # Append one row
-        row_count = self.rowCount()
-        self.beginInsertRows(QModelIndex(), row_count, row_count)
+        record_row = self.rowCount()
+        self.beginInsertRows(QModelIndex(), record_row, record_row)
 
-    def _on_storage_record_added(self):
+    def _on_storage_record_added(self, record: QObject):
         self.endInsertRows()
-        row = self.rowCount() - 1
-        self._on_record_added(self.storage_records[row], row)
+        record_row = self.rowCount() - 1
+        self._on_record_added(record, record_row)
+
+    def _on_storage_record_removing(self, record: QObject):
+        record_row = self.storage_records.index(record)
+        self._on_record_removing(record, record_row)
+        self.beginRemoveRows(QModelIndex(), record_row, record_row)
+
+    def _on_storage_record_removed(self, record: QObject):
+        self.endRemoveRows()
 
     @property
     @abstractmethod
@@ -171,5 +179,5 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         pass
 
     @abstractmethod
-    def _on_record_removed(self, record: QObject, row: int):
+    def _on_record_removing(self, record: QObject, row: int):
         pass

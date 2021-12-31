@@ -53,6 +53,11 @@ class GraphicsView(QGraphicsView):
         view_smooth_zoom.zoom_finished.connect(self._on_zoom_finished)
         self.viewport().installEventFilter(view_smooth_zoom)
 
+    def set_visualized_scene_rect(self, rect: QRectF):
+        self.setSceneRect(rect)
+
+        self._update_viewport_anchors()
+
     def paintEvent(self, event: QPaintEvent):
         super().paintEvent(event)
 
@@ -105,12 +110,15 @@ class GraphicsView(QGraphicsView):
         if self._viewport_anchoring:
             return
 
+        scene_rect = self.sceneRect()
+        if scene_rect.isEmpty():
+            return
+
+        scene_size = np.array([scene_rect.width(), scene_rect.height()])
+
         viewport_rect = self.viewport().rect()
         top_left_viewport_point = self.mapToScene(viewport_rect.topLeft())
         bottom_right_viewport_point = self.mapToScene(viewport_rect.bottomRight())
-
-        scene_rect = self.sceneRect()
-        scene_size = np.array([scene_rect.width(), scene_rect.height()])
 
         self._viewport_anchors[0] = np.array([top_left_viewport_point.x(), top_left_viewport_point.y()]) / scene_size
         self._viewport_anchors[1] = \
@@ -143,6 +151,7 @@ class GraphicsView(QGraphicsView):
         self.fitInView(rect, aspect_ratio_mode)
 
         self._update_scale()
+        self._update_viewport_anchors()
 
 
 class _ViewSmoothZoom(QObject):

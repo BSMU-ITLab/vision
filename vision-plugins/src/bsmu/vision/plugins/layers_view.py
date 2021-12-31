@@ -9,8 +9,8 @@ from PySide2.QtWidgets import QTableView, QDockWidget
 
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
+from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewerHolder
 from bsmu.vision.widgets.visibility_v2 import Visibility, VisibilityDelegate
 
 if TYPE_CHECKING:
@@ -78,8 +78,8 @@ class LayersTableViewPlugin(Plugin):
         raise NotImplementedError
 
     def _on_mdi_sub_window_activated(self, sub_window: QMdiSubWindow):
-        if isinstance(sub_window, LayeredImageViewerSubWindow):
-            self._layers_table_model.record_storage = sub_window.viewer
+        if isinstance(sub_window, LayeredImageViewerHolder):
+            self._layers_table_model.record_storage = sub_window.layered_image_viewer
         else:
             self._layers_table_model.record_storage = None
 
@@ -126,10 +126,14 @@ class LayersTableModel(RecordTableModel):
     def _on_record_storage_changing(self):
         self.record_storage.layer_view_adding.disconnect(self._on_storage_record_adding)
         self.record_storage.layer_view_added.disconnect(self._on_storage_record_added)
+        self.record_storage.layer_view_removing.disconnect(self._on_storage_record_removing)
+        self.record_storage.layer_view_removed.disconnect(self._on_storage_record_removed)
 
     def _on_record_storage_changed(self):
         self.record_storage.layer_view_adding.connect(self._on_storage_record_adding)
         self.record_storage.layer_view_added.connect(self._on_storage_record_added)
+        self.record_storage.layer_view_removing.connect(self._on_storage_record_removing)
+        self.record_storage.layer_view_removed.connect(self._on_storage_record_removed)
 
     def _on_record_added(self, record: ImageLayerView, row: int):
         visibility_changed_handler = partial(self._on_visibility_changed, record, row)
@@ -140,7 +144,7 @@ class LayersTableModel(RecordTableModel):
         self.opacity_changed_handler_by_record[record] = opacity_changed_handler
         record.opacity_changed.connect(opacity_changed_handler)
 
-    def _on_record_removed(self, record: ImageLayerView, row: int):
+    def _on_record_removing(self, record: ImageLayerView, row: int):
         visibility_changed_handler = self.visibility_changed_handler_by_record.pop(record)
         record.visibility_changed.disconnect(visibility_changed_handler)
 

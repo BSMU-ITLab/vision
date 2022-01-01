@@ -385,13 +385,14 @@ class LayeredImageViewer(DataViewer):
     data_name_changed = Signal(str)
 
     def __init__(self, data: LayeredImage = None, zoomable: bool = True):
+        self.layered_image_graphics_object = _LayeredImageGraphicsObject()
+
         super().__init__(data)
 
         self.graphics_scene = QGraphicsScene()
 
         self.graphics_view = GraphicsView(self.graphics_scene, zoomable)
 
-        self.layered_image_graphics_object = _LayeredImageGraphicsObject()
         self.layered_image_graphics_object.active_layer_view_changed.connect(
             self._on_active_layer_view_changed)
         self.layered_image_graphics_object.bounding_rect_changed.connect(
@@ -469,11 +470,6 @@ class LayeredImageViewer(DataViewer):
 
     def _remove_layer_view_by_model(self, image_layer: ImageLayer):
         self.layered_image_graphics_object.remove_layer_view_by_model(image_layer)
-
-    def _add_layer_views_from_model(self): #% temp
-        if self.data is not None:
-            for layer in self.data.layers:
-                self._add_layer_view_from_model(layer)
 
     @property
     def viewport(self):

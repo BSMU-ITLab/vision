@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 import numpy as np
 
@@ -80,16 +79,22 @@ class VolumeSliceImageLayerView(ImageLayerView):
 
 
 class VolumeSliceImageViewer(LayeredImageViewer):
-    def __init__(self, plane_axis: PlaneAxis, slice_number: Optional[int] = None, data: LayeredImage = None,
-                 zoomable: bool = True):
-        super().__init__(data, zoomable)
-
+    def __init__(
+            self,
+            plane_axis: PlaneAxis,
+            slice_number: int | None = None,
+            data: LayeredImage = None,
+            zoomable: bool = True
+    ):
         self.plane_axis = plane_axis
 
-        first_layer_image_center_slice_number = math.floor(self.data.layers[0].image_pixels.shape[self.plane_axis] / 2)
-        self.slice_number = slice_number if slice_number is not None else first_layer_image_center_slice_number
+        if slice_number is None:
+            # Use center image slice of first layer
+            slice_number = math.floor(data.layers[0].image_pixels.shape[self.plane_axis] / 2)
 
-        #%self._add_layer_views_from_model()
+        self.slice_number = slice_number
+
+        super().__init__(data, zoomable)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer) -> VolumeSliceImageLayerView:
         if isinstance(image_layer.image, VolumeImage):

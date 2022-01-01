@@ -62,7 +62,7 @@ class LayersTableViewPlugin(Plugin):
 
         self._mdi.subWindowActivated.connect(self._on_mdi_sub_window_activated)
 
-        self._main_window.addDockWidget(Qt.LeftDockWidgetArea, self._layers_table_view_dock_widget, Qt.Vertical)
+        self._main_window.addDockWidget(Qt.LeftDockWidgetArea, self._layers_table_view_dock_widget)
 
     def _disable(self):
         self._main_window.removeDockWidget(self._layers_table_view_dock_widget)

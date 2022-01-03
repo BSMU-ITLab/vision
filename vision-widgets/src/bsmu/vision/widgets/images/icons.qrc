@@ -16,5 +16,6 @@ D:\Projects\vision\vision-widgets\src\bsmu\vision\widgets\images> pyside2-rcc ic
     <file>icons/eye-crossed-out.svg</file>
     <file>icons/eye-outlined.svg</file>
     <file>icons/eye-outlined-crossed-out.svg</file>
+    <file>icons/vision.svg</file>
 </qresource>
 </RCC>

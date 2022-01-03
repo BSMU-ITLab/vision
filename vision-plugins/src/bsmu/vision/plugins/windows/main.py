@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import Qt
+from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import QMainWindow, QMenuBar, QMenu
 from sortedcontainers import SortedDict
 
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.widgets.images import icons_rc  # noqa: F401
 
 if TYPE_CHECKING:
     from typing import Tuple, Type
@@ -115,6 +117,9 @@ class MainWindowPlugin(Plugin):
         title_config = self.config.value('title')
         if title_config is not None:
             self._main_window.setWindowTitle(title_config)
+
+        icon = QIcon(':/icons/vision.svg')
+        self._main_window.setWindowIcon(icon)
 
         self._main_window.show()
 

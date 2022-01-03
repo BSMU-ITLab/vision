@@ -101,6 +101,7 @@ class AppBuilder:
                                    'that is easily extensible with plugins.',
             app_base: str | None = 'Win32GUI',  # Use None for a console application
             # (or to display GUI and console windows)
+            icon_path_relative_to_file_dir: Path | None = None,
 
             add_packages: List[str] | None = None,
             packages_with_data: List[ModuleType] | None = None,
@@ -119,6 +120,10 @@ class AppBuilder:
         self._app_version = app_version
         self._app_description = app_description
         self._app_base = app_base
+        if icon_path_relative_to_file_dir is None:
+            self._icon_path = Path(__file__).parent / 'images/icons/vision.ico'
+        else:
+            self._icon_path = self._file_dir / icon_path_relative_to_file_dir
 
         if build_exe_options is None:
             default_packages = self._BASE_BUILD_EXE_PACKAGES
@@ -157,6 +162,7 @@ class AppBuilder:
                 target_name=f'{self._app_name.replace(" ", "")}-{self._app_version}',
                 shortcut_name=self._app_name,
                 shortcut_dir='DesktopFolder',
+                icon=self._icon_path,
             )]
         )
 

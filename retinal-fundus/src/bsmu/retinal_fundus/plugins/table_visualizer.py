@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,6 +13,7 @@ import bsmu.vision.dnn.segmenter as segmenter
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.models.table import RecordTableModel, TableColumn, TableItemDataRole
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
@@ -117,6 +117,8 @@ class PatientRetinalFundusRecord(QObject):
 class PatientRetinalFundusJournal(Data):
     record_adding = Signal(PatientRetinalFundusRecord)
     record_added = Signal(PatientRetinalFundusRecord)
+    record_removing = Signal(PatientRetinalFundusRecord)
+    record_removed = Signal(PatientRetinalFundusRecord)
 
     def __init__(self):
         super().__init__()
@@ -133,10 +135,6 @@ class PatientRetinalFundusJournal(Data):
         self.record_added.emit(record)
 
 
-class TableColumn:
-    TITLE = ''
-
-
 class PreviewTableColumn(TableColumn):
     TITLE = 'Preview'
 
@@ -145,60 +143,34 @@ class NameTableColumn(TableColumn):
     TITLE = 'Name'
 
 
-class TableItemDataRole(IntEnum):
-    RECORD_REF = Qt.UserRole
-
-
-class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
-    def __init__(self, data: PatientRetinalFundusJournal, preview_height: int | None = None, parent: QObject = None):
-        super().__init__(parent)
-
-        self._data = data
-        self._data.record_adding.connect(self._on_data_record_adding)
-        self._data.record_added.connect(self._on_data_record_added)
-
-        self._row_by_record = {}
+class PatientRetinalFundusJournalTableModel(RecordTableModel):
+    def __init__(
+            self,
+            record_storage: PatientRetinalFundusJournal = None,
+            preview_height: int | None = None,
+            parent: QObject = None
+    ):
+        super().__init__(record_storage, PatientRetinalFundusRecord, (PreviewTableColumn, NameTableColumn), parent)
 
         self._preview_height = preview_height
 
-        self._columns = [PreviewTableColumn, NameTableColumn]
-        self._number_by_column = {column: number for number, column in enumerate(self._columns)}
-
         # Store numpy array's data for preview images, because QImage uses it without copying,
         # and QImage will crash if it's data buffer will be deleted
-        self._preview_data_buffer_by_row = {}
+        self._preview_data_buffer_by_record = {}
 
-    def record_row(self, record) -> int:
-        return self._row_by_record[record]
+    @property
+    def storage_records(self) -> List[PatientRetinalFundusRecord]:
+        return self.record_storage.records
 
-    def column_number(self, column: Type[TableColumn]) -> int:
-        return self._number_by_column[column]
-
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 0 if parent.isValid() else len(self._data.records)
-
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 0 if parent.isValid() else len(self._columns)
-
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
-        if not index.isValid():
-            return
-
-        if index.row() >= len(self._data.records) or index.row() < 0:
-            return
-
-        record = self._data.records[index.row()]
+    def _record_data(self, record: PatientRetinalFundusRecord, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if role == Qt.DisplayRole:
             if index.column() == self.column_number(NameTableColumn):
                 return record.image.path_name
-        elif role == TableItemDataRole.RECORD_REF:
-            if index.column() == self.column_number(PreviewTableColumn):
-                return record
         elif role == Qt.DecorationRole:
             if index.column() == self.column_number(PreviewTableColumn):
                 preview_rgba_pixels = image_converter.converted_to_rgba(record.image.array)
                 # Keep reference to numpy data, otherwise QImage will crash
-                self._preview_data_buffer_by_row[index.row()] = preview_rgba_pixels.data
+                self._preview_data_buffer_by_record[record] = preview_rgba_pixels.data
 
                 qimage_format = QImage.Format_RGBA8888_Premultiplied if preview_rgba_pixels.itemsize == 1 \
                     else QImage.Format_RGBA64_Premultiplied
@@ -207,47 +179,17 @@ class PatientRetinalFundusJournalTableModel(QAbstractTableModel):
                     preview_qimage = preview_qimage.scaledToHeight(self._preview_height, Qt.SmoothTransformation)
                 return preview_qimage
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
-        if role != Qt.DisplayRole:
-            return
+    def _on_record_storage_changing(self):
+        self.record_storage.record_adding.disconnect(self._on_storage_record_adding)
+        self.record_storage.record_added.disconnect(self._on_storage_record_added)
+        self.record_storage.record_removing.disconnect(self._on_storage_record_removing)
+        self.record_storage.record_removed.disconnect(self._on_storage_record_removed)
 
-        if orientation == Qt.Horizontal:
-            return self._columns[section].TITLE
-        elif orientation == Qt.Vertical:
-            return section + 1
-
-    # Need this function only to insert some rows into our |self._data| using this model
-    # E.g. some view can use this function to insert rows
-    # At other times it's more convenient to use |self._data.add_record| method
-    def insertRows(self, row: int, count: int, parent: QModelIndex = QModelIndex()) -> bool:
-        self.beginInsertRows(QModelIndex(), row, row + count - 1)
-
-        for i in range(count):
-            self._data.records.insert(row, PatientRetinalFundusRecord(FlatImage()))
-
-        self.endInsertRows()
-        return True
-
-    def removeRows(self, row: int, count: int, parent: QModelIndex = QModelIndex()) -> bool:
-        self.beginRemoveRows(QModelIndex(), row, row + count - 1)
-
-        del self._data.records[row: row + count]
-
-        self.endRemoveRows()
-        return True
-
-    def row_record(self, row: int) -> PatientRetinalFundusRecord:
-        preview_model_index = self.index(row, self.column_number(PreviewTableColumn))
-        return self.data(preview_model_index, TableItemDataRole.RECORD_REF)
-
-    def _on_data_record_adding(self, record):
-        # Append one row
-        row_count = self.rowCount()
-        self.beginInsertRows(QModelIndex(), row_count, row_count)
-
-    def _on_data_record_added(self, record):
-        self.endInsertRows()
-        self._row_by_record[record] = self.rowCount() - 1
+    def _on_record_storage_changed(self):
+        self.record_storage.record_adding.connect(self._on_storage_record_adding)
+        self.record_storage.record_added.connect(self._on_storage_record_added)
+        self.record_storage.record_removing.connect(self._on_storage_record_removing)
+        self.record_storage.record_removed.connect(self._on_storage_record_removed)
 
 
 class ImageCenterAlignmentDelegate(QStyledItemDelegate):

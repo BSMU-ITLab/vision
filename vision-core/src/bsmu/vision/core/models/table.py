@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from enum import IntEnum
 from typing import TYPE_CHECKING
 
 from PySide2.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
@@ -15,6 +16,10 @@ class TableColumn:
     TITLE = ''
 
 
+class TableItemDataRole(IntEnum):
+    RECORD_REF = Qt.UserRole
+
+
 class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
     def __init__(
             self,
@@ -25,15 +30,29 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
     ):
         super().__init__(parent)
 
-        self._record_storage = None
-        self.record_storage = record_storage
-
         self._record_type = record_type
         self._columns = columns
         self._number_by_column = {column: number for number, column in enumerate(self._columns)}
 
+        self._record_storage = None
+        self.record_storage = record_storage
+
     def clean_up(self):
         self.record_storage = None
+
+    def record_row(self, record: QObject) -> int:
+        matched_indexes = self.match(
+            self.index(0, self.record_column_number),
+            TableItemDataRole.RECORD_REF,
+            record,
+            hits=1,
+            flags=Qt.MatchExactly
+        )
+        return matched_indexes[0].row()
+
+    @property
+    def record_column_number(self) -> int:
+        return 0  # Use zero column to store record reference
 
     @property
     def record_storage(self) -> QObject:
@@ -48,14 +67,14 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
         if self._record_storage is not None:
             self._on_record_storage_changing()
-            for i, record in enumerate(self.storage_records):
-                self._on_record_removing(record, i)
+            for record in self.storage_records:
+                self._on_record_removing(record, self.record_row(record))
 
         self._record_storage = value
 
         if self._record_storage is not None:
-            for i, record in enumerate(self.storage_records):
-                self._on_record_added(record, i)
+            for record in self.storage_records:
+                self._on_record_added(record, self.record_row(record))
             self._on_record_storage_changed()
 
         self.endResetModel()
@@ -68,6 +87,10 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return 0 if parent.isValid() or self.record_storage is None else len(self._columns)
+
+    def row_record(self, row: int) -> QObject:
+        record_model_index = self.index(row, self.record_column_number)
+        return self.data(record_model_index, TableItemDataRole.RECORD_REF)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         if not index.isValid():
@@ -94,6 +117,10 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
             return
 
         record = self.storage_records[index.row()]
+        if role == TableItemDataRole.RECORD_REF:
+            if index.column() == self.record_column_number:
+                return record
+
         return self._record_data(record, index, role)
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.EditRole) -> bool:
@@ -137,16 +164,16 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
     def _on_storage_record_adding(self, record: QObject):
         # Append one row
-        record_row = self.rowCount()
-        self.beginInsertRows(QModelIndex(), record_row, record_row)
+        new_record_row = self.rowCount()
+        self.beginInsertRows(QModelIndex(), new_record_row, new_record_row)
 
     def _on_storage_record_added(self, record: QObject):
         self.endInsertRows()
-        record_row = self.rowCount() - 1
-        self._on_record_added(record, record_row)
+        new_record_row = self.rowCount() - 1
+        self._on_record_added(record, new_record_row)
 
     def _on_storage_record_removing(self, record: QObject):
-        record_row = self.storage_records.index(record)
+        record_row = self.record_row(record)
         self._on_record_removing(record, record_row)
         self.beginRemoveRows(QModelIndex(), record_row, record_row)
 
@@ -162,22 +189,17 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
     def _record_data(self, record: QObject, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         pass
 
-    @abstractmethod
     def _set_record_data(self, record: QObject, index: QModelIndex, value: Any) -> bool | Tuple[bool, bool]:
         pass
 
-    @abstractmethod
     def _on_record_storage_changing(self):
         pass
 
-    @abstractmethod
     def _on_record_storage_changed(self):
         pass
 
-    @abstractmethod
     def _on_record_added(self, record: QObject, row: int):
         pass
 
-    @abstractmethod
     def _on_record_removing(self, record: QObject, row: int):
         pass

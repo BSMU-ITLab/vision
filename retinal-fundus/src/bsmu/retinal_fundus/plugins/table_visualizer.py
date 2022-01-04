@@ -4,16 +4,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide2.QtCore import QObject, Qt, Signal, QAbstractTableModel, QModelIndex, QSize
+from PySide2.QtCore import QObject, Qt, Signal, QModelIndex, QSize
 from PySide2.QtGui import QImage
-from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter
+from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, QAbstractItemView
 
 import bsmu.vision.core.converters.image as image_converter
 import bsmu.vision.dnn.segmenter as segmenter
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
-from bsmu.vision.core.models.table import RecordTableModel, TableColumn, TableItemDataRole
+from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
@@ -24,7 +24,7 @@ from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewe
 from bsmu.vision.widgets.visibility_v2 import Visibility
 
 if TYPE_CHECKING:
-    from typing import List, Any, Type
+    from typing import List, Any
 
     from PySide2.QtCore import QAbstractItemModel
     from PySide2.QtWidgets import QWidget, QStyleOptionViewItem
@@ -216,6 +216,8 @@ class PatientRetinalFundusJournalTableView(QTableView):
             vertical_header = self.verticalHeader()
             vertical_header.setSectionResizeMode(QHeaderView.Fixed)
             vertical_header.setDefaultSectionSize(row_height)
+
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
 
     def setModel(self, model: QAbstractItemModel):
         super().setModel(model)

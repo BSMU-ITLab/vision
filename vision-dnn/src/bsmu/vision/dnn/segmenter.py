@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import numbers
 from typing import TYPE_CHECKING
 
@@ -10,7 +11,7 @@ import onnxruntime as ort
 import bsmu.vision.core.converters.image as image_converter
 
 if TYPE_CHECKING:
-    from typing import Callable, List, Tuple
+    from typing import Callable, List, Tuple, Sequence
     from pathlib import Path
 
 
@@ -71,11 +72,75 @@ def preprocessed_image(image: np.ndarray, normalize: bool = True, preprocessing_
     return image
 
 
-def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.ndarray]:
+class BBox:
+    def __init__(
+            self,
+            left: int,      # included
+            right: int,     # excluded
+            top: int,       # included
+            bottom: int,    # excluded
+    ):
+        self.left = left
+        self.right = right
+        self.top = top
+        self.bottom = bottom
+
+    @property
+    def width(self) -> int:
+        return self.right - self.left
+
+    @property
+    def height(self) -> int:
+        return self.bottom - self.top
+
+    def resize(self, resize_factor_x: float, resize_factor_y: float):
+        self.left = round(resize_factor_x * self.left)
+        self.right = round(resize_factor_x * self.right)
+        self.top = round(resize_factor_y * self.top)
+        self.bottom = round(resize_factor_y * self.bottom)
+
+    def resized(self, resize_factor_x: float, resize_factor_y: float) -> BBox:
+        resized_bbox = copy.copy(self)
+        resized_bbox.resize(resize_factor_x, resize_factor_y)
+        return resized_bbox
+
+    def clip_to_shape(self, shape: Sequence[int]):
+        if self.left < 0:
+            self.left = 0
+
+        if self.top < 0:
+            self.top = 0
+
+        shape_width = shape[1]
+        if self.right > shape_width:
+            self.right = shape_width
+
+        shape_height = shape[0]
+        if self.bottom > shape_height:
+            self.bottom = shape_height
+
+    def clipped_to_shape(self, shape: Sequence[int]) -> BBox:
+        clipped_bbox = copy.copy(self)
+        clipped_bbox.clip_to_shape(shape)
+        return clipped_bbox
+
+    def add_margins(self, margin_size: int):
+        self.left -= margin_size
+        self.right += margin_size
+        self.top -= margin_size
+        self.bottom += margin_size
+
+    def margins_added(self, margin_size: int) -> BBox:
+        bbox_with_margins = copy.copy(self)
+        bbox_with_margins.add_margins(margin_size)
+        return bbox_with_margins
+
+
+def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.ndarray, BBox | None]:
     """
     Find a connected component with the largest area (exclude background label, which is 0)
     :param mask: mask to find connected components
-    :return: Tuple[largest connected component label, labeled mask]
+    :return: Tuple[largest connected component label, labeled mask, largest connected component bbox]
     If all pixels are background (zeros), then return None as the largest connected component label
     """
 
@@ -89,7 +154,19 @@ def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.
         if label_area > largest_area:
             largest_area = label_area
             label_with_largest_area = label
-    return label_with_largest_area, labeled_mask
+    if label_with_largest_area is None:
+        largest_component_bbox = None
+    else:
+        largest_component_stats_array = stats_by_component_label[label_with_largest_area]
+        largest_component_left = largest_component_stats_array[cv.CC_STAT_LEFT]
+        largest_component_top = largest_component_stats_array[cv.CC_STAT_TOP]
+        largest_component_bbox = BBox(
+            largest_component_left,
+            largest_component_left + largest_component_stats_array[cv.CC_STAT_WIDTH],
+            largest_component_top,
+            largest_component_top + largest_component_stats_array[cv.CC_STAT_HEIGHT],
+        )
+    return label_with_largest_area, labeled_mask, largest_component_bbox
 
 
 class Segmenter:
@@ -98,22 +175,18 @@ class Segmenter:
 
         self._inference_session: ort.InferenceSession | None = None
 
-    def segment(
-            self,
-            image: np.ndarray,
-            postprocessing: Callable[[np.ndarray], np.ndarray] | None = None
-    ) -> np.ndarray:
-
+    def _create_inference_session(self):
         if self._inference_session is None:
             self._inference_session = ort.InferenceSession(
                 str(self._model_params.path), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
 
-        src_image_shape = image.shape
+    def _segment_without_resize(self, image: np.ndarray) -> np.ndarray:
         image = cv.resize(image, self._model_params.input_image_size, interpolation=cv.INTER_AREA)
         image = preprocessed_image(image, normalize=True, preprocessing_mode=self._model_params.preprocessing_mode)
 
         input_image_batch = [image]
 
+        self._create_inference_session()
         model_inputs: List[ort.NodeArg] = self._inference_session.get_inputs()
         assert len(model_inputs) == 1, 'Segmenter can process only models with one input'
         input_feed = {model_inputs[0].name: input_image_batch}
@@ -125,41 +198,68 @@ class Segmenter:
 
         mask = output_mask_batch[0]
         mask = np.squeeze(mask)
+        return mask
+
+    def segment(
+            self,
+            image: np.ndarray,
+            postprocessing: Callable[[np.ndarray], np.ndarray | Tuple[np.ndarray, ...]] | None = None
+    ) -> np.ndarray:
+        mask = self._segment_without_resize(image)
 
         if postprocessing is not None:
-            mask = postprocessing(mask)
+            postprocessing_result = postprocessing(mask)
+            if isinstance(postprocessing_result, tuple):
+                mask = postprocessing_result[0]
+            else:
+                mask = postprocessing_result
 
+        src_image_shape = image.shape
         mask = cv.resize(mask, (src_image_shape[1], src_image_shape[0]), interpolation=cv.INTER_LINEAR_EXACT)
 
         return mask
 
+    def segment_largest_connected_component_and_return_mask_with_bbox(
+            self, image: np.ndarray) -> Tuple[np.ndarray, BBox]:
+        mask = self._segment_without_resize(image)
+        mask, largest_component_bbox = largest_connected_component_mask(mask)
 
-def largest_connected_component_soft_mask(soft_mask: np.ndarray) -> np.ndarray:
+        src_image_shape = image.shape
+        resize_factor_x = src_image_shape[1] / mask.shape[1]
+        resize_factor_y = src_image_shape[0] / mask.shape[0]
+        largest_component_bbox.resize(resize_factor_x, resize_factor_y)
+        largest_component_bbox.clip_to_shape(src_image_shape)
+
+        mask = cv.resize(mask, (src_image_shape[1], src_image_shape[0]), interpolation=cv.INTER_NEAREST_EXACT)
+        return mask, largest_component_bbox
+
+
+def largest_connected_component_soft_mask(soft_mask: np.ndarray) -> Tuple[np.ndarray, BBox]:
     """
     Erase all pixels, which do not belong to the largest connected component.
-    :return: soft mask with only largest connected component
+    :return: Tuple[soft mask with only largest connected component, largest connected component bbox]
     """
 
     assert issubclass(soft_mask.dtype.type, numbers.Real), 'This function is created for soft mask processing.'
 
     mask = np.round(soft_mask).astype(np.uint8)
-    label_with_largest_area, labeled_mask = largest_connected_component_label(mask)
+    label_with_largest_area, labeled_mask, largest_component_bbox = largest_connected_component_label(mask)
     soft_mask_with_largest_connected_component = soft_mask.copy()
     # Do not erase zero-pixels to get soft mask
     soft_mask_with_largest_connected_component[
         np.logical_and(labeled_mask != label_with_largest_area, labeled_mask != 0)] = 0
-    return soft_mask_with_largest_connected_component
+    return soft_mask_with_largest_connected_component, largest_component_bbox
 
 
-def largest_connected_component_mask(soft_mask: np.ndarray) -> np.ndarray:
+def largest_connected_component_mask(soft_mask: np.ndarray) -> Tuple[np.ndarray, BBox]:
     """
     Erase all pixels, which do not belong to the largest connected component.
-    :return: binarized mask with only largest connected component
+    :return: Tuple[binarized mask with only largest connected component, largest connected component bbox]
     """
 
     assert issubclass(soft_mask.dtype.type, numbers.Real), 'This function is created for soft mask processing.'
 
     mask = np.round(soft_mask).astype(np.uint8)
-    label_with_largest_area, labeled_mask = largest_connected_component_label(mask)
+    label_with_largest_area, labeled_mask, largest_component_bbox = largest_connected_component_label(mask)
     mask[labeled_mask != label_with_largest_area] = 0
-    return mask
+    return mask, largest_component_bbox

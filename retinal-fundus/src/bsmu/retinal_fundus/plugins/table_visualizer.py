@@ -382,7 +382,20 @@ class RetinalFundusTableVisualizer(QObject):
 
         first_layer = data.layers[0]
         image = first_layer.image
-        mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
+
+        #mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
+        mask_pixels, disk_bbox = \
+            self._segmenter.segment_largest_connected_component_and_return_mask_with_bbox(image.array)
+
+        disk_bbox.add_margins(round(disk_bbox.width / 2))
+        disk_bbox.clip_to_shape(image.array.shape)
+
+        disk_region_image_pixels = image.array[
+                                   disk_bbox.top:disk_bbox.bottom,
+                                   disk_bbox.left:disk_bbox.right,
+                                   ...]
+        data.add_layer_from_image(FlatImage(disk_region_image_pixels), name='disk-region')
+
         # mask_palette = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
         #                                                [1, 0, 255, 0, 100]])
         print('bef mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))

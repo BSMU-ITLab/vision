@@ -135,6 +135,14 @@ class BBox:
         bbox_with_margins.add_margins(margin_size)
         return bbox_with_margins
 
+    def move_left(self, value: int):
+        self.left -= value
+        self.right -= value
+
+    def move_top(self, value: int):
+        self.top -= value
+        self.bottom -= value
+
 
 def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.ndarray, BBox | None]:
     """
@@ -180,7 +188,12 @@ class Segmenter:
             self._inference_session = ort.InferenceSession(
                 str(self._model_params.path), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
 
-    def _segment_without_resize(self, image: np.ndarray) -> np.ndarray:
+    def _segment_without_postresize(self, image: np.ndarray) -> np.ndarray:
+        # If it's an RGBA-image
+        if image.shape[2] == 4:
+            # Remove alpha-channel
+            image = image[:, :, :3]
+
         image = cv.resize(image, self._model_params.input_image_size, interpolation=cv.INTER_AREA)
         image = preprocessed_image(image, normalize=True, preprocessing_mode=self._model_params.preprocessing_mode)
 
@@ -205,7 +218,7 @@ class Segmenter:
             image: np.ndarray,
             postprocessing: Callable[[np.ndarray], np.ndarray | Tuple[np.ndarray, ...]] | None = None
     ) -> np.ndarray:
-        mask = self._segment_without_resize(image)
+        mask = self._segment_without_postresize(image)
 
         if postprocessing is not None:
             postprocessing_result = postprocessing(mask)
@@ -220,17 +233,47 @@ class Segmenter:
         return mask
 
     def segment_largest_connected_component_and_return_mask_with_bbox(
-            self, image: np.ndarray) -> Tuple[np.ndarray, BBox]:
-        mask = self._segment_without_resize(image)
+            self, image: np.ndarray, use_square_image: bool = True) -> Tuple[np.ndarray, BBox]:
+        src_image_shape = image.shape
+
+        if use_square_image:
+            max_size = max(src_image_shape[:2])
+            height_border = max_size - src_image_shape[0]
+            top_border = int(height_border / 2)
+            bottom_border = height_border - top_border
+            width_border = max_size - src_image_shape[1]
+            left_border = int(width_border / 2)
+            right_border = width_border - left_border
+
+            border_value = [0] * image.shape[2]
+            image = cv.copyMakeBorder(
+                image, top_border, bottom_border, left_border, right_border, cv.BORDER_CONSTANT, value=border_value)
+
+        image_shape_before_preresize = image.shape
+        mask = self._segment_without_postresize(image)
         mask, largest_component_bbox = largest_connected_component_mask(mask)
 
-        src_image_shape = image.shape
-        resize_factor_x = src_image_shape[1] / mask.shape[1]
-        resize_factor_y = src_image_shape[0] / mask.shape[0]
+        resize_factor_x = image_shape_before_preresize[1] / mask.shape[1]
+        resize_factor_y = image_shape_before_preresize[0] / mask.shape[0]
         largest_component_bbox.resize(resize_factor_x, resize_factor_y)
+
+        mask = cv.resize(
+            mask,
+            (image_shape_before_preresize[1], image_shape_before_preresize[0]),
+            interpolation=cv.INTER_NEAREST_EXACT
+        )
+
+        if use_square_image:
+            largest_component_bbox.move_left(left_border)
+            largest_component_bbox.move_top(top_border)
+
+            mask = mask[
+                   top_border:image_shape_before_preresize[0] - bottom_border,
+                   left_border: image_shape_before_preresize[1] - right_border,
+                   ...]
+
         largest_component_bbox.clip_to_shape(src_image_shape)
 
-        mask = cv.resize(mask, (src_image_shape[1], src_image_shape[0]), interpolation=cv.INTER_NEAREST_EXACT)
         return mask, largest_component_bbox
 
 

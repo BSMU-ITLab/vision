@@ -383,11 +383,11 @@ class RetinalFundusTableVisualizer(QObject):
         first_layer = data.layers[0]
         image = first_layer.image
 
-        #mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
-        mask_pixels, disk_bbox = \
+        #disk_mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
+        disk_mask_pixels, disk_bbox = \
             self._segmenter.segment_largest_connected_component_and_return_mask_with_bbox(image.array)
 
-        disk_bbox.add_margins(round(disk_bbox.width / 2))
+        disk_bbox.add_margins(round((disk_bbox.width + disk_bbox.height) / 2))
         disk_bbox.clip_to_shape(image.array.shape)
 
         disk_region_image_pixels = image.array[
@@ -396,22 +396,31 @@ class RetinalFundusTableVisualizer(QObject):
                                    ...]
         data.add_layer_from_image(FlatImage(disk_region_image_pixels), name='disk-region')
 
+        disk_region_mask_pixels = np.zeros_like(disk_mask_pixels)
+        disk_region_mask_pixels[disk_bbox.top:disk_bbox.bottom, disk_bbox.left:disk_bbox.right, ...] = 255
+        disk_region_mask_layer = data.add_layer_from_image(
+            FlatImage(disk_region_mask_pixels, self._mask_palette), name='disk-region-mask')
+
         # mask_palette = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
         #                                                [1, 0, 255, 0, 100]])
-        print('bef mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))
-        mask_pixels = image_converter.normalized_uint8(mask_pixels)
-        print('aft mask_pixels', mask_pixels.dtype, mask_pixels.min(), mask_pixels.max(), np.unique(mask_pixels))
+        print('bef disk_mask_pixels', disk_mask_pixels.dtype, disk_mask_pixels.min(), disk_mask_pixels.max(), np.unique(disk_mask_pixels))
+        disk_mask_pixels = image_converter.normalized_uint8(disk_mask_pixels)
+        print('aft disk_mask_pixels', disk_mask_pixels.dtype, disk_mask_pixels.min(), disk_mask_pixels.max(), np.unique(disk_mask_pixels))
 
-        mask_layer = data.add_layer_from_image(
-            FlatImage(array=mask_pixels, palette=self._mask_palette), name='mask')
+        disk_mask_layer = data.add_layer_from_image(
+            FlatImage(array=disk_mask_pixels, palette=self._mask_palette), name='mask')
 
         record = PatientRetinalFundusRecord(data)
         self.journal.add_record(record)
 
         self.journal_viewer.select_record(record)
 
-        # mask_layer_view = self.layered_image_viewer.layer_view_by_model(mask_layer)
-        # mask_layer_view.opacity = 0.4
+        disk_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_mask_layer)
+        disk_mask_layer_view.opacity = 0.4
+
+        disk_region_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_region_mask_layer)
+        disk_region_mask_layer_view.opacity = 0.2
+        disk_region_mask_layer_view.visible = False
 
     def raise_journal_sub_window(self):
         self._journal_sub_window.show_normal()

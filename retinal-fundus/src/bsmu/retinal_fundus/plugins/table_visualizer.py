@@ -81,16 +81,27 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             disk_segmenter_model_props['input-size'],
             disk_segmenter_model_props['preprocessing-mode'],
         )
+        cup_segmenter_model_props = self.config.value('cup-segmenter-model')
+        cup_segmenter_model_params = DnnModelParams(
+            self.data_path(self._DNN_MODELS_DIR_NAME, cup_segmenter_model_props['name']),
+            cup_segmenter_model_props['input-size'],
+            cup_segmenter_model_props['preprocessing-mode'],
+        )
         self.table_visualizer = RetinalFundusTableVisualizer(
-            self._data_visualization_manager, self._mdi, disk_segmenter_model_params)
+            self._data_visualization_manager, self._mdi, disk_segmenter_model_params, cup_segmenter_model_params)
 
         self._post_load_conversion_manager.data_converted.connect(self.table_visualizer.visualize_retinal_fundus_data)
 
-        self._main_window.add_menu_action(WindowsMenu, 'Table', self._disable, #% self.table_visualizer.raise_journal_sub_window,
-                                         Qt.CTRL + Qt.Key_1)
+        self._main_window.add_menu_action(
+            WindowsMenu, 'Table', self.table_visualizer.maximize_journal_viewer, Qt.CTRL + Qt.Key_1)
+        self._main_window.add_menu_action(
+            WindowsMenu, 'Table/Image', self.table_visualizer.show_journal_and_image_viewers, Qt.CTRL + Qt.Key_2)
+        self._main_window.add_menu_action(
+            WindowsMenu, 'Image', self.table_visualizer.maximize_layered_image_viewer, Qt.CTRL + Qt.Key_3)
 
     def _disable(self):
-        self._post_load_conversion_manager.data_converted.disconnect(self.table_visualizer.visualize_retinal_fundus_data)
+        self._post_load_conversion_manager.data_converted.disconnect(
+            self.table_visualizer.visualize_retinal_fundus_data)
 
 
 class PatientRetinalFundusRecord(QObject):
@@ -269,10 +280,9 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         self._splitter = QSplitter()
         self._splitter.addWidget(self._journal_viewer)
         self._splitter.addWidget(self._layered_image_viewer)
-        # Divide the width equally between the two widgets
-        splitter_widget_size = max(
-            self._journal_viewer.minimumSizeHint().width(), self._layered_image_viewer.minimumSizeHint().width())
-        self._splitter.setSizes([splitter_widget_size, splitter_widget_size])
+        self._splitter.splitterMoved.connect(self._on_splitter_moved)
+        self.show_journal_and_image_viewers_with_equal_sizes()
+        self._splitter_state = self._splitter.saveState()
 
         grid_layout = QGridLayout()
         grid_layout.setContentsMargins(0, 0, 0, 0)
@@ -298,6 +308,33 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
     @property
     def data_path_name(self):
         return self._journal_viewer.data_path_name
+
+    def maximize_journal_viewer(self):
+        self._maximize_splitter_widget(self._journal_viewer)
+
+    def maximize_layered_image_viewer(self):
+        self._maximize_splitter_widget(self._layered_image_viewer)
+
+    def show_journal_and_image_viewers_with_equal_sizes(self):
+        # Divide the width equally between the two widgets
+        splitter_widget_size = max(
+            self._journal_viewer.minimumSizeHint().width(), self._layered_image_viewer.minimumSizeHint().width())
+        self._splitter.setSizes([splitter_widget_size, splitter_widget_size])
+
+    def show_journal_and_image_viewers(self):
+        self._splitter.restoreState(self._splitter_state)
+        # If some widget is maximized
+        if 0 in self._splitter.sizes():
+            self.show_journal_and_image_viewers_with_equal_sizes()
+
+    def _maximize_splitter_widget(self, widget: QWidget):
+        sizes = [0] * self._splitter.count()
+        widget_index = self._splitter.indexOf(widget)
+        sizes[widget_index] = 1
+        self._splitter.setSizes(sizes)
+
+    def _on_splitter_moved(self, pos: int, index: int):
+        self._splitter_state = self._splitter.saveState()
 
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
         # Save previous visibility of layers
@@ -331,16 +368,19 @@ class RetinalFundusTableVisualizer(QObject):
             self,
             visualization_manager: DataVisualizationManager,  #% Temp
             mdi: Mdi,
-            disk_segmenter_model_params: DnnModelParams
+            disk_segmenter_model_params: DnnModelParams,
+            cup_segmenter_model_params: DnnModelParams,
     ):
         super().__init__()
 
         self._visualization_manager = visualization_manager
         self._mdi = mdi
 
-        self._segmenter = DnnSegmenter(disk_segmenter_model_params)
+        self._disk_segmenter = DnnSegmenter(disk_segmenter_model_params)
+        self._cup_segmenter = DnnSegmenter(cup_segmenter_model_params)
 
-        self._mask_palette = Palette.default_soft([0, 255, 0])
+        self._mask_palette = Palette.default_soft([102, 255, 128])
+        self._cup_mask_palette = Palette.default_binary(255, [189, 103, 255])
 
         self._journal = PatientRetinalFundusJournal()
         self._journal.add_record(PatientRetinalFundusRecord.from_flat_image(FlatImage(
@@ -376,6 +416,15 @@ class RetinalFundusTableVisualizer(QObject):
     def layered_image_viewer(self) -> LayeredFlatImageViewer:
         return self._illustrated_journal_viewer.layered_image_viewer
 
+    def maximize_journal_viewer(self):
+        self._illustrated_journal_viewer.maximize_journal_viewer()
+
+    def maximize_layered_image_viewer(self):
+        self._illustrated_journal_viewer.maximize_layered_image_viewer()
+
+    def show_journal_and_image_viewers(self):
+        self._illustrated_journal_viewer.show_journal_and_image_viewers()
+
     def visualize_retinal_fundus_data(self, data: Data):
         if not isinstance(data, LayeredImage):
             return
@@ -383,9 +432,10 @@ class RetinalFundusTableVisualizer(QObject):
         first_layer = data.layers[0]
         image = first_layer.image
 
-        #disk_mask_pixels = self._segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
+        # Optic disk segmentation
+        #%disk_mask_pixels = self._disk_segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
         disk_mask_pixels, disk_bbox = \
-            self._segmenter.segment_largest_connected_component_and_return_mask_with_bbox(image.array)
+            self._disk_segmenter.segment_largest_connected_component_and_return_mask_with_bbox(image.array)
 
         disk_bbox.add_margins(round((disk_bbox.width + disk_bbox.height) / 2))
         disk_bbox.clip_to_shape(image.array.shape)
@@ -394,7 +444,7 @@ class RetinalFundusTableVisualizer(QObject):
                                    disk_bbox.top:disk_bbox.bottom,
                                    disk_bbox.left:disk_bbox.right,
                                    ...]
-        data.add_layer_from_image(FlatImage(disk_region_image_pixels), name='disk-region')
+        # data.add_layer_from_image(FlatImage(disk_region_image_pixels), name='disk-region')
 
         disk_region_mask_pixels = np.zeros_like(disk_mask_pixels)
         disk_region_mask_pixels[disk_bbox.top:disk_bbox.bottom, disk_bbox.left:disk_bbox.right, ...] = 255
@@ -406,9 +456,18 @@ class RetinalFundusTableVisualizer(QObject):
         print('bef disk_mask_pixels', disk_mask_pixels.dtype, disk_mask_pixels.min(), disk_mask_pixels.max(), np.unique(disk_mask_pixels))
         disk_mask_pixels = image_converter.normalized_uint8(disk_mask_pixels)
         print('aft disk_mask_pixels', disk_mask_pixels.dtype, disk_mask_pixels.min(), disk_mask_pixels.max(), np.unique(disk_mask_pixels))
-
         disk_mask_layer = data.add_layer_from_image(
-            FlatImage(array=disk_mask_pixels, palette=self._mask_palette), name='mask')
+            FlatImage(array=disk_mask_pixels, palette=self._mask_palette), name='disk-mask')
+
+        # Optic cup segmentation
+        cup_mask_pixels_on_disk_region, cup_bbox = \
+            self._cup_segmenter.segment_largest_connected_component_and_return_mask_with_bbox(disk_region_image_pixels)
+        cup_mask_pixels_on_disk_region = image_converter.normalized_uint8(cup_mask_pixels_on_disk_region)
+        cup_mask_pixels = np.zeros_like(disk_mask_pixels)
+        cup_mask_pixels[disk_bbox.top:disk_bbox.bottom, disk_bbox.left:disk_bbox.right, ...] = \
+            cup_mask_pixels_on_disk_region
+        cup_mask_layer = data.add_layer_from_image(
+            FlatImage(array=cup_mask_pixels, palette=self._cup_mask_palette), name='cup-mask')
 
         record = PatientRetinalFundusRecord(data)
         self.journal.add_record(record)
@@ -416,11 +475,14 @@ class RetinalFundusTableVisualizer(QObject):
         self.journal_viewer.select_record(record)
 
         disk_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_mask_layer)
-        disk_mask_layer_view.opacity = 0.4
+        disk_mask_layer_view.opacity = 0.5
 
         disk_region_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_region_mask_layer)
         disk_region_mask_layer_view.opacity = 0.2
         disk_region_mask_layer_view.visible = False
+
+        cup_mask_layer_view = self.layered_image_viewer.layer_view_by_model(cup_mask_layer)
+        cup_mask_layer_view.opacity = 0.5
 
     def raise_journal_sub_window(self):
         self._journal_sub_window.show_normal()

@@ -5,11 +5,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide2.QtCore import QObject, Qt, Signal, QModelIndex, QSize
-from PySide2.QtGui import QImage
+from PySide2.QtGui import QImage, QPainter, QFont, QPalette, QColor
 from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, QAbstractItemView
 
 import bsmu.vision.core.converters.image as image_converter
-import bsmu.vision.dnn.segmenter as segmenter
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
@@ -230,6 +229,10 @@ class PatientRetinalFundusJournalTableView(QTableView):
 
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
 
+        palette = self.palette()
+        palette.setColor(QPalette.PlaceholderText, QColor(0, 0, 0, 16))
+        self.setPalette(palette)
+
     def setModel(self, model: QAbstractItemModel):
         super().setModel(model)
 
@@ -240,6 +243,32 @@ class PatientRetinalFundusJournalTableView(QTableView):
                                       ImageCenterAlignmentDelegate(self))
 
         self.selectionModel().currentRowChanged.connect(self._on_current_row_changed)
+
+    def paintEvent(self, event):
+        # Draw 'DROP IMAGES HERE' text
+        painter = QPainter(self.viewport())
+        painter.save()
+
+        painter.setPen(self.palette().placeholderText().color())
+        font = QFont('Monospace', 16, QFont.Bold)
+        font.setStretch(QFont.SemiExpanded)
+        painter.setFont(font)
+
+        last_row = self.model().rowCount() - 1
+        all_rows_height = self.rowViewportPosition(last_row) + self.rowHeight(last_row)
+
+        free_rect_to_draw_text = self.viewport().rect()
+        free_rect_to_draw_text.setY(all_rows_height)
+
+        text_flags = Qt.AlignCenter
+        text = 'DROP\n\nIMAGES\n\nHERE'
+        text_bounding_rect = painter.boundingRect(free_rect_to_draw_text, text_flags, text)
+
+        if free_rect_to_draw_text.contains(text_bounding_rect):
+            painter.drawText(free_rect_to_draw_text, text_flags, text)
+
+        painter.restore()
+        super().paintEvent(event)
 
     def _on_current_row_changed(self, current: QModelIndex, previous: QModelIndex):
         self.record_selected.emit(self.model().row_record(current.row()))

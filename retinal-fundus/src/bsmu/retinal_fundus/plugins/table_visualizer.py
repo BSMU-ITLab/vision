@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from PySide2.QtCore import QAbstractItemModel
     from PySide2.QtWidgets import QWidget, QStyleOptionViewItem
 
+    from bsmu.vision.core.image.layered import ImageLayer
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
@@ -356,6 +357,9 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         if 0 in self._splitter.sizes():
             self.show_journal_and_image_viewers_with_equal_sizes()
 
+    def is_layer_visibility_cached(self, layer_name: str) -> bool:
+        return layer_name in self._layer_visibility_by_name
+
     def _maximize_splitter_widget(self, widget: QWidget):
         sizes = [0] * self._splitter.count()
         widget_index = self._splitter.indexOf(widget)
@@ -503,15 +507,23 @@ class RetinalFundusTableVisualizer(QObject):
 
         self.journal_viewer.select_record(record)
 
-        disk_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_mask_layer)
-        disk_mask_layer_view.opacity = 0.5
+        # If the layer with such name was added for the first time, then set it's opacity
+        # (otherwise opacity customized by a user will remain unchanged)
+        if not self._is_layer_visibility_cached(disk_mask_layer):
+            disk_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_mask_layer)
+            disk_mask_layer_view.opacity = 0.5
 
-        disk_region_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_region_mask_layer)
-        disk_region_mask_layer_view.opacity = 0.2
-        disk_region_mask_layer_view.visible = False
+        if not self._is_layer_visibility_cached(disk_region_mask_layer):
+            disk_region_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_region_mask_layer)
+            disk_region_mask_layer_view.opacity = 0.2
+            disk_region_mask_layer_view.visible = False
 
-        cup_mask_layer_view = self.layered_image_viewer.layer_view_by_model(cup_mask_layer)
-        cup_mask_layer_view.opacity = 0.5
+        if not self._is_layer_visibility_cached(cup_mask_layer):
+            cup_mask_layer_view = self.layered_image_viewer.layer_view_by_model(cup_mask_layer)
+            cup_mask_layer_view.opacity = 0.5
+
+    def _is_layer_visibility_cached(self, layer: ImageLayer):
+        return self.illustrated_journal_viewer.is_layer_visibility_cached(layer.name)
 
     def raise_journal_sub_window(self):
         self._journal_sub_window.show_normal()

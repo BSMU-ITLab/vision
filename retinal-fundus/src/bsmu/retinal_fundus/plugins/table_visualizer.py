@@ -4,9 +4,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide2.QtCore import QObject, Qt, Signal, QModelIndex, QSize
+from PySide2.QtCore import QObject, Qt, Signal, QModelIndex, QSize, QMargins
 from PySide2.QtGui import QImage, QPainter, QFont, QPalette, QColor
-from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, QAbstractItemView
+from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, QAbstractItemView, \
+    QStyle
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.core.data import Data
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
     from bsmu.vision.plugins.post_load_converters.manager import PostLoadConversionManagerPlugin, \
         PostLoadConversionManager
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
 
 class RetinalFundusTableVisualizerPlugin(Plugin):
@@ -105,10 +107,15 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
 
 
 class PatientRetinalFundusRecord(QObject):
+    UNKNOWN_VALUE_STR: str = '?'
+
     def __init__(self, layered_image: LayeredImage):
         super().__init__()
 
         self._layered_image = layered_image
+
+        self._disk_area: float | None = None
+        self._cup_area: float | None = None
 
     @classmethod
     def from_flat_image(cls, image: FlatImage) -> PatientRetinalFundusRecord:
@@ -123,6 +130,29 @@ class PatientRetinalFundusRecord(QObject):
     @property
     def image(self) -> FlatImage:
         return self._layered_image.layers[0].image
+
+    @property
+    def disk_area(self) -> float | None:
+        return self._disk_area
+
+    @property
+    def disk_area_str(self) -> str:
+        return self._value_str(self.disk_area)
+
+    @property
+    def cup_area(self) -> float | None:
+        return self._cup_area
+
+    @property
+    def cup_area_str(self) -> str:
+        return self._value_str(self.cup_area)
+
+    def calculate_params(self):
+        self._disk_area = 30
+        self._cup_area = 20
+
+    def _value_str(self, value: float | None) -> str:
+        return self.UNKNOWN_VALUE_STR if value is None else str(value)
 
 
 class PatientRetinalFundusJournal(Data):
@@ -154,16 +184,30 @@ class NameTableColumn(TableColumn):
     TITLE = 'Name'
 
 
+class DiskAreaTableColumn(TableColumn):
+    TITLE = 'Disk Area'
+
+
+class CupAreaTableColumn(TableColumn):
+    TITLE = 'Cup Area'
+
+
 class PatientRetinalFundusJournalTableModel(RecordTableModel):
     def __init__(
             self,
             record_storage: PatientRetinalFundusJournal = None,
-            preview_height: int | None = None,
             parent: QObject = None
     ):
-        super().__init__(record_storage, PatientRetinalFundusRecord, (PreviewTableColumn, NameTableColumn), parent)
+        super().__init__(
+            record_storage,
+            PatientRetinalFundusRecord,
+            (PreviewTableColumn, NameTableColumn, DiskAreaTableColumn, CupAreaTableColumn),
+            parent,
+        )
 
-        self._preview_height = preview_height
+        self._center_text_alignment_columns = {NameTableColumn, DiskAreaTableColumn, CupAreaTableColumn}
+        self._center_text_alignment_column_numbers = \
+            {self.column_number(column) for column in self._center_text_alignment_columns}
 
         # Store numpy array's data for preview images, because QImage uses it without copying,
         # and QImage will crash if it's data buffer will be deleted
@@ -177,6 +221,10 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
         if role == Qt.DisplayRole:
             if index.column() == self.column_number(NameTableColumn):
                 return record.image.path_name
+            elif index.column() == self.column_number(DiskAreaTableColumn):
+                return record.disk_area_str
+            elif index.column() == self.column_number(CupAreaTableColumn):
+                return record.cup_area_str
         elif role == Qt.DecorationRole:
             if index.column() == self.column_number(PreviewTableColumn):
                 preview_rgba_pixels = image_converter.converted_to_rgba(record.image.array)
@@ -186,9 +234,10 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
                 qimage_format = QImage.Format_RGBA8888_Premultiplied if preview_rgba_pixels.itemsize == 1 \
                     else QImage.Format_RGBA64_Premultiplied
                 preview_qimage = image_converter.numpy_rgba_image_to_qimage(preview_rgba_pixels, qimage_format)
-                if self._preview_height is not None:
-                    preview_qimage = preview_qimage.scaledToHeight(self._preview_height, Qt.SmoothTransformation)
                 return preview_qimage
+        elif role == Qt.TextAlignmentRole:
+            if index.column() in self._center_text_alignment_column_numbers:
+                return Qt.AlignCenter
 
     def _on_record_storage_changing(self):
         self.record_storage.record_adding.disconnect(self._on_storage_record_adding)
@@ -204,17 +253,30 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
 
 
 class ImageCenterAlignmentDelegate(QStyledItemDelegate):
-    def __init__(self, table_view: QTableView, parent: QObject = None):
+    def __init__(self, size_hint: QSize, border: int = 4, parent: QObject = None):
         super().__init__(parent)
 
-        self._table_view = table_view
+        self._size_hint = size_hint
+        self._border = border
 
-    def initStyleOption(self, option: QStyleOptionViewItem, index: QModelIndex):
-        super().initStyleOption(option, index)
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        option.widget.style().drawControl(QStyle.CE_ItemViewItem, option, painter)
 
-        option.decorationSize = QSize(self._table_view.columnWidth(index.column()),
-                                      self._table_view.verticalHeader().defaultSectionSize())
-        # option.decorationAlignment = Qt.AlignCenter
+        painter.save()
+
+        image = index.data(Qt.DecorationRole)
+        scaled_image_rect = option.rect
+        scaled_image_rect = scaled_image_rect.marginsRemoved(
+            QMargins(self._border, self._border, self._border, self._border))
+        image = image.scaled(scaled_image_rect.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+        point_to_draw_image = option.rect.center() - image.rect().center()
+        painter.drawImage(point_to_draw_image, image)
+
+        painter.restore()
+
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
+        return self._size_hint
 
 
 class PatientRetinalFundusJournalTableView(QTableView):
@@ -223,15 +285,19 @@ class PatientRetinalFundusJournalTableView(QTableView):
     def __init__(self, row_height: int | None = None, parent: QWidget = None):
         super().__init__(parent)
 
+        self._row_height = row_height
         if row_height is not None:
             vertical_header = self.verticalHeader()
             vertical_header.setSectionResizeMode(QHeaderView.Fixed)
             vertical_header.setDefaultSectionSize(row_height)
 
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setAlternatingRowColors(True)
 
         palette = self.palette()
         palette.setColor(QPalette.PlaceholderText, QColor(0, 0, 0, 16))
+        palette.setColor(QPalette.Highlight, QColor(204, 228, 247))
+        palette.setColor(QPalette.HighlightedText, Qt.black)
         self.setPalette(palette)
 
     def setModel(self, model: QAbstractItemModel):
@@ -240,8 +306,9 @@ class PatientRetinalFundusJournalTableView(QTableView):
         if model is None:
             return
 
-        self.setItemDelegateForColumn(self.model().column_number(PreviewTableColumn),
-                                      ImageCenterAlignmentDelegate(self))
+        self.setItemDelegateForColumn(
+            self.model().column_number(PreviewTableColumn),
+            ImageCenterAlignmentDelegate(QSize(int(1.25 * self._row_height), self._row_height)))
 
         self.selectionModel().currentRowChanged.connect(self._on_current_row_changed)
 
@@ -281,9 +348,8 @@ class PatientRetinalFundusJournalViewer(DataViewer):
     def __init__(self, data: PatientRetinalFundusJournal = None):
         super().__init__(data)
 
-        row_height = 64
-        self._table_model = PatientRetinalFundusJournalTableModel(data, preview_height=row_height - 4)
-        self._table_view = PatientRetinalFundusJournalTableView(row_height=row_height)
+        self._table_model = PatientRetinalFundusJournalTableModel(data)
+        self._table_view = PatientRetinalFundusJournalTableView(row_height=64)
         self._table_view.setModel(self._table_model)
         self._table_view.record_selected.connect(self.record_selected)
 
@@ -367,6 +433,8 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         self._splitter.setSizes(sizes)
 
     def _on_splitter_moved(self, pos: int, index: int):
+        # TODO: do not save the splitter state multiple times here.
+        #  We need to save it just one time, when splitter moving finished.
         self._splitter_state = self._splitter.saveState()
 
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
@@ -503,6 +571,7 @@ class RetinalFundusTableVisualizer(QObject):
             FlatImage(array=cup_mask_pixels, palette=self._cup_mask_palette), name='cup-mask')
 
         record = PatientRetinalFundusRecord(data)
+        record.calculate_params()
         self.journal.add_record(record)
 
         self.journal_viewer.select_record(record)

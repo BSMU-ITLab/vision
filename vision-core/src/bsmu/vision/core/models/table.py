@@ -9,7 +9,7 @@ from PySide2.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
 from bsmu.vision.core.abc import QABCMeta
 
 if TYPE_CHECKING:
-    from typing import Type, List, Tuple, Any
+    from typing import Type, List, Tuple, Any, Sequence
 
 
 class TableColumn:
@@ -25,7 +25,7 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
             self,
             record_storage: QObject,
             record_type: Type[QObject],
-            columns: List[Type[TableColumn]] | Tuple[Type[TableColumn]] = (),
+            columns: Sequence[Type[TableColumn]] = (),
             parent: QObject = None,
     ):
         super().__init__(parent)

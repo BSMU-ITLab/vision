@@ -107,6 +107,10 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
 
 
 class PatientRetinalFundusRecord(QObject):
+    IMAGE_LAYER_NAME = 'image'
+    DISK_MASK_LAYER_NAME = 'disk-mask'
+    CUP_MASK_LAYER_NAME = 'cup-mask'
+
     UNKNOWN_VALUE_STR: str = '?'
 
     def __init__(self, layered_image: LayeredImage):
@@ -116,11 +120,12 @@ class PatientRetinalFundusRecord(QObject):
 
         self._disk_area: float | None = None
         self._cup_area: float | None = None
+        self._cup_to_disk_area_ratio: float | None = None
 
     @classmethod
     def from_flat_image(cls, image: FlatImage) -> PatientRetinalFundusRecord:
         layered_image = LayeredImage()
-        layered_image.add_layer_from_image(image, 'image')
+        layered_image.add_layer_from_image(image, cls.IMAGE_LAYER_NAME)
         return cls(layered_image)
 
     @property
@@ -147,12 +152,43 @@ class PatientRetinalFundusRecord(QObject):
     def cup_area_str(self) -> str:
         return self._value_str(self.cup_area)
 
+    @property
+    def cup_to_disk_area_ratio(self) -> float | None:
+        return self._cup_to_disk_area_ratio
+
+    @property
+    def cup_to_disk_area_ratio_str(self) -> str:
+        return self._value_str(self.cup_to_disk_area_ratio)
+
     def calculate_params(self):
-        self._disk_area = 30
-        self._cup_area = 20
+        self._calculate_disk_area()
+        self._calculate_cup_area()
+        self._calculate_cup_to_disk_area_ratio()
+
+    def _calculate_disk_area(self) -> float:
+        if self._disk_area is None:
+            self._disk_area = self._count_nonzero_layer_pixels(self.DISK_MASK_LAYER_NAME)
+        return self._disk_area
+
+    def _calculate_cup_area(self):
+        if self._cup_area is None:
+            self._cup_area = self._count_nonzero_layer_pixels(self.CUP_MASK_LAYER_NAME)
+        return self._cup_area
+
+    def _calculate_cup_to_disk_area_ratio(self):
+        if self._cup_to_disk_area_ratio is None:
+            self._cup_to_disk_area_ratio = self._calculate_cup_area() / self._calculate_disk_area()
+        return self._cup_to_disk_area_ratio
+
+    def _count_nonzero_layer_pixels(self, layer_name: str) -> int:
+        layer = self._layered_image.layer_by_name(layer_name)
+        return np.count_nonzero(layer.image_pixels)
 
     def _value_str(self, value: float | None) -> str:
-        return self.UNKNOWN_VALUE_STR if value is None else str(value)
+        if value is None:
+            return self.UNKNOWN_VALUE_STR
+
+        return f'{value:.2f}' if isinstance(value, float) else str(value)
 
 
 class PatientRetinalFundusJournal(Data):
@@ -185,11 +221,15 @@ class NameTableColumn(TableColumn):
 
 
 class DiskAreaTableColumn(TableColumn):
-    TITLE = 'Disk Area'
+    TITLE = 'Disk\nArea'
 
 
 class CupAreaTableColumn(TableColumn):
-    TITLE = 'Cup Area'
+    TITLE = 'Cup\nArea'
+
+
+class CupToDiskAreaRatioTableColumn(TableColumn):
+    TITLE = 'Cup/Disk\nArea'
 
 
 class PatientRetinalFundusJournalTableModel(RecordTableModel):
@@ -201,11 +241,13 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
         super().__init__(
             record_storage,
             PatientRetinalFundusRecord,
-            (PreviewTableColumn, NameTableColumn, DiskAreaTableColumn, CupAreaTableColumn),
+            (PreviewTableColumn, NameTableColumn, DiskAreaTableColumn, CupAreaTableColumn,
+             CupToDiskAreaRatioTableColumn),
             parent,
         )
 
-        self._center_text_alignment_columns = {NameTableColumn, DiskAreaTableColumn, CupAreaTableColumn}
+        self._center_text_alignment_columns = \
+            {NameTableColumn, DiskAreaTableColumn, CupAreaTableColumn, CupToDiskAreaRatioTableColumn}
         self._center_text_alignment_column_numbers = \
             {self.column_number(column) for column in self._center_text_alignment_columns}
 
@@ -225,6 +267,8 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
                 return record.disk_area_str
             elif index.column() == self.column_number(CupAreaTableColumn):
                 return record.cup_area_str
+            elif index.column() == self.column_number(CupToDiskAreaRatioTableColumn):
+                return record.cup_to_disk_area_ratio_str
         elif role == Qt.DecorationRole:
             if index.column() == self.column_number(PreviewTableColumn):
                 preview_rgba_pixels = image_converter.converted_to_rgba(record.image.array)
@@ -338,6 +382,15 @@ class PatientRetinalFundusJournalTableView(QTableView):
         painter.restore()
         super().paintEvent(event)
 
+    def sizeHintForColumn(self, column: int) -> int:
+        if self.model() is None:
+            return -1
+
+        if column == self.model().column_number(NameTableColumn):
+            return self.fontMetrics().horizontalAdvance('Ivanov Ivan Ivanovich')
+
+        return super().sizeHintForColumn(column)
+
     def _on_current_row_changed(self, current: QModelIndex, previous: QModelIndex):
         self.record_selected.emit(self.model().row_record(current.row()))
 
@@ -361,6 +414,9 @@ class PatientRetinalFundusJournalViewer(DataViewer):
     def select_record(self, record: PatientRetinalFundusRecord):
         row = self._table_model.record_row(record)
         self._table_view.selectRow(row)
+
+    def resize_columns_to_contents(self):
+        self._table_view.resizeColumnsToContents()
 
 
 class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
@@ -494,6 +550,7 @@ class RetinalFundusTableVisualizer(QObject):
         self._image_sub_windows_by_record = {}
 
         self._illustrated_journal_viewer = PatientRetinalFundusIllustratedJournalViewer(self._journal)
+        self.journal_viewer.resize_columns_to_contents()
 
         self._journal_sub_window = IllustratedJournalSubWindow(self._illustrated_journal_viewer)
         self._journal_sub_window.setWindowFlag(Qt.FramelessWindowHint)
@@ -575,6 +632,7 @@ class RetinalFundusTableVisualizer(QObject):
         self.journal.add_record(record)
 
         self.journal_viewer.select_record(record)
+        self.journal_viewer.resize_columns_to_contents()
 
         # If the layer with such name was added for the first time, then set it's opacity
         # (otherwise opacity customized by a user will remain unchanged)

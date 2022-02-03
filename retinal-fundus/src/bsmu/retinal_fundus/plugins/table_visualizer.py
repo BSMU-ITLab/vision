@@ -16,6 +16,7 @@ from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.dnn import segmenter
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
@@ -89,8 +90,15 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             cup_segmenter_model_props['input-size'],
             cup_segmenter_model_props['preprocessing-mode'],
         )
+        vessels_segmenter_model_props = self.config.value('vessels-segmenter-model')
+        vessels_segmenter_model_params = DnnModelParams(
+            self.data_path(self._DNN_MODELS_DIR_NAME, vessels_segmenter_model_props['name']),
+            vessels_segmenter_model_props['input-size'],
+            vessels_segmenter_model_props['preprocessing-mode'],
+        )
         self.table_visualizer = RetinalFundusTableVisualizer(
-            self._data_visualization_manager, self._mdi, disk_segmenter_model_params, cup_segmenter_model_params)
+            self._data_visualization_manager, self._mdi,
+            disk_segmenter_model_params, cup_segmenter_model_params, vessels_segmenter_model_params)
 
         self._post_load_conversion_manager.data_converted.connect(self.table_visualizer.visualize_retinal_fundus_data)
 
@@ -527,6 +535,7 @@ class RetinalFundusTableVisualizer(QObject):
             mdi: Mdi,
             disk_segmenter_model_params: DnnModelParams,
             cup_segmenter_model_params: DnnModelParams,
+            vessels_segmenter_model_params: DnnModelParams,
     ):
         super().__init__()
 
@@ -535,9 +544,11 @@ class RetinalFundusTableVisualizer(QObject):
 
         self._disk_segmenter = DnnSegmenter(disk_segmenter_model_params)
         self._cup_segmenter = DnnSegmenter(cup_segmenter_model_params)
+        self._vessels_segmenter = DnnSegmenter(vessels_segmenter_model_params)
 
-        self._mask_palette = Palette.default_soft([102, 255, 128])
+        self._mask_palette = Palette.default_binary(255, [102, 255, 128])
         self._cup_mask_palette = Palette.default_binary(255, [189, 103, 255])
+        self._vessels_mask_palette = Palette.default_soft([102, 183, 255])
 
         self._journal = PatientRetinalFundusJournal()
         self._journal.add_record(PatientRetinalFundusRecord.from_flat_image(FlatImage(
@@ -627,6 +638,12 @@ class RetinalFundusTableVisualizer(QObject):
         cup_mask_layer = data.add_layer_from_image(
             FlatImage(array=cup_mask_pixels, palette=self._cup_mask_palette), name='cup-mask')
 
+        # Vessels segmentation
+        vessels_mask_pixels = self._vessels_segmenter.segment_on_splitted_into_tiles(image.array)
+        vessels_mask_pixels = image_converter.normalized_uint8(vessels_mask_pixels)
+        vessels_mask_layer = data.add_layer_from_image(
+            FlatImage(array=vessels_mask_pixels, palette=self._vessels_mask_palette), name='vessels-mask')
+
         record = PatientRetinalFundusRecord(data)
         record.calculate_params()
         self.journal.add_record(record)
@@ -648,6 +665,10 @@ class RetinalFundusTableVisualizer(QObject):
         if not self._is_layer_visibility_cached(cup_mask_layer):
             cup_mask_layer_view = self.layered_image_viewer.layer_view_by_model(cup_mask_layer)
             cup_mask_layer_view.opacity = 0.5
+
+        if not self._is_layer_visibility_cached(vessels_mask_layer):
+            vessels_mask_layer_view = self.layered_image_viewer.layer_view_by_model(vessels_mask_layer)
+            vessels_mask_layer_view.opacity = 0.5
 
     def _is_layer_visibility_cached(self, layer: ImageLayer):
         return self.illustrated_journal_viewer.is_layer_visibility_cached(layer.name)

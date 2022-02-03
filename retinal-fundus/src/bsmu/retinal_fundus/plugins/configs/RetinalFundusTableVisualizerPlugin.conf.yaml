@@ -7,3 +7,8 @@ cup-segmenter-model:
   name: 'cup-model-006.onnx'
   input-size: [352, 352, 3]
   preprocessing-mode: 'image-net-tf'
+
+vessels-segmenter-model:
+  name: 'vessels-model-083.onnx'
+  input-size: [352, 352, 3]
+  preprocessing-mode: 'image-net-tf'

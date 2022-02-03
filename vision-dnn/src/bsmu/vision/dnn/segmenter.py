@@ -9,6 +9,7 @@ import numpy as np
 import onnxruntime as ort
 
 import bsmu.vision.core.converters.image as image_converter
+from bsmu.vision.core.image import tile_splitter
 
 if TYPE_CHECKING:
     from typing import Callable, List, Tuple, Sequence
@@ -188,16 +189,21 @@ class Segmenter:
             self._inference_session = ort.InferenceSession(
                 str(self._model_params.path), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
 
-    def _segment_without_postresize(self, image: np.ndarray) -> np.ndarray:
-        # If it's an RGBA-image
-        if image.shape[2] == 4:
-            # Remove alpha-channel
-            image = image[:, :, :3]
+    def _segment_batch_without_postresize(self, images: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
+        input_image_batch = []
 
-        image = cv.resize(image, self._model_params.input_image_size, interpolation=cv.INTER_AREA)
-        image = preprocessed_image(image, normalize=True, preprocessing_mode=self._model_params.preprocessing_mode)
+        for image in images:
+            # If it's an RGBA-image
+            if image.shape[2] == 4:
+                # Remove alpha-channel
+                image = image[:, :, :3]
 
-        input_image_batch = [image]
+            if image.shape[:2] != self._model_params.input_image_size:
+                image = cv.resize(image, self._model_params.input_image_size, interpolation=cv.INTER_AREA)
+
+            image = preprocessed_image(image, normalize=True, preprocessing_mode=self._model_params.preprocessing_mode)
+
+            input_image_batch.append(image)
 
         self._create_inference_session()
         model_inputs: List[ort.NodeArg] = self._inference_session.get_inputs()
@@ -209,14 +215,17 @@ class Segmenter:
         assert len(outputs) == 1, 'Segmenter can process only models with one output'
         output_mask_batch = outputs[0]
 
-        mask = output_mask_batch[0]
-        mask = np.squeeze(mask)
-        return mask
+        # Squeeze channels axis
+        output_mask_batch = np.squeeze(output_mask_batch, axis=3)
+        return output_mask_batch
+
+    def _segment_without_postresize(self, image: np.ndarray) -> np.ndarray:
+        return self._segment_batch_without_postresize([image])[0]
 
     def segment(
             self,
             image: np.ndarray,
-            postprocessing: Callable[[np.ndarray], np.ndarray | Tuple[np.ndarray, ...]] | None = None
+            postprocessing: Callable[[np.ndarray], np.ndarray | Tuple] | None = None
     ) -> np.ndarray:
         mask = self._segment_without_postresize(image)
 
@@ -275,6 +284,34 @@ class Segmenter:
         largest_component_bbox.clip_to_shape(src_image_shape)
 
         return mask, largest_component_bbox
+
+    def segment_on_splitted_into_tiles(
+            self,
+            image: np.ndarray,
+            use_square_image: bool = True,
+            tile_grid_shape: Sequence = (3, 3),
+            border_size: int = 10,
+    ) -> np.ndarray:
+        model_input_image_size = self._model_params.input_image_size
+        borders_size = 2 * border_size
+        model_input_image_size_multiplied_by_tile_shape = (
+            (model_input_image_size[0] - borders_size) * tile_grid_shape[0],
+            (model_input_image_size[1] - borders_size) * tile_grid_shape[1])
+        src_image_shape = image.shape
+        image = cv.resize(image, model_input_image_size_multiplied_by_tile_shape, interpolation=cv.INTER_AREA)
+
+        # Split image into tiles
+        image_tiles = tile_splitter.split_image_into_tiles(image, tile_grid_shape, border_size=border_size)
+
+        # Get predictions for tiles without image and mask resize
+        tile_masks = self._segment_batch_without_postresize(image_tiles)
+
+        # Merge tiles
+        mask = tile_splitter.merge_tiles_into_image_with_blending(tile_masks, tile_grid_shape, border_size=border_size)
+
+        # Resize resulted mask to image size
+        mask = cv.resize(mask, (src_image_shape[1], src_image_shape[0]), interpolation=cv.INTER_LINEAR_EXACT)
+        return mask
 
 
 def largest_connected_component_soft_mask(soft_mask: np.ndarray) -> Tuple[np.ndarray, BBox]:

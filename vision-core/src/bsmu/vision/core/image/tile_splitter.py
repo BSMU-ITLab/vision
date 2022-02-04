@@ -10,8 +10,7 @@ if TYPE_CHECKING:
 
 def split_image_into_tiles(image, tile_grid_shape: Sequence = (2, 2), border_size: int = 0) -> list:
     border_axis_qty = 2
-    border_pad_width = ((border_size, border_size),) * border_axis_qty \
-                       + ((0, 0),) * (len(image.shape) - border_axis_qty)
+    border_pad_width = ((border_size, border_size),) * border_axis_qty + ((0, 0),) * (image.ndim - border_axis_qty)
     bordered_image = np.pad(image, pad_width=border_pad_width)
 
     tile_grid_row_qty = tile_grid_shape[0]

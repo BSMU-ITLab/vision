@@ -11,4 +11,4 @@ cup-segmenter-model:
 vessels-segmenter-model:
   name: 'vessels-model-083.onnx'
   input-size: [352, 352, 3]
-  preprocessing-mode: 'image-net-tf'
+  preprocessing-mode: 'image-net-torch'

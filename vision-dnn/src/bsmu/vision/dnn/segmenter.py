@@ -145,6 +145,42 @@ class BBox:
         self.bottom -= value
 
 
+class Padding:
+    def __init__(
+            self,
+            left: int,
+            right: int,
+            top: int,
+            bottom: int,
+    ):
+        self.left = left
+        self.right = right
+        self.top = top
+        self.bottom = bottom
+
+
+def padded_to_square_shape(image: np.ndarray) -> Tuple[np.ndarray, Padding]:
+    max_size = max(image.shape[:2])
+    height_pad = max_size - image.shape[0]
+    top_pad = int(height_pad / 2)
+    bottom_pad = height_pad - top_pad
+    width_pad = max_size - image.shape[1]
+    left_pad = int(width_pad / 2)
+    right_pad = width_pad - left_pad
+
+    pad_value = [0] * image.shape[2]
+    image = cv.copyMakeBorder(image, top_pad, bottom_pad, left_pad, right_pad, cv.BORDER_CONSTANT, value=pad_value)
+    padding = Padding(left_pad, right_pad, top_pad, bottom_pad)
+    return image, padding
+
+
+def padding_removed(image: np.ndarray, padding: Padding) -> np.ndarray:
+    return image[
+           padding.top: image.shape[0] - padding.bottom,
+           padding.left: image.shape[1] - padding.right,
+           ...]
+
+
 def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.ndarray, BBox | None]:
     """
     Find a connected component with the largest area (exclude background label, which is 0)
@@ -246,17 +282,7 @@ class Segmenter:
         src_image_shape = image.shape
 
         if use_square_image:
-            max_size = max(src_image_shape[:2])
-            height_border = max_size - src_image_shape[0]
-            top_border = int(height_border / 2)
-            bottom_border = height_border - top_border
-            width_border = max_size - src_image_shape[1]
-            left_border = int(width_border / 2)
-            right_border = width_border - left_border
-
-            border_value = [0] * image.shape[2]
-            image = cv.copyMakeBorder(
-                image, top_border, bottom_border, left_border, right_border, cv.BORDER_CONSTANT, value=border_value)
+            image, padding = padded_to_square_shape(image)
 
         image_shape_before_preresize = image.shape
         mask = self._segment_without_postresize(image)
@@ -273,13 +299,10 @@ class Segmenter:
         )
 
         if use_square_image:
-            largest_component_bbox.move_left(left_border)
-            largest_component_bbox.move_top(top_border)
+            largest_component_bbox.move_left(padding.left)
+            largest_component_bbox.move_top(padding.top)
 
-            mask = mask[
-                   top_border:image_shape_before_preresize[0] - bottom_border,
-                   left_border: image_shape_before_preresize[1] - right_border,
-                   ...]
+            mask = padding_removed(mask, padding)
 
         largest_component_bbox.clip_to_shape(src_image_shape)
 
@@ -297,20 +320,28 @@ class Segmenter:
         model_input_image_size_multiplied_by_tile_shape = (
             (model_input_image_size[0] - borders_size) * tile_grid_shape[0],
             (model_input_image_size[1] - borders_size) * tile_grid_shape[1])
-        src_image_shape = image.shape
+
+        if use_square_image:
+            image, padding = padded_to_square_shape(image)
+
+        image_shape_before_preresize = image.shape
         image = cv.resize(image, model_input_image_size_multiplied_by_tile_shape, interpolation=cv.INTER_AREA)
 
         # Split image into tiles
         image_tiles = tile_splitter.split_image_into_tiles(image, tile_grid_shape, border_size=border_size)
-
-        # Get predictions for tiles without image and mask resize
+        # Get mask predictions for tiles
         tile_masks = self._segment_batch_without_postresize(image_tiles)
-
         # Merge tiles
         mask = tile_splitter.merge_tiles_into_image_with_blending(tile_masks, tile_grid_shape, border_size=border_size)
 
         # Resize resulted mask to image size
-        mask = cv.resize(mask, (src_image_shape[1], src_image_shape[0]), interpolation=cv.INTER_LINEAR_EXACT)
+        mask = cv.resize(
+            mask, (image_shape_before_preresize[1], image_shape_before_preresize[0]),
+            interpolation=cv.INTER_LINEAR_EXACT)
+
+        if use_square_image:
+            mask = padding_removed(mask, padding)
+
         return mask
 
 

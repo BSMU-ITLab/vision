@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide2.QtCore import QObject, Signal
-from PySide2.QtGui import QColor
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtGui import QColor
 from sortedcontainers import SortedList
 
 from bsmu.vision.core.data import Data

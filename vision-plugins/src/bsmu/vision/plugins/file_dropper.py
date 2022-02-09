@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, QEvent
+from PySide6.QtCore import QObject, QEvent
 
 from bsmu.vision.core.plugins.base import Plugin
 

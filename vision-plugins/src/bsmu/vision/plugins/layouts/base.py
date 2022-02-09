@@ -4,7 +4,7 @@ from typing import List
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide2.QtCore import QObject
+from PySide6.QtCore import QObject
 
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer

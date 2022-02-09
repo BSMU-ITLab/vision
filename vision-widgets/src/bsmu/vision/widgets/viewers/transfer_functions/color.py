@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import itertools
 
-from PySide2.QtCharts import QtCharts
-from PySide2.QtCore import Qt, QPointF, QRectF
-from PySide2.QtGui import QPainter, QLinearGradient, QGradient, QPen, QBrush, QColor
-from PySide2.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGridLayout, QColorDialog, QGraphicsItem
+from PySide6.QtCharts import QtCharts
+from PySide6.QtCore import Qt, QPointF, QRectF
+from PySide6.QtGui import QPainter, QLinearGradient, QGradient, QPen, QBrush, QColor
+from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGridLayout, QColorDialog, QGraphicsItem
 
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.core.transfer_functions.color import ColorTransferFunction

@@ -4,8 +4,8 @@ import typing
 from functools import partial
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Qt, QModelIndex
-from PySide2.QtWidgets import QTableView, QDockWidget
+from PySide6.QtCore import QObject, Qt, QModelIndex
+from PySide6.QtWidgets import QTableView, QDockWidget
 
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.plugins.base import Plugin
@@ -16,8 +16,8 @@ from bsmu.vision.widgets.visibility_v2 import Visibility, VisibilityDelegate
 if TYPE_CHECKING:
     from typing import List, Tuple, Any
 
-    from PySide2.QtCore import QAbstractItemModel
-    from PySide2.QtWidgets import QWidget, QMdiSubWindow
+    from PySide6.QtCore import QAbstractItemModel
+    from PySide6.QtWidgets import QWidget, QMdiSubWindow
 
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow

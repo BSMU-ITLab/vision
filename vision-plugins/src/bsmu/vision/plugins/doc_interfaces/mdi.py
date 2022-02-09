@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import Signal
-from PySide2.QtGui import QResizeEvent
-from PySide2.QtWidgets import QMdiArea
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QResizeEvent
+from PySide6.QtWidgets import QMdiArea
 
 from bsmu.vision.core.plugins.base import Plugin
 

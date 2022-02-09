@@ -3,9 +3,9 @@ from __future__ import annotations
 from functools import partial
 
 import numpy as np
-from PySide2.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QRect, QRectF, QPointF
-from PySide2.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics
-from PySide2.QtWidgets import QGraphicsView
+from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QRect, QRectF, QPointF
+from PySide6.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics
+from PySide6.QtWidgets import QGraphicsView
 
 
 SMOOTH_ZOOM_DURATION = 100
@@ -176,7 +176,7 @@ class _ViewSmoothZoom(QObject):
         zoom_factor = self.zoom_in_factor if event.angleDelta().y() > 0 else self.zoom_out_factor
         zoom_factor = 1 + zoom_factor / (SMOOTH_ZOOM_DURATION / SMOOTH_ZOOM_UPDATE_INTERVAL)
 
-        zoom = _Zoom(event.pos(), zoom_factor)
+        zoom = _Zoom(event.position(), zoom_factor)
         zoom_time_line = _ZoomTimeLine(SMOOTH_ZOOM_DURATION, self)
         zoom_time_line.setUpdateInterval(SMOOTH_ZOOM_UPDATE_INTERVAL)
         zoom_time_line.valueChanged.connect(partial(self.zoom_view, zoom))
@@ -184,10 +184,10 @@ class _ViewSmoothZoom(QObject):
         zoom_time_line.start()
 
     def zoom_view(self, zoom, time_line_value):  # PySide signal doesn't work without one more parameter from signal (time_line_value)
-        old_pos = self.view.mapToScene(zoom.pos)
+        old_pos = self.view.mapToScene(zoom.pos.toPoint())
         self.view.scale(zoom.factor, zoom.factor)
 
-        new_pos = self.view.mapToScene(zoom.pos)
+        new_pos = self.view.mapToScene(zoom.pos.toPoint())
 
         # Move the scene's view to old position
         delta = new_pos - old_pos

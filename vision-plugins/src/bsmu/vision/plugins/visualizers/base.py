@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.plugins.processor.base import ProcessorPlugin
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
@@ -19,7 +19,7 @@ class DataVisualizerPlugin(ProcessorPlugin):
         super().__init__(data_visualizer_cls)
 
 
-class DataVisualizerMeta(abc.ABCMeta, type(QObject)):
+class DataVisualizerMeta(type(QObject), abc.ABCMeta):
     _DATA_TYPES = ()
 
     @property

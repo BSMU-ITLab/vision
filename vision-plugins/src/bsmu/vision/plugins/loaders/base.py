@@ -4,7 +4,7 @@ import abc
 import inspect
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins.processor.base import ProcessorPlugin
@@ -19,7 +19,7 @@ class FileLoaderPlugin(ProcessorPlugin):
         super().__init__(file_loader_cls)
 
 
-class FileLoaderMeta(abc.ABCMeta, type(QObject)):
+class FileLoaderMeta(type(QObject), abc.ABCMeta):
     _FORMATS = ()
 
     def __new__(mcs, name, bases, namespace):

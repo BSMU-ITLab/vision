@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QFileDialog
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFileDialog
 
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.plugins.windows.main import FileMenu

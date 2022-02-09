@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide2.QtCore import QObject, Qt, Signal, QModelIndex, QSize, QMargins
-from PySide2.QtGui import QImage, QPainter, QFont, QPalette, QColor
-from PySide2.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, QAbstractItemView, \
+from PySide6.QtCore import QObject, Qt, Signal, QModelIndex, QSize, QMargins
+from PySide6.QtGui import QImage, QPainter, QFont, QPalette, QColor
+from PySide6.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, QAbstractItemView, \
     QStyle
 
 import bsmu.vision.core.converters.image as image_converter
@@ -27,8 +27,8 @@ from bsmu.vision.widgets.visibility_v2 import Visibility
 if TYPE_CHECKING:
     from typing import List, Any
 
-    from PySide2.QtCore import QAbstractItemModel
-    from PySide2.QtWidgets import QWidget, QStyleOptionViewItem
+    from PySide6.QtCore import QAbstractItemModel
+    from PySide6.QtWidgets import QWidget, QStyleOptionViewItem
 
     from bsmu.vision.core.image.layered import ImageLayer
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi

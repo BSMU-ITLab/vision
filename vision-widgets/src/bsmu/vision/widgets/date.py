@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PySide2.QtCore import QDate
-from PySide2.QtWidgets import QWidget, QDateEdit
+from PySide6.QtCore import QDate
+from PySide6.QtWidgets import QWidget, QDateEdit
 
 
 class DateEditWidget(QDateEdit):

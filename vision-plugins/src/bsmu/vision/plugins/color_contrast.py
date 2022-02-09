@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide2.QtCore import QObject, Qt
+from PySide6.QtCore import QObject, Qt
 
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.image.base import VolumeImage

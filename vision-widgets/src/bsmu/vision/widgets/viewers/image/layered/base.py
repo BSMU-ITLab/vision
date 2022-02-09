@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 import numpy as np
-from PySide2.QtCore import QObject, Qt, Signal, QRectF, QPointF
-from PySide2.QtGui import QPainter, QImage
-from PySide2.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
+from PySide6.QtCore import QObject, Qt, Signal, QRectF, QPointF
+from PySide6.QtGui import QPainter, QImage
+from PySide6.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.core.image.base import Image, FlatImage

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 
-from PySide2.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins.processor.base import ProcessorPlugin
@@ -13,7 +13,7 @@ class PostLoadConverterPlugin(ProcessorPlugin):
         super().__init__(post_load_converter_cls)
 
 
-class PostLoadConverterMeta(abc.ABCMeta, type(QObject)):
+class PostLoadConverterMeta(type(QObject), abc.ABCMeta):
     _DATA_TYPES = ()
 
     @property

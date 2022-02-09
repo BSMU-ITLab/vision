@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import skimage.transform
-from PySide2.QtCore import QObject, Qt, QSysInfo, Signal, QDate
-from PySide2.QtGui import QColor
-from PySide2.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
-    QActionGroup, QAction, QStyledItemDelegate, QStyle, QDoubleSpinBox
+from PySide6.QtCore import QObject, Qt, Signal, QDate, QOperatingSystemVersion
+from PySide6.QtGui import QColor, QAction, QActionGroup
+from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QGridLayout, QAbstractItemView, QHeaderView, QMenu, \
+    QStyledItemDelegate, QStyle, QDoubleSpinBox
 
 from bsmu.bone_age.plugins.max_height_analyzer import MaxHeightAnalyzer
 from bsmu.bone_age.plugins.predictor import Predictor, DnnModelParams
@@ -36,9 +36,9 @@ from bsmu.vision.widgets.viewers.base import DataViewer
 if TYPE_CHECKING:
     from typing import List, Type
 
-    from PySide2.QtCore import QModelIndex, QPoint
-    from PySide2.QtGui import QPainter
-    from PySide2.QtWidgets import QStyleOptionViewItem
+    from PySide6.QtCore import QModelIndex, QPoint
+    from PySide6.QtGui import QPainter
+    from PySide6.QtWidgets import QStyleOptionViewItem
 
     from bsmu.bone_age.plugins.main_window import BoneAgeMainWindowPlugin, BoneAgeMainWindow
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
@@ -405,7 +405,7 @@ class PatientBoneAgeJournalTable(QTableWidget):
         # self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
-        if QSysInfo.windowsVersion() == QSysInfo.WV_WINDOWS10:
+        if QOperatingSystemVersion.current() >= QOperatingSystemVersion.Windows10:
             # Add border under the header
             self.setStyleSheet(
                 'QHeaderView::section { '

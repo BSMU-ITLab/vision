@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Qt
+from PySide6.QtCore import QObject, Qt
 
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.plugins.windows.main import ViewMenu

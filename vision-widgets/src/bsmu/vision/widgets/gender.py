@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PySide2.QtCore import Signal
-from PySide2.QtGui import QColor
-from PySide2.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSizePolicy, QFrame, QButtonGroup
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSizePolicy, QFrame, QButtonGroup
 
 from bsmu.vision.widgets.styles.base import VisionStyle
 

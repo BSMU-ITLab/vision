@@ -6,7 +6,7 @@ import re
 from functools import partial
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.plugins.observer import ObserverPlugin

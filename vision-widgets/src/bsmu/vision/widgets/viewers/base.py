@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide2.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
     from bsmu.vision.core.data import Data

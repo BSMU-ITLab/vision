@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from PySide2.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import Image

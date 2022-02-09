@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject
+from PySide6.QtCore import QObject
 
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.palette import Palette
@@ -12,7 +12,7 @@ from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubW
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
 
 if TYPE_CHECKING:
-    from PySide2.QtCore import Qt
+    from PySide6.QtCore import Qt
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi

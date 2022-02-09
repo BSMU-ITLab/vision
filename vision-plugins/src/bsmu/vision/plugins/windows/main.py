@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import Qt
-from PySide2.QtGui import QIcon
-from PySide2.QtWidgets import QMainWindow, QMenuBar, QMenu
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QMainWindow, QMenuBar, QMenu
 from sortedcontainers import SortedDict
 
 from bsmu.vision.core.plugins.base import Plugin
@@ -78,7 +78,10 @@ class MenuBar(QMenuBar):
         return menu
 
     def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut=None) -> QAction:
-        return self.menu(menu_type).addAction(action_name, method, shortcut)
+        if shortcut is None:
+            return self.menu(menu_type).addAction(action_name, method)
+        else:
+            return self.menu(menu_type).addAction(action_name, method, shortcut)
 
     def _menu_order_index(self, menu_type: Type[MainMenu]) -> int:
         return self._menus_order_indexes[menu_type]

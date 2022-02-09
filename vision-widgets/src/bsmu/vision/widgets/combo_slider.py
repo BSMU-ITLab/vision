@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import Qt, Signal, QLocale
-from PySide2.QtGui import QDoubleValidator, QPainter, QColor, QPaintEvent, QIcon
-from PySide2.QtWidgets import QWidget, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QPushButton, QFrame, QApplication
+from PySide6.QtCore import Qt, Signal, QLocale
+from PySide6.QtGui import QDoubleValidator, QPainter, QColor, QPaintEvent, QIcon
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QPushButton, QFrame, QApplication
 
 from bsmu.vision.widgets.images import icons_rc  # noqa
 
 if TYPE_CHECKING:
-    from PySide2.QtGui import QMouseEvent, QKeyEvent, QWheelEvent
+    from PySide6.QtGui import QMouseEvent, QKeyEvent, QWheelEvent
 
 
 DEFAULT_FRAME_WIDTH = 1

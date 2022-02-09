@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide2.QtCore import QObject
+from PySide6.QtCore import QObject
 
 
 class DataViewerTool(QObject):

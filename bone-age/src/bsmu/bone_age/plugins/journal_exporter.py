@@ -3,8 +3,8 @@ from __future__ import annotations
 import csv
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject
-from PySide2.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtCore import QObject
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bsmu.bone_age.plugins.main_window import TableMenu
 from bsmu.vision.core.plugins.base import Plugin

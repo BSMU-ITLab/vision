@@ -6,8 +6,8 @@ import traceback
 import warnings
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import Qt, Signal
-from PySide2.QtWidgets import QApplication
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QApplication
 
 from bsmu.vision.app.plugin_manager import PluginManager
 from bsmu.vision.core.config.united import UnitedConfig
@@ -51,7 +51,7 @@ class App(QApplication, DataFileProvider):
         return self._plugin_manager.enabled_plugins
 
     def run(self):
-        sys.exit(self.exec_())
+        sys.exit(self.exec())
 
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):

@@ -1,5 +1,5 @@
 import numpy as np
-from PySide2.QtGui import QImage
+from PySide6.QtGui import QImage
 from skimage.color import gray2rgba
 
 

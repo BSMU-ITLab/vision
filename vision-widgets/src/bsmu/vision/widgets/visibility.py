@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PySide2.QtCore import QSize, Signal
-from PySide2.QtGui import QIcon, QColor
-from PySide2.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSizePolicy, QFrame
+from PySide6.QtCore import QSize, Signal
+from PySide6.QtGui import QIcon, QColor
+from PySide6.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSizePolicy, QFrame
 
 from bsmu.vision.widgets.combo_slider import ComboSlider
 from bsmu.vision.widgets.images import icons_rc  # noqa

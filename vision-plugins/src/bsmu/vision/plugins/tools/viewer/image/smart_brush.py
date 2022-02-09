@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import skimage.draw
 import skimage.measure
-from PySide2.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, Qt
 
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool

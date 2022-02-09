@@ -4,7 +4,7 @@ from abc import abstractmethod
 from enum import IntEnum
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
+from PySide6.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
 
 from bsmu.vision.core.abc import QABCMeta
 

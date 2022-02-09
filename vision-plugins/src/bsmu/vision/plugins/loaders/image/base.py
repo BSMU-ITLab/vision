@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 from typing import Type
 
 from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
@@ -11,4 +12,8 @@ class ImageFileLoaderPlugin(FileLoaderPlugin):
 
 
 class ImageFileLoader(FileLoader):
-    pass
+    @abc.abstractmethod  # Method was added to fix current PySide bug, when inspect.isabstract returns False
+    # for classes without explicit abstract methods
+    # https://bugreports.qt.io/browse/PYSIDE-1767
+    def _load_file(self, path: Path, **kwargs) -> Data:
+        pass

@@ -3,16 +3,16 @@ from __future__ import annotations
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from PySide2.QtCore import Qt, QObject, Signal, QSize, QPointF, QRectF, QMarginsF, QElapsedTimer, QPoint
-from PySide2.QtGui import QPainter, QPixmap, QPalette, QColor, QPen, QPolygonF, QIntValidator
-from PySide2.QtWidgets import QWidget, QStyledItemDelegate, QStyle, QLineEdit
+from PySide6.QtCore import Qt, QObject, Signal, QSize, QPointF, QRectF, QMarginsF, QElapsedTimer, QPoint
+from PySide6.QtGui import QPainter, QPixmap, QPalette, QColor, QPen, QPolygonF, QIntValidator
+from PySide6.QtWidgets import QWidget, QStyledItemDelegate, QStyle, QLineEdit
 
 from bsmu.vision.widgets.images import icons_rc  # noqa: F401
 
 if TYPE_CHECKING:
-    from PySide2.QtCore import QAbstractItemModel, QModelIndex, QRect
-    from PySide2.QtGui import QPaintEvent, QMouseEvent
-    from PySide2.QtWidgets import QStyleOptionViewItem
+    from PySide6.QtCore import QAbstractItemModel, QModelIndex, QRect
+    from PySide6.QtGui import QPaintEvent, QMouseEvent
+    from PySide6.QtWidgets import QStyleOptionViewItem
 
 
 class Visibility(QObject):
@@ -292,13 +292,13 @@ class VisibilityEditor(QWidget):
             painter, self.rect(), self.palette(), _VisibilityDrawer.EditMode.EDITABLE, self._used_control)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        self._press_pos = event.pos()
+        self._press_pos = event.position()
         self._click_duration_timer.start()
 
-        self._pressed_element = self._visibility_drawer.element_in_pos(event.pos())
+        self._pressed_element = self._visibility_drawer.element_in_pos(event.position())
         if self._pressed_element == _VisibilityDrawer.Element.SLIDER:
             self._slider_movement_started = True
-            self._edit_opacity_using_pos(event.x())
+            self._edit_opacity_using_pos(event.position().x())
         else:
             self._slider_movement_started = False
 
@@ -307,9 +307,9 @@ class VisibilityEditor(QWidget):
     def mouseMoveEvent(self, event: QMouseEvent):
         if self._slider_movement_started \
                 or self._click_duration_timer.elapsed() > 500 \
-                or (event.pos() - self._press_pos).manhattanLength() > 10:
+                or (event.position() - self._press_pos).manhattanLength() > 10:
             self._slider_movement_started = True
-            self._edit_opacity_using_pos(event.x())
+            self._edit_opacity_using_pos(event.position().x())
 
         super().mouseMoveEvent(event)
 

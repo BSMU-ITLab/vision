@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import numpy as np
-from PySide2.QtCore import QPoint, QRect
-from PySide2.QtWidgets import QMdiSubWindow
+from PySide6.QtCore import QPoint, QRect
+from PySide6.QtWidgets import QMdiSubWindow
 
 
 class DataViewerSubWindow(QMdiSubWindow):

@@ -1,19 +1,27 @@
 from __future__ import annotations
 
 import itertools
+from typing import TYPE_CHECKING
 
-from PySide6.QtCharts import QtCharts
+from PySide6.QtCharts import QChart, QLineSeries, QValueAxis, QChartView
 from PySide6.QtCore import Qt, QPointF, QRectF
 from PySide6.QtGui import QPainter, QLinearGradient, QGradient, QPen, QBrush, QColor
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGridLayout, QColorDialog, QGraphicsItem
-
-from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 from sortedcontainers import SortedList
+
+from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
+from bsmu.vision.widgets.viewers.base import DataViewer
+
+if TYPE_CHECKING:
+    import numpy as np
+    from PySide6.QtGui import QResizeEvent
+    from PySide6.QtWidgets import QWidget, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
+
+    from bsmu.vision.core.transfer_functions.color import ColorTransferFunctionPoint
 
 
 def pairwise(iterable):
-    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    """s -> (s0,s1), (s1,s2), (s2, s3), ..."""
     a, b = itertools.tee(iterable)
     next(b, None)
     return zip(a, b)
@@ -172,7 +180,7 @@ class ColorTransferFunctionIntervalView(QGraphicsRectItem):
         return self.begin_point.x < other.begin_point.x
 
 
-class ColorTransferFunctionChart(QtCharts.QChart):
+class ColorTransferFunctionChart(QChart):
     def __init__(self, data: ColorTransferFunction = None):
         super().__init__()
 
@@ -193,13 +201,13 @@ class ColorTransferFunctionViewer(DataViewer):
         # self.chart.legend().hide()
         self.chart_rect_f = QRectF()
 
-        self.axis_x = QtCharts.QValueAxis()
+        self.axis_x = QValueAxis()
         # self.axis_x.setLabelFormat('%d')
         self.axis_x.setLabelFormat('%.1f')
         self.axis_x.setTitleText('Intensity')
         self.chart.addAxis(self.axis_x, Qt.AlignBottom)
 
-        self.axis_y = QtCharts.QValueAxis()
+        self.axis_y = QValueAxis()
         # self.axis_y.setTickCount(10)
         self.axis_y.setLabelFormat('%.2f')
         # self.axis_y.setTitleText('Magnitude')
@@ -210,8 +218,8 @@ class ColorTransferFunctionViewer(DataViewer):
         # Add an empty series, else |chart.mapToPosition| will no work
         self.series = self.add_series()
 
-        self.chart_view = QtCharts.QChartView(self.chart)
-        # self.chart_view.setRubberBand(QtCharts.QChartView.RectangleRubberBand)
+        self.chart_view = QChartView(self.chart)
+        # self.chart_view.setRubberBand(QChartView.RectangleRubberBand)
         self.chart_view.setRenderHint(QPainter.Antialiasing)
 
         self.scene = self.chart_view.scene()
@@ -295,7 +303,7 @@ class ColorTransferFunctionViewer(DataViewer):
             point_view.update_pos()
 
     def add_series(self):
-        series = QtCharts.QLineSeries()
+        series = QLineSeries()
         series.setName('Color Transfer Function')
         self.chart.addSeries(series)
         series.attachAxis(self.axis_x)

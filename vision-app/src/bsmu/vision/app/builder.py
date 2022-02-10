@@ -86,6 +86,7 @@ class AppBuilder:
         'bsmu.vision.dnn',
         'bsmu.vision.plugins',
         'bsmu.vision.widgets',
+        'imageio',
     ]
 
     def __init__(
@@ -171,14 +172,24 @@ class AppBuilder:
             packages: List[str],
             packages_with_data: List[ModuleType]
     ) -> dict:
+        list_of_data_file_tuples = generate_list_of_data_file_tuples(packages_with_data)
+        frozen_rel_data_paths = [data_file_tuple[1] for data_file_tuple in list_of_data_file_tuples]
+        data_modules_to_exclude = []
+        for frozen_rel_data_path in frozen_rel_data_paths:
+            data_module_to_exclude = frozen_rel_data_path.replace('\\', '.')
+            data_module_to_exclude = data_module_to_exclude[len(DataFileProvider.frozen_data_dir_name()) + len('.'):]
+            data_modules_to_exclude.append(data_module_to_exclude)
+        print('Data modules to exclude:', data_modules_to_exclude)
+
+        excludes = ['tkinter', 'scipy.spatial.cKDTree'] + data_modules_to_exclude
         return {
-            'packages': packages,
-            'excludes': ['tkinter', 'scipy.spatial.cKDTree'],  # to fix the current bug
-            'includes': ['numpy', 'scipy.sparse.csgraph._validation'],
-            'include_files': generate_list_of_data_file_tuples(packages_with_data),
             'build_exe': self._build_dir,
+            'packages': packages,
+            'excludes': excludes,
+            'includes': ['numpy', 'scipy.sparse.csgraph._validation'],
+            'include_files': list_of_data_file_tuples,
         }
-    
+
     def _generate_default_install_exe_options(self) -> dict:
         return {
             'build_dir': self._build_dir,

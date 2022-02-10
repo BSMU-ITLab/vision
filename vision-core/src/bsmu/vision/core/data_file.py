@@ -11,6 +11,10 @@ class DataFileProvider:
     _FROZEN_DATA_DIR_NAME = 'data'
 
     @classmethod
+    def frozen_data_dir_name(cls) -> str:
+        return cls._FROZEN_DATA_DIR_NAME
+
+    @classmethod
     def data_dirs(cls) -> tuple:
         return tuple(set(cls._BASE_DATA_DIRS).union(set(cls._DATA_DIRS)))
 

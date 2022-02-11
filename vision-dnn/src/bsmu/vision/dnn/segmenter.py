@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import copy
 import numbers
+import time
 from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
 import onnxruntime as ort
+from PySide6.QtCore import QThreadPool, QTimer
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.core.image import tile_splitter
@@ -215,15 +217,29 @@ def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.
 
 
 class Segmenter:
-    def __init__(self, model_params: ModelParams):
+    def __init__(self, model_params: ModelParams, preload_model: bool = True):
         self._model_params = model_params
 
         self._inference_session: ort.InferenceSession | None = None
+        self._inference_session_being_created: bool = False
+
+        if preload_model:
+            # Use zero timer to start method whenever there are no pending events (see QCoreApplication::exec doc)
+            QTimer.singleShot(0, self._preload_model)
+
+    def _preload_model(self):
+        QThreadPool.globalInstance().start(self._create_inference_session_with_delay)
+
+    def _create_inference_session_with_delay(self):
+        time.sleep(1.5)  # Wait for application is fully loaded to avoid GUI freezes
+        self._create_inference_session()
 
     def _create_inference_session(self):
-        if self._inference_session is None:
+        if self._inference_session is None and self._inference_session_being_created is False:
+            self._inference_session_being_created = True
             self._inference_session = ort.InferenceSession(
                 str(self._model_params.path), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+            self._inference_session_being_created = False
 
     def _segment_batch_without_postresize(self, images: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
         input_image_batch = []

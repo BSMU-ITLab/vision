@@ -71,6 +71,8 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
 
+        self._table_visualizer: RetinalFundusTableVisualizer | None = None
+
     def _enable(self):
         self._main_window = self._main_window_plugin.main_window
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
@@ -95,22 +97,22 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             vessels_segmenter_model_props['input-size'],
             vessels_segmenter_model_props['preprocessing-mode'],
         )
-        self.table_visualizer = RetinalFundusTableVisualizer(
+        self._table_visualizer = RetinalFundusTableVisualizer(
             self._data_visualization_manager, self._mdi,
             disk_segmenter_model_params, cup_segmenter_model_params, vessels_segmenter_model_params)
 
-        self._post_load_conversion_manager.data_converted.connect(self.table_visualizer.visualize_retinal_fundus_data)
+        self._post_load_conversion_manager.data_converted.connect(self._table_visualizer.visualize_retinal_fundus_data)
 
         self._main_window.add_menu_action(
-            WindowsMenu, 'Table', self.table_visualizer.maximize_journal_viewer, Qt.CTRL + Qt.Key_1)
+            WindowsMenu, 'Table', self._table_visualizer.maximize_journal_viewer, Qt.CTRL + Qt.Key_1)
         self._main_window.add_menu_action(
-            WindowsMenu, 'Table/Image', self.table_visualizer.show_journal_and_image_viewers, Qt.CTRL + Qt.Key_2)
+            WindowsMenu, 'Table/Image', self._table_visualizer.show_journal_and_image_viewers, Qt.CTRL + Qt.Key_2)
         self._main_window.add_menu_action(
-            WindowsMenu, 'Image', self.table_visualizer.maximize_layered_image_viewer, Qt.CTRL + Qt.Key_3)
+            WindowsMenu, 'Image', self._table_visualizer.maximize_layered_image_viewer, Qt.CTRL + Qt.Key_3)
 
     def _disable(self):
         self._post_load_conversion_manager.data_converted.disconnect(
-            self.table_visualizer.visualize_retinal_fundus_data)
+            self._table_visualizer.visualize_retinal_fundus_data)
 
 
 class PatientRetinalFundusRecord(QObject):

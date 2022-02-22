@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,13 +30,13 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QAbstractItemModel
     from PySide6.QtWidgets import QWidget, QStyleOptionViewItem
 
-    from bsmu.vision.core.image.layered import ImageLayer
+    from bsmu.vision.dnn.segmenter import BBox
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
     from bsmu.vision.plugins.post_load_converters.manager import PostLoadConversionManagerPlugin, \
         PostLoadConversionManager
-    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayerView
 
 
 class RetinalFundusTableVisualizerPlugin(Plugin):
@@ -117,8 +118,10 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
 
 class PatientRetinalFundusRecord(QObject):
     IMAGE_LAYER_NAME = 'image'
+    DISK_REGION_MASK_LAYER_NAME = 'disk-region-mask'
     DISK_MASK_LAYER_NAME = 'disk-mask'
     CUP_MASK_LAYER_NAME = 'cup-mask'
+    VESSELS_MASK_LAYER_NAME = 'vessels-mask'
 
     UNKNOWN_VALUE_STR: str = '?'
 
@@ -429,6 +432,13 @@ class PatientRetinalFundusJournalViewer(DataViewer):
 
 
 class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
+    _DEFAULT_LAYER_VISIBILITY_BY_NAME = {
+        PatientRetinalFundusRecord.DISK_REGION_MASK_LAYER_NAME: Visibility(False, 0.2),
+        PatientRetinalFundusRecord.DISK_MASK_LAYER_NAME: Visibility(True, 0.5),
+        PatientRetinalFundusRecord.CUP_MASK_LAYER_NAME: Visibility(True, 0.5),
+        PatientRetinalFundusRecord.VESSELS_MASK_LAYER_NAME: Visibility(True, 0.5),
+    }
+
     def __init__(self, data: PatientRetinalFundusJournal = None, parent: QWidget = None):
         self._journal_viewer = PatientRetinalFundusJournalViewer(data)
         self._journal_viewer.record_selected.connect(self._on_journal_record_selected)
@@ -437,6 +447,8 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
 
         self._layered_image_viewer = LayeredFlatImageViewer()
         self._layer_visibility_by_name = {}
+        self._layered_image_viewer.layer_view_removing.connect(self._save_layer_visibility)
+        self._layered_image_viewer.layer_view_added.connect(self._restore_layer_visibility)
 
         self._splitter = QSplitter()
         self._splitter.addWidget(self._journal_viewer)
@@ -488,9 +500,6 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         if 0 in self._splitter.sizes():
             self.show_journal_and_image_viewers_with_equal_sizes()
 
-    def is_layer_visibility_cached(self, layer_name: str) -> bool:
-        return layer_name in self._layer_visibility_by_name
-
     def _maximize_splitter_widget(self, widget: QWidget):
         sizes = [0] * self._splitter.count()
         widget_index = self._splitter.indexOf(widget)
@@ -502,21 +511,25 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         #  We need to save it just one time, when splitter moving finished.
         self._splitter_state = self._splitter.saveState()
 
+    def _save_layer_visibility(self, layer_view: ImageLayerView):
+        layer_view_visibility = Visibility(layer_view.visible, layer_view.opacity)
+        self._layer_visibility_by_name[layer_view.name] = layer_view_visibility
+
+    def _restore_layer_visibility(self, layer_view: ImageLayerView):
+        """
+        Restore previous visibility of the layer or use default one.
+        (If the layer with such name was added for the first time, then set it's default visibility;
+        otherwise visibility customized by a user will remain unchanged)
+        """
+        layer_visibility_to_restore = self._layer_visibility_by_name.get(layer_view.name)
+        if layer_visibility_to_restore is None:
+            layer_visibility_to_restore = self._DEFAULT_LAYER_VISIBILITY_BY_NAME.get(layer_view.name)
+        if layer_visibility_to_restore is not None:
+            layer_view.visible = layer_visibility_to_restore.visible
+            layer_view.opacity = layer_visibility_to_restore.opacity
+
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
-        # Save previous visibility of layers
-        for layer_view in self.layered_image_viewer.layer_views:
-            layer_view_visibility = Visibility(layer_view.visible, layer_view.opacity)
-            self._layer_visibility_by_name[layer_view.name] = layer_view_visibility
-
         self._layered_image_viewer.data = record.layered_image
-
-        # Restore previous visibility of layers
-        for layer_view in self.layered_image_viewer.layer_views:
-            prev_layer_visibility = self._layer_visibility_by_name.get(layer_view.name)
-            if prev_layer_visibility is not None:
-                layer_view.visible = prev_layer_visibility.visible
-                layer_view.opacity = prev_layer_visibility.opacity
-
         self.layered_image_viewer.fit_image_in()
 
 
@@ -547,7 +560,7 @@ class RetinalFundusTableVisualizer(QObject):
         self._cup_segmenter = DnnSegmenter(cup_segmenter_model_params)
         self._vessels_segmenter = DnnSegmenter(vessels_segmenter_model_params)
 
-        self._mask_palette = Palette.default_binary(255, [102, 255, 128])
+        self._disk_mask_palette = Palette.default_binary(255, [102, 255, 128])
         self._cup_mask_palette = Palette.default_binary(255, [189, 103, 255])
         self._vessels_mask_palette = Palette.default_soft([102, 183, 255])
 
@@ -595,18 +608,13 @@ class RetinalFundusTableVisualizer(QObject):
     def show_journal_and_image_viewers(self):
         self._illustrated_journal_viewer.show_journal_and_image_viewers()
 
-    def visualize_retinal_fundus_data(self, data: Data):
-        if not isinstance(data, LayeredImage):
-            return
-
-        first_layer = data.layers[0]
-        image = first_layer.image
-
-        # Optic disk segmentation
-        #%disk_mask_pixels = self._disk_segmenter.segment(image.array, segmenter.largest_connected_component_soft_mask)
-        disk_mask_pixels, disk_bbox = \
-            self._disk_segmenter.segment_largest_connected_component_and_return_mask_with_bbox(image.array)
-
+    def _on_disk_segmented(
+            self,
+            record: PatientRetinalFundusRecord,
+            image: FlatImage,
+            disk_mask_pixels: np.ndarray,
+            disk_bbox: BBox,
+    ):
         disk_bbox.add_margins(round((disk_bbox.width + disk_bbox.height) / 2))
         disk_bbox.clip_to_shape(image.array.shape)
 
@@ -618,61 +626,68 @@ class RetinalFundusTableVisualizer(QObject):
 
         disk_region_mask_pixels = np.zeros_like(disk_mask_pixels)
         disk_region_mask_pixels[disk_bbox.top:disk_bbox.bottom, disk_bbox.left:disk_bbox.right, ...] = 255
-        disk_region_mask_layer = data.add_layer_from_image(
-            FlatImage(disk_region_mask_pixels, self._mask_palette), name='disk-region-mask')
+        disk_region_mask_layer = record.layered_image.add_layer_from_image(
+            FlatImage(disk_region_mask_pixels, self._disk_mask_palette),
+            PatientRetinalFundusRecord.DISK_REGION_MASK_LAYER_NAME)
 
-        # mask_palette = Palette.from_sparse_index_list([[0, 0, 0, 0, 0],
-        #                                                [1, 0, 255, 0, 100]])
-        print('bef disk_mask_pixels', disk_mask_pixels.dtype, disk_mask_pixels.min(), disk_mask_pixels.max(), np.unique(disk_mask_pixels))
         disk_mask_pixels = image_converter.normalized_uint8(disk_mask_pixels)
-        print('aft disk_mask_pixels', disk_mask_pixels.dtype, disk_mask_pixels.min(), disk_mask_pixels.max(), np.unique(disk_mask_pixels))
-        disk_mask_layer = data.add_layer_from_image(
-            FlatImage(array=disk_mask_pixels, palette=self._mask_palette), name='disk-mask')
+        disk_mask_layer = record.layered_image.add_layer_from_image(
+            FlatImage(array=disk_mask_pixels, palette=self._disk_mask_palette),
+            PatientRetinalFundusRecord.DISK_MASK_LAYER_NAME)
 
         # Optic cup segmentation
-        cup_mask_pixels_on_disk_region, cup_bbox = \
-            self._cup_segmenter.segment_largest_connected_component_and_return_mask_with_bbox(disk_region_image_pixels)
+        self._cup_segmenter.segment_largest_connected_component_and_return_mask_with_bbox_async(
+            partial(self._on_cup_segmented, record, image, disk_mask_pixels, disk_bbox), disk_region_image_pixels)
+
+    def _on_cup_segmented(
+            self,
+            record: PatientRetinalFundusRecord,
+            image: FlatImage,
+            disk_mask_pixels: np.ndarray,
+            disk_bbox: BBox,
+            cup_mask_pixels_on_disk_region: np.ndarray,
+            cup_bbox: BBox,
+    ):
         cup_mask_pixels_on_disk_region = image_converter.normalized_uint8(cup_mask_pixels_on_disk_region)
         cup_mask_pixels = np.zeros_like(disk_mask_pixels)
         cup_mask_pixels[disk_bbox.top:disk_bbox.bottom, disk_bbox.left:disk_bbox.right, ...] = \
             cup_mask_pixels_on_disk_region
-        cup_mask_layer = data.add_layer_from_image(
-            FlatImage(array=cup_mask_pixels, palette=self._cup_mask_palette), name='cup-mask')
+        cup_mask_layer = record.layered_image.add_layer_from_image(
+            FlatImage(array=cup_mask_pixels, palette=self._cup_mask_palette),
+            PatientRetinalFundusRecord.CUP_MASK_LAYER_NAME)
 
         # Vessels segmentation
-        vessels_mask_pixels = self._vessels_segmenter.segment_on_splitted_into_tiles(image.array)
+        self._vessels_segmenter.segment_on_splitted_into_tiles_async(
+            partial(self._on_vessels_segmented, record), image.array)
+
+    def _on_vessels_segmented(
+            self,
+            record: PatientRetinalFundusRecord,
+            vessels_mask_pixels: np.ndarray,
+    ):
         vessels_mask_pixels = image_converter.normalized_uint8(vessels_mask_pixels)
-        vessels_mask_layer = data.add_layer_from_image(
-            FlatImage(array=vessels_mask_pixels, palette=self._vessels_mask_palette), name='vessels-mask')
+        vessels_mask_layer = record.layered_image.add_layer_from_image(
+            FlatImage(array=vessels_mask_pixels, palette=self._vessels_mask_palette),
+            PatientRetinalFundusRecord.VESSELS_MASK_LAYER_NAME)
+
+        record.calculate_params()
+        self.journal_viewer.resize_columns_to_contents()
+
+    def visualize_retinal_fundus_data(self, data: Data):
+        if not isinstance(data, LayeredImage):
+            return
 
         record = PatientRetinalFundusRecord(data)
-        record.calculate_params()
         self.journal.add_record(record)
 
         self.journal_viewer.select_record(record)
-        self.journal_viewer.resize_columns_to_contents()
 
-        # If the layer with such name was added for the first time, then set it's opacity
-        # (otherwise opacity customized by a user will remain unchanged)
-        if not self._is_layer_visibility_cached(disk_mask_layer):
-            disk_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_mask_layer)
-            disk_mask_layer_view.opacity = 0.5
+        first_layer = data.layers[0]
+        image = first_layer.image
 
-        if not self._is_layer_visibility_cached(disk_region_mask_layer):
-            disk_region_mask_layer_view = self.layered_image_viewer.layer_view_by_model(disk_region_mask_layer)
-            disk_region_mask_layer_view.opacity = 0.2
-            disk_region_mask_layer_view.visible = False
-
-        if not self._is_layer_visibility_cached(cup_mask_layer):
-            cup_mask_layer_view = self.layered_image_viewer.layer_view_by_model(cup_mask_layer)
-            cup_mask_layer_view.opacity = 0.5
-
-        if not self._is_layer_visibility_cached(vessels_mask_layer):
-            vessels_mask_layer_view = self.layered_image_viewer.layer_view_by_model(vessels_mask_layer)
-            vessels_mask_layer_view.opacity = 0.5
-
-    def _is_layer_visibility_cached(self, layer: ImageLayer):
-        return self.illustrated_journal_viewer.is_layer_visibility_cached(layer.name)
+        # Optic disk segmentation
+        self._disk_segmenter.segment_largest_connected_component_and_return_mask_with_bbox_async(
+            partial(self._on_disk_segmented, record, image), image.array)
 
     def raise_journal_sub_window(self):
         self._journal_sub_window.show_normal()

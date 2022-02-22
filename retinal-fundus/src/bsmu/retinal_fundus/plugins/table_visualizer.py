@@ -125,6 +125,10 @@ class PatientRetinalFundusRecord(QObject):
 
     UNKNOWN_VALUE_STR: str = '?'
 
+    disk_area_changed = Signal(float)
+    cup_area_changed = Signal(float)
+    cup_to_disk_area_ratio_changed = Signal(float)
+
     def __init__(self, layered_image: LayeredImage):
         super().__init__()
 
@@ -152,6 +156,12 @@ class PatientRetinalFundusRecord(QObject):
     def disk_area(self) -> float | None:
         return self._disk_area
 
+    @disk_area.setter
+    def disk_area(self, value: float):
+        if self._disk_area != value:
+            self._disk_area = value
+            self.disk_area_changed.emit(self._disk_area)
+
     @property
     def disk_area_str(self) -> str:
         return self._value_str(self.disk_area)
@@ -160,6 +170,12 @@ class PatientRetinalFundusRecord(QObject):
     def cup_area(self) -> float | None:
         return self._cup_area
 
+    @cup_area.setter
+    def cup_area(self, value: float):
+        if self._cup_area != value:
+            self._cup_area = value
+            self.cup_area_changed.emit(self._cup_area)
+
     @property
     def cup_area_str(self) -> str:
         return self._value_str(self.cup_area)
@@ -167,6 +183,12 @@ class PatientRetinalFundusRecord(QObject):
     @property
     def cup_to_disk_area_ratio(self) -> float | None:
         return self._cup_to_disk_area_ratio
+
+    @cup_to_disk_area_ratio.setter
+    def cup_to_disk_area_ratio(self, value: float):
+        if self._cup_to_disk_area_ratio != value:
+            self._cup_to_disk_area_ratio = value
+            self.cup_to_disk_area_ratio_changed.emit(self._cup_to_disk_area_ratio)
 
     @property
     def cup_to_disk_area_ratio_str(self) -> str:
@@ -179,17 +201,17 @@ class PatientRetinalFundusRecord(QObject):
 
     def _calculate_disk_area(self) -> float:
         if self._disk_area is None:
-            self._disk_area = self._count_nonzero_layer_pixels(self.DISK_MASK_LAYER_NAME)
+            self.disk_area = self._count_nonzero_layer_pixels(self.DISK_MASK_LAYER_NAME)
         return self._disk_area
 
     def _calculate_cup_area(self):
         if self._cup_area is None:
-            self._cup_area = self._count_nonzero_layer_pixels(self.CUP_MASK_LAYER_NAME)
+            self.cup_area = self._count_nonzero_layer_pixels(self.CUP_MASK_LAYER_NAME)
         return self._cup_area
 
     def _calculate_cup_to_disk_area_ratio(self):
         if self._cup_to_disk_area_ratio is None:
-            self._cup_to_disk_area_ratio = self._calculate_cup_area() / self._calculate_disk_area()
+            self.cup_to_disk_area_ratio = self._calculate_cup_area() / self._calculate_disk_area()
         return self._cup_to_disk_area_ratio
 
     def _count_nonzero_layer_pixels(self, layer_name: str) -> int:
@@ -250,6 +272,9 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
             record_storage: PatientRetinalFundusJournal = None,
             parent: QObject = None
     ):
+        # Store connection objects to disconnect record property changed signals.
+        self._property_changed_connections_by_record = {}
+
         super().__init__(
             record_storage,
             PatientRetinalFundusRecord,
@@ -306,6 +331,36 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
         self.record_storage.record_added.connect(self._on_storage_record_added)
         self.record_storage.record_removing.connect(self._on_storage_record_removing)
         self.record_storage.record_removed.connect(self._on_storage_record_removed)
+
+    def _on_record_added(self, record: PatientRetinalFundusRecord, row: int):
+        record_property_changed_connections = set()
+
+        record_property_changed_connections.add(
+            record.disk_area_changed.connect(partial(self._on_disk_area_changed, record)))
+        record_property_changed_connections.add(
+            record.cup_area_changed.connect(partial(self._on_cup_area_changed, record)))
+        record_property_changed_connections.add(
+            record.cup_to_disk_area_ratio_changed.connect(partial(self._on_cup_to_disk_area_ratio_changed, record)))
+
+        self._property_changed_connections_by_record[record] = record_property_changed_connections
+
+    def _on_record_removing(self, record: PatientRetinalFundusRecord, row: int):
+        record_property_changed_connections = self._property_changed_connections_by_record.pop(record)
+        for connection in record_property_changed_connections:
+            QObject.disconnect(connection)
+
+    def _on_disk_area_changed(self, record: PatientRetinalFundusRecord, disk_area: float):
+        disk_area_model_index = self.index(self.record_row(record), self.column_number(DiskAreaTableColumn))
+        self.dataChanged.emit(disk_area_model_index, disk_area_model_index)
+
+    def _on_cup_area_changed(self, record: PatientRetinalFundusRecord, cur_area: float):
+        cup_area_model_index = self.index(self.record_row(record), self.column_number(CupAreaTableColumn))
+        self.dataChanged.emit(cup_area_model_index, cup_area_model_index)
+
+    def _on_cup_to_disk_area_ratio_changed(self, record: PatientRetinalFundusRecord, cup_to_disk_area_ratio: float):
+        cup_to_disk_area_ratio_model_index = \
+            self.index(self.record_row(record), self.column_number(CupToDiskAreaRatioTableColumn))
+        self.dataChanged.emit(cup_to_disk_area_ratio_model_index, cup_to_disk_area_ratio_model_index)
 
 
 class ImageCenterAlignmentDelegate(QStyledItemDelegate):

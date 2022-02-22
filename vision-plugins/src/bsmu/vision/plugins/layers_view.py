@@ -136,6 +136,8 @@ class LayersTableModel(RecordTableModel):
         self.record_storage.layer_view_removed.connect(self._on_storage_record_removed)
 
     def _on_record_added(self, record: ImageLayerView, row: int):
+        # TODO: |self._on_visibility_changed| will always use the same row for the record.
+        #  This can lead to undefined behaviour when some records will be removed (and record row will change).
         visibility_changed_handler = partial(self._on_visibility_changed, record, row)
         self.visibility_changed_handler_by_record[record] = visibility_changed_handler
         record.visibility_changed.connect(visibility_changed_handler)

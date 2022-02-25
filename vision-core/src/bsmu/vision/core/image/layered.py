@@ -76,7 +76,7 @@ class LayeredImage(Data):
     def layers(self) -> List[ImageLayer]:
         return self._layers
 
-    def layer_by_name(self, name: str) -> ImageLayer:
+    def layer_by_name(self, name: str) -> ImageLayer | None:
         return self._names_layers.get(name)
 
     def add_layer(self, layer: ImageLayer):

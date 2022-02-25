@@ -74,6 +74,10 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
 
         self._table_visualizer: RetinalFundusTableVisualizer | None = None
 
+    @property
+    def table_visualizer(self) -> RetinalFundusTableVisualizer | None:
+        return self._table_visualizer
+
     def _enable(self):
         self._main_window = self._main_window_plugin.main_window
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
@@ -153,6 +157,18 @@ class PatientRetinalFundusRecord(QObject):
         return self._layered_image.layers[0].image
 
     @property
+    def disk_mask(self) -> FlatImage | None:
+        return self.image_by_layer_name(self.DISK_MASK_LAYER_NAME)
+
+    @property
+    def cup_mask(self) -> FlatImage | None:
+        return self.image_by_layer_name(self.CUP_MASK_LAYER_NAME)
+
+    @property
+    def vessels_mask(self) -> FlatImage | None:
+        return self.image_by_layer_name(self.VESSELS_MASK_LAYER_NAME)
+
+    @property
     def disk_area(self) -> float | None:
         return self._disk_area
 
@@ -193,6 +209,10 @@ class PatientRetinalFundusRecord(QObject):
     @property
     def cup_to_disk_area_ratio_str(self) -> str:
         return self._value_str(self.cup_to_disk_area_ratio)
+
+    def image_by_layer_name(self, layer_name: str) -> FlatImage | None:
+        layer = self._layered_image.layer_by_name(layer_name)
+        return None if layer is None else layer.image
 
     def calculate_params(self):
         self._calculate_disk_area()
@@ -402,6 +422,8 @@ class PatientRetinalFundusJournalTableView(QTableView):
             vertical_header.setSectionResizeMode(QHeaderView.Fixed)
             vertical_header.setDefaultSectionSize(row_height)
 
+        self._selected_record: PatientRetinalFundusRecord | None = None
+
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setAlternatingRowColors(True)
 
@@ -410,6 +432,10 @@ class PatientRetinalFundusJournalTableView(QTableView):
         palette.setColor(QPalette.Highlight, QColor(204, 228, 247))
         palette.setColor(QPalette.HighlightedText, Qt.black)
         self.setPalette(palette)
+
+    @property
+    def selected_record(self) -> PatientRetinalFundusRecord | None:
+        return self._selected_record
 
     def setModel(self, model: QAbstractItemModel):
         super().setModel(model)
@@ -459,7 +485,8 @@ class PatientRetinalFundusJournalTableView(QTableView):
         return super().sizeHintForColumn(column)
 
     def _on_current_row_changed(self, current: QModelIndex, previous: QModelIndex):
-        self.record_selected.emit(self.model().row_record(current.row()))
+        self._selected_record = self.model().row_record(current.row())
+        self.record_selected.emit(self._selected_record)
 
 
 class PatientRetinalFundusJournalViewer(DataViewer):
@@ -477,6 +504,10 @@ class PatientRetinalFundusJournalViewer(DataViewer):
         grid_layout.setContentsMargins(0, 0, 0, 0)
         grid_layout.addWidget(self._table_view)
         self.setLayout(grid_layout)
+
+    @property
+    def selected_record(self) -> PatientRetinalFundusRecord | None:
+        return self._table_view.selected_record
 
     def select_record(self, record: PatientRetinalFundusRecord):
         row = self._table_model.record_row(record)
@@ -653,6 +684,10 @@ class RetinalFundusTableVisualizer(QObject):
     @property
     def layered_image_viewer(self) -> LayeredFlatImageViewer:
         return self._illustrated_journal_viewer.layered_image_viewer
+
+    @property
+    def selected_record(self) -> PatientRetinalFundusRecord | None:
+        return self.journal_viewer.selected_record
 
     def maximize_journal_viewer(self):
         self._illustrated_journal_viewer.maximize_journal_viewer()

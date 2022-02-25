@@ -2,16 +2,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow, MenuBar, FileMenu, ViewMenu, ToolsMenu, \
-    WindowsMenu, HelpMenu
+from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow, MainMenu, MenuBar, FileMenu, ViewMenu, \
+    ToolsMenu, WindowsMenu, HelpMenu
 
 if TYPE_CHECKING:
-    from bsmu.vision.plugins.windows.main import MainMenu
     from typing import Tuple, Type
 
 
+class HistogramsMenu(MainMenu):
+    name = 'Histograms'
+
+
 class RetinalFundusMenuBar(MenuBar):
-    def __init__(self, menu_order: Tuple[MainMenu] = (FileMenu, ViewMenu, ToolsMenu, WindowsMenu, HelpMenu)):
+    def __init__(
+            self,
+            menu_order: Tuple[MainMenu] = (FileMenu, ViewMenu, ToolsMenu, HistogramsMenu, WindowsMenu, HelpMenu)
+    ):
         super().__init__(menu_order)
 
 

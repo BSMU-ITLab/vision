@@ -8,7 +8,6 @@ from PySide6.QtCharts import QChart, QChartView, QLineSeries, \
     QAreaSeries
 from PySide6.QtCore import Qt, QObject, QMetaObject
 from PySide6.QtGui import QPainter, QColor, QPen
-from PySide6.QtWidgets import QGridLayout
 
 from bsmu.retinal_fundus.plugins.main_window import HistogramsMenu
 from bsmu.vision.core.image.base import FlatImage
@@ -159,14 +158,20 @@ class RetinalFundusHistogramVisualizer(QObject):
 
     def on_visualize_neuroretinal_rim_histogram_toggled(self, checked: bool):
         if checked:
+            self._create_chart()
+            self._create_chart_view()
             self._journal_record_selected_connection = \
                 self._table_visualizer.journal_viewer.record_selected.connect(self._on_journal_record_selected)
             self._start_to_visualize_neuroretinal_rim_histogram_for_record(self._table_visualizer.selected_record)
-            self._table_visualizer.detailed_info_viewer.show()
+            self._table_visualizer.detailed_info_viewer.add_widget(self._chart_view)
+            if len(self._chart.series()) == 0:
+                self._hide_chart_view()
         else:
-            self._table_visualizer.detailed_info_viewer.hide()
+            self._table_visualizer.detailed_info_viewer.remove_widget(self._chart_view)
             self._stop_to_visualize_neuroretinal_rim_histogram()
             QObject.disconnect(self._journal_record_selected_connection)
+            self._chart_view = None
+            self._chart = None
 
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
         self._stop_to_visualize_neuroretinal_rim_histogram()
@@ -176,8 +181,6 @@ class RetinalFundusHistogramVisualizer(QObject):
         if record is None:
             return
 
-        print('START', record.image.path_name)
-
         self._visualized_record = record
         # Disk, cup or vessels mask layers can be added later, so we have to be notified about |layer_added| signal
         self._visualized_record_image_layer_added_connection = \
@@ -185,8 +188,6 @@ class RetinalFundusHistogramVisualizer(QObject):
         self._visualize_neuroretinal_rim_histogram()
 
     def _stop_to_visualize_neuroretinal_rim_histogram(self):
-        print('STOP', '' if self._visualized_record is None else self._visualized_record.image.path_name)
-
         QObject.disconnect(self._visualized_record_image_layer_added_connection)
         self._visualized_record = None
 
@@ -219,14 +220,22 @@ class RetinalFundusHistogramVisualizer(QObject):
 
         return neuroretinal_rim_mask
 
+    def _show_chart_view(self):
+        if self._chart_view is not None and self._chart_view.isHidden() and self._chart_view.parentWidget() is not None:
+            self._chart_view.show()
+
+    def _hide_chart_view(self):
+        if self._chart_view is not None and self._chart_view.isVisible():
+            self._chart_view.hide()
+
     def _visualize_neuroretinal_rim_histogram(self):
         if self._visualized_record is None:
+            self._hide_chart_view()
             return
 
         neuroretinal_rim_mask = self._calculate_record_neuroretinal_rim_mask(self._visualized_record)
         if neuroretinal_rim_mask is None:
-            if self._chart_view is not None and self._chart_view.isVisible():
-                self._chart_view.hide()
+            self._hide_chart_view()
             return
 
         neuroretinal_rim_float_mask = neuroretinal_rim_mask / 255
@@ -250,6 +259,8 @@ class RetinalFundusHistogramVisualizer(QObject):
             self._histogram_channel_area_series.append(area_series)
             self._histogram_channel_line_series.append(line_series)
         self._visualize_chart_with_series_list(self._histogram_channel_area_series)
+
+        self._show_chart_view()
 
     @staticmethod
     def _create_histogram_area_series(hist: np.ndarray, bin_edges: np.ndarray, name: str, pen: QPen, brush):
@@ -285,20 +296,8 @@ class RetinalFundusHistogramVisualizer(QObject):
 
         self._chart_view.setChart(self._chart)
 
-        detailed_info_viewer_layout = QGridLayout()
-        detailed_info_viewer_layout.setContentsMargins(0, 0, 0, 0)
-        detailed_info_viewer_layout.addWidget(self._chart_view)
-        self._table_visualizer.detailed_info_viewer.setLayout(detailed_info_viewer_layout)
-
     def _visualize_chart_with_series_list(self, series_list: List[QAbstractSeries]):
-        self._create_chart()
-
         self._chart.removeAllSeries()
         for series in series_list:
             self._chart.addSeries(series)
         self._chart.createDefaultAxes()
-
-        self._create_chart_view()
-
-        if self._chart_view.isHidden():
-            self._chart_view.show()

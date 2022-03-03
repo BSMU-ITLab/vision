@@ -517,6 +517,32 @@ class PatientRetinalFundusJournalViewer(DataViewer):
         self._table_view.resizeColumnsToContents()
 
 
+class RecordDetailedInfoViewer(QFrame):
+    def __init__(self, parent: QWidget = None):
+        super().__init__(parent)
+
+        self.setFrameShape(QFrame.Box)
+        self.setFrameShape(QFrame.StyledPanel)
+
+        self._splitter = QSplitter(Qt.Vertical)
+
+        self._layout = QGridLayout()
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.addWidget(self._splitter)
+        self.setLayout(self._layout)
+
+    def add_widget(self, widget: QWidget):
+        self._splitter.addWidget(widget)
+        self._update_visibility()
+
+    def remove_widget(self, widget: QWidget):
+        widget.setParent(None)
+        self._update_visibility()
+
+    def _update_visibility(self):
+        self.setVisible(self._splitter.count() > 0)
+
+
 class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
     _DEFAULT_LAYER_VISIBILITY_BY_NAME = {
         PatientRetinalFundusRecord.DISK_REGION_MASK_LAYER_NAME: Visibility(False, 0.2),
@@ -531,9 +557,7 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
 
         super().__init__(parent)
 
-        self._detailed_info_viewer = QFrame()
-        self._detailed_info_viewer.setFrameShape(QFrame.Box)
-        self._detailed_info_viewer.setFrameShape(QFrame.StyledPanel)
+        self._detailed_info_viewer = RecordDetailedInfoViewer()
         self._detailed_info_viewer.hide()
         self._journal_with_detailed_info_splitter = QSplitter(Qt.Vertical)
         self._journal_with_detailed_info_splitter.addWidget(self._journal_viewer)
@@ -561,7 +585,7 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         return self._journal_viewer
 
     @property
-    def detailed_info_viewer(self) -> QWidget:
+    def detailed_info_viewer(self) -> RecordDetailedInfoViewer:
         return self._detailed_info_viewer
 
     @property
@@ -694,7 +718,7 @@ class RetinalFundusTableVisualizer(QObject):
         return self._illustrated_journal_viewer.journal_viewer
 
     @property
-    def detailed_info_viewer(self) -> QWidget:
+    def detailed_info_viewer(self) -> RecordDetailedInfoViewer:
         return self._illustrated_journal_viewer.detailed_info_viewer
 
     @property

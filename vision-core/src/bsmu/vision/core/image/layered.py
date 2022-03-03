@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
+import numpy as np
 from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import Image
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import Type, List
+
+    from bsmu.vision.core.palette import Palette
 
 
 class ImageLayer(QObject):
@@ -27,7 +34,7 @@ class ImageLayer(QObject):
         self.name = name if name else 'Layer ' + str(self.id)
 
     @property
-    def image_path(self) -> Optional[Path]:
+    def image_path(self) -> Path | None:
         return self.image.path if self.image is not None else None
 
     @property
@@ -70,25 +77,35 @@ class LayeredImage(Data):
         super().__init__(path)
 
         self._layers = []
-        self._names_layers = {}
+        self._layer_by_name = {}
 
     @property
     def layers(self) -> List[ImageLayer]:
         return self._layers
 
     def layer_by_name(self, name: str) -> ImageLayer | None:
-        return self._names_layers.get(name)
+        return self._layer_by_name.get(name)
 
     def add_layer(self, layer: ImageLayer):
         self.layer_adding.emit(layer)
         self._layers.append(layer)
-        self._names_layers[layer.name] = layer
+        self._layer_by_name[layer.name] = layer
         self.layer_added.emit(layer)
 
-    def add_layer_from_image(self, image: Optional[Image], name: str = '') -> ImageLayer:
+    def add_layer_from_image(self, image: Image | None, name: str = '') -> ImageLayer:
         image_layer = ImageLayer(image, name)
         self.add_layer(image_layer)
         return image_layer
+
+    def add_layer_or_modify_pixels(
+            self, name: str, pixels: np.array, image_type: Type[Image], palette: Palette = None) -> ImageLayer:
+        layer = self.layer_by_name(name)
+        if layer is None:
+            layer = self.add_layer_from_image(image_type(pixels, palette), name)
+        else:
+            layer.image.array = pixels
+            layer.image.emit_pixels_modified()
+        return layer
 
     def print_layers(self):
         for index, layer in enumerate(self.layers):

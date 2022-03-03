@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PySide6.QtCore import QObject, Qt, Signal, QModelIndex, QSize, QMargins
 from PySide6.QtGui import QImage, QPainter, QFont, QPalette, QColor
-from PySide6.QtWidgets import QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, QAbstractItemView, \
-    QStyle
+from PySide6.QtWidgets import QWidget, QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, \
+    QAbstractItemView, QStyle, QFrame
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.core.data import Data
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from typing import List, Any
 
     from PySide6.QtCore import QAbstractItemModel
-    from PySide6.QtWidgets import QWidget, QStyleOptionViewItem
+    from PySide6.QtWidgets import QStyleOptionViewItem
 
     from bsmu.vision.dnn.segmenter import BBox
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
@@ -531,13 +531,21 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
 
         super().__init__(parent)
 
+        self._detailed_info_viewer = QFrame()
+        self._detailed_info_viewer.setFrameShape(QFrame.Box)
+        self._detailed_info_viewer.setFrameShape(QFrame.StyledPanel)
+        self._detailed_info_viewer.hide()
+        self._journal_with_detailed_info_splitter = QSplitter(Qt.Vertical)
+        self._journal_with_detailed_info_splitter.addWidget(self._journal_viewer)
+        self._journal_with_detailed_info_splitter.addWidget(self._detailed_info_viewer)
+
         self._layered_image_viewer = LayeredFlatImageViewer()
         self._layer_visibility_by_name = {}
         self._layered_image_viewer.layer_view_removing.connect(self._save_layer_visibility)
         self._layered_image_viewer.layer_view_added.connect(self._restore_layer_visibility)
 
         self._splitter = QSplitter()
-        self._splitter.addWidget(self._journal_viewer)
+        self._splitter.addWidget(self._journal_with_detailed_info_splitter)
         self._splitter.addWidget(self._layered_image_viewer)
         self._splitter.splitterMoved.connect(self._on_splitter_moved)
         self.show_journal_and_image_viewers_with_equal_sizes()
@@ -551,6 +559,10 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
     @property
     def journal_viewer(self) -> PatientRetinalFundusJournalViewer:
         return self._journal_viewer
+
+    @property
+    def detailed_info_viewer(self) -> QWidget:
+        return self._detailed_info_viewer
 
     @property
     def layered_image_viewer(self) -> LayeredFlatImageViewer:
@@ -569,7 +581,7 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         return self._journal_viewer.data_path_name
 
     def maximize_journal_viewer(self):
-        self._maximize_splitter_widget(self._journal_viewer)
+        self._maximize_splitter_widget(self._journal_with_detailed_info_splitter)
 
     def maximize_layered_image_viewer(self):
         self._maximize_splitter_widget(self._layered_image_viewer)
@@ -680,6 +692,10 @@ class RetinalFundusTableVisualizer(QObject):
     @property
     def journal_viewer(self) -> PatientRetinalFundusJournalViewer:
         return self._illustrated_journal_viewer.journal_viewer
+
+    @property
+    def detailed_info_viewer(self) -> QWidget:
+        return self._illustrated_journal_viewer.detailed_info_viewer
 
     @property
     def layered_image_viewer(self) -> LayeredFlatImageViewer:

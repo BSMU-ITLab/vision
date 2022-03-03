@@ -13,6 +13,8 @@ from bsmu.vision.widgets.images import icons_rc  # noqa: F401
 if TYPE_CHECKING:
     from typing import Tuple, Type
 
+    from PySide6.QtGui import QAction
+
 
 class MainMenu(QMenu):
     name = ''
@@ -77,7 +79,7 @@ class MenuBar(QMenuBar):
             menu = self.add_menu(menu_type)
         return menu
 
-    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut=None) -> QAction:
+    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method=None, shortcut=None) -> QAction:
         if shortcut is None:
             return self.menu(menu_type).addAction(action_name, method)
         else:
@@ -98,8 +100,11 @@ class MainWindow(QMainWindow):
         self._menu_bar = MenuBar() if menu_bar is None else menu_bar
         self.setMenuBar(self._menu_bar)
 
-    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method, shortcut=None):
+    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method=None, shortcut=None) -> QAction:
         return self._menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
+
+    def menu(self, menu_type: Type[MainMenu], add_nonexistent: bool = True) -> MainMenu | None:
+        return self._menu_bar.menu(menu_type, add_nonexistent)
 
 
 class MainWindowPlugin(Plugin):

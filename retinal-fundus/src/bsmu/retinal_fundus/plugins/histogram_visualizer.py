@@ -241,6 +241,7 @@ class RetinalFundusHistogramVisualizer(QObject):
         neuroretinal_rim_float_mask = neuroretinal_rim_mask / 255
 
         histogram_image_pixels = self._histogram_color_representation.from_rgb(self._visualized_record.image.array)
+        # mean = np.mean(histogram_image_pixels, axis=(0, 1), where=neuroretinal_rim_float_mask > 0.5)
         histogram_range = (histogram_image_pixels.min(), histogram_image_pixels.max())
         self._histogram_channel_area_series.clear()
         self._histogram_channel_line_series.clear()
@@ -248,7 +249,10 @@ class RetinalFundusHistogramVisualizer(QObject):
             channel_pixels = histogram_image_pixels[..., channel]
             channel_histogram, channel_histogram_bin_edges = np.histogram(
                 channel_pixels, bins=self.BIN_COUNT, range=histogram_range, weights=neuroretinal_rim_float_mask)
+            channel_mean = np.mean(channel_pixels, where=neuroretinal_rim_float_mask > 0.5)
+            channel_std = np.std(channel_pixels, where=neuroretinal_rim_float_mask > 0.5)
             series_name = self._histogram_color_representation.name[channel]
+            series_name += f': μ={channel_mean:.2f}; σ={channel_std:.2f}'
             area_series, line_series = self._create_histogram_area_series(
                 channel_histogram,
                 channel_histogram_bin_edges,

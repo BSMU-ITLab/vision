@@ -99,14 +99,14 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
 class HistogramColorRepresentation:
     name = ''
     channel_pens = (
-        QPen(QColor(144, 58, 58), 2),
-        QPen(QColor(58, 144, 67), 2),
-        QPen(QColor(58, 59, 144), 2),
+        QPen(QColor(255, 158, 158), 2),
+        QPen(QColor(143, 231, 143), 2),
+        QPen(QColor(137, 180, 213), 2),
     )
     channel_brushes = (
-        QColor(180, 71, 71, 50),
-        QColor(71, 178, 84, 50),
-        QColor(73, 77, 178, 50),
+        QColor(255, 158, 158, 100),
+        QColor(143, 231, 143, 100),
+        QColor(137, 180, 213, 100),
     )
 
     @staticmethod
@@ -145,6 +145,8 @@ class RetinalFundusHistogramVisualizer(QObject):
         self._visualized_record: PatientRetinalFundusRecord | None = None
         self._visualized_record_image_layer_added_connection = QMetaObject.Connection()
         self._journal_record_selected_connection = QMetaObject.Connection()
+
+        self._neuroretinal_rim_histogram_visualizing: bool = False
 
         self._chart: QChart | None = None
         self._chart_view: QChartView | None = None
@@ -185,14 +187,14 @@ class RetinalFundusHistogramVisualizer(QObject):
         # Disk, cup or vessels mask layers can be added later, so we have to be notified about |layer_added| signal
         self._visualized_record_image_layer_added_connection = \
             self._visualized_record.layered_image.layer_added.connect(self._on_visualized_record_image_layer_added)
-        self._visualize_neuroretinal_rim_histogram()
+        self._visualize_neuroretinal_rim_histogram_without_repeated_calls()
 
     def _stop_to_visualize_neuroretinal_rim_histogram(self):
         QObject.disconnect(self._visualized_record_image_layer_added_connection)
         self._visualized_record = None
 
     def _on_visualized_record_image_layer_added(self, image_layer: ImageLayer):
-        self._visualize_neuroretinal_rim_histogram()
+        self._visualize_neuroretinal_rim_histogram_without_repeated_calls()
 
     def _calculate_record_neuroretinal_rim_mask(
             self, record: PatientRetinalFundusRecord, binary: bool = False) -> np.ndarray | None:
@@ -227,6 +229,14 @@ class RetinalFundusHistogramVisualizer(QObject):
     def _hide_chart_view(self):
         if self._chart_view is not None and self._chart_view.isVisible():
             self._chart_view.hide()
+
+    def _visualize_neuroretinal_rim_histogram_without_repeated_calls(self):
+        if self._neuroretinal_rim_histogram_visualizing:
+            return
+
+        self._neuroretinal_rim_histogram_visualizing = True
+        self._visualize_neuroretinal_rim_histogram()
+        self._neuroretinal_rim_histogram_visualizing = False
 
     def _visualize_neuroretinal_rim_histogram(self):
         if self._visualized_record is None:

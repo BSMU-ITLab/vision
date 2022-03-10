@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import cv2 as cv
 import numpy as np
-import skimage.color
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, \
     QAreaSeries
 from PySide6.QtCore import Qt, QObject, QMetaObject
@@ -123,7 +123,15 @@ class HsvHistogramColorRepresentation(HistogramColorRepresentation):
 
     @staticmethod
     def from_rgb(rgb: np.ndarray):
-        return skimage.color.rgb2hsv(rgb)
+        rgb = rgb.astype(np.float32) / 255
+
+        # We can use skimage, but it is slower than OpenCV
+        # hsv = skimage.color.rgb2hsv(rgb)
+
+        hsv = cv.cvtColor(rgb, cv.COLOR_RGB2HSV)
+        hsv[..., 0] /= 360  # Normalize H-channel to [0; 1] range
+
+        return hsv
 
 
 class RetinalFundusHistogramVisualizer(QObject):

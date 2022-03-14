@@ -17,7 +17,7 @@ from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
+from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams, BBox
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QAbstractItemModel
     from PySide6.QtWidgets import QStyleOptionViewItem
 
-    from bsmu.vision.dnn.segmenter import BBox
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
@@ -129,6 +128,8 @@ class PatientRetinalFundusRecord(QObject):
 
     UNKNOWN_VALUE_STR: str = '?'
 
+    disk_bbox_changed = Signal(BBox)
+
     disk_area_changed = Signal(float)
     cup_area_changed = Signal(float)
     cup_to_disk_area_ratio_changed = Signal(float)
@@ -137,6 +138,8 @@ class PatientRetinalFundusRecord(QObject):
         super().__init__()
 
         self._layered_image = layered_image
+
+        self._disk_bbox: BBox | None = None
 
         self._disk_area: float | None = None
         self._cup_area: float | None = None
@@ -159,6 +162,16 @@ class PatientRetinalFundusRecord(QObject):
     @property
     def disk_mask(self) -> FlatImage | None:
         return self.image_by_layer_name(self.DISK_MASK_LAYER_NAME)
+
+    @property
+    def disk_bbox(self) -> BBox | None:
+        return self._disk_bbox
+
+    @disk_bbox.setter
+    def disk_bbox(self, value: BBox | None):
+        if self._disk_bbox != value:
+            self._disk_bbox = value
+            self.disk_bbox_changed.emit(self._disk_bbox)
 
     @property
     def cup_mask(self) -> FlatImage | None:
@@ -745,17 +758,18 @@ class RetinalFundusTableVisualizer(QObject):
             disk_mask_pixels: np.ndarray,
             disk_bbox: BBox,
     ):
-        disk_bbox.add_margins(round((disk_bbox.width + disk_bbox.height) / 2))
-        disk_bbox.clip_to_shape(image.array.shape)
+        record.disk_bbox = disk_bbox
+        disk_region_bbox = disk_bbox.margins_added(round((disk_bbox.width + disk_bbox.height) / 2))
+        disk_region_bbox.clip_to_shape(image.array.shape)
 
         disk_region_image_pixels = image.array[
-                                   disk_bbox.top:disk_bbox.bottom,
-                                   disk_bbox.left:disk_bbox.right,
+                                   disk_region_bbox.top:disk_region_bbox.bottom,
+                                   disk_region_bbox.left:disk_region_bbox.right,
                                    ...]
         # data.add_layer_from_image(FlatImage(disk_region_image_pixels), name='disk-region')
 
         disk_region_mask_pixels = np.zeros_like(disk_mask_pixels)
-        disk_region_mask_pixels[disk_bbox.top:disk_bbox.bottom, disk_bbox.left:disk_bbox.right, ...] = 255
+        disk_region_mask_pixels[disk_region_bbox.top:disk_region_bbox.bottom, disk_region_bbox.left:disk_region_bbox.right, ...] = 255
         disk_region_mask_layer = record.layered_image.add_layer_from_image(
             FlatImage(disk_region_mask_pixels, self._disk_mask_palette),
             PatientRetinalFundusRecord.DISK_REGION_MASK_LAYER_NAME)
@@ -767,7 +781,7 @@ class RetinalFundusTableVisualizer(QObject):
 
         # Optic cup segmentation
         self._cup_segmenter.segment_largest_connected_component_and_return_mask_with_bbox_async(
-            partial(self._on_cup_segmented, record, image, disk_mask_pixels, disk_bbox), disk_region_image_pixels)
+            partial(self._on_cup_segmented, record, image, disk_mask_pixels, disk_region_bbox), disk_region_image_pixels)
 
     def _on_cup_segmented(
             self,

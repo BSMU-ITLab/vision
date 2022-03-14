@@ -55,6 +55,10 @@ class Image(Data):
     def zeros_mask_like(cls, other_image: Image, palette: Palette = None) -> Image:
         return cls.zeros_like(other_image, create_mask=True, palette=palette)
 
+    @property
+    def shape(self) -> tuple:
+        return self.array.shape
+
     def zeros_mask(self, palette: Palette = None) -> Image:
         return self.zeros_mask_like(self, palette=palette)
 

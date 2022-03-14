@@ -110,6 +110,16 @@ class BBox:
         resized_bbox.resize(resize_factor_x, resize_factor_y)
         return resized_bbox
 
+    def scale(self, factor_x: float, factor_y: float):
+        width_margins = (factor_x - 1) * self.width
+        height_margins = (factor_y - 1) * self.height
+        self.add_xy_margins(round(width_margins / 2), round(height_margins / 2))
+
+    def scaled(self, factor_x: float, factor_y: float) -> BBox:
+        scaled_bbox = copy.copy(self)
+        scaled_bbox.scale(factor_x, factor_y)
+        return scaled_bbox
+
     def clip_to_shape(self, shape: Sequence[int]):
         if self.left < 0:
             self.left = 0
@@ -140,6 +150,12 @@ class BBox:
         bbox_with_margins = copy.copy(self)
         bbox_with_margins.add_margins(margin_size)
         return bbox_with_margins
+
+    def add_xy_margins(self, x_margin: int, y_margin: int):
+        self.left -= x_margin
+        self.right += x_margin
+        self.top -= y_margin
+        self.bottom += y_margin
 
     def move_left(self, value: int):
         self.left -= value

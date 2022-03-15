@@ -11,13 +11,14 @@ from PySide6.QtWidgets import QWidget, QGridLayout, QTableView, QHeaderView, QSt
     QAbstractItemView, QStyle, QFrame
 
 import bsmu.vision.core.converters.image as image_converter
+from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams, BBox
+from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
@@ -742,6 +743,18 @@ class RetinalFundusTableVisualizer(QObject):
     def selected_record(self) -> PatientRetinalFundusRecord | None:
         return self.journal_viewer.selected_record
 
+    @property
+    def disk_mask_palette(self) -> Palette:
+        return self._disk_mask_palette
+
+    @property
+    def cup_mask_palette(self) -> Palette:
+        return self._cup_mask_palette
+
+    @property
+    def vessels_mask_palette(self) -> Palette:
+        return self._vessels_mask_palette
+
     def maximize_journal_viewer(self):
         self._illustrated_journal_viewer.maximize_journal_viewer()
 
@@ -762,10 +775,7 @@ class RetinalFundusTableVisualizer(QObject):
         disk_region_bbox = disk_bbox.margins_added(round((disk_bbox.width + disk_bbox.height) / 2))
         disk_region_bbox.clip_to_shape(image.array.shape)
 
-        disk_region_image_pixels = image.array[
-                                   disk_region_bbox.top:disk_region_bbox.bottom,
-                                   disk_region_bbox.left:disk_region_bbox.right,
-                                   ...]
+        disk_region_image_pixels = image.bboxed_pixels(disk_region_bbox)
         # data.add_layer_from_image(FlatImage(disk_region_image_pixels), name='disk-region')
 
         disk_region_mask_pixels = np.zeros_like(disk_mask_pixels)

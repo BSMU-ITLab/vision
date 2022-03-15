@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide6.QtCore import Signal
 
+from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from bsmu.vision.core.constants import PlaneAxis
+    from bsmu.vision.core.palette import Palette
 
 
 MASK_TYPE = np.uint8
@@ -31,7 +39,7 @@ class Image(Data):
 
     pixels_modified = Signal()
 
-    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None,
+    def __init__(self, array: np.ndarray = None, palette: Palette = None, path: Path = None,
                  spatial: SpatialAttrs = None):
         super().__init__(path)
 
@@ -80,6 +88,9 @@ class Image(Data):
     def spatial_size_to_indexed_rounded(self, spatial_size: np.ndarray):
         return self.spatial_size_to_indexed(spatial_size).round().astype(np.int_)
 
+    def bboxed_pixels(self, bbox: BBox) -> np.ndarray:
+        return self.array[bbox.top:bbox.bottom, bbox.left:bbox.right]
+
     @property
     def palette(self) -> Palette:
         return self._palette
@@ -95,11 +106,11 @@ class Image(Data):
             self._check_array_palette_matching()
 
     @property
-    def colored_array(self) -> ndarray:
+    def colored_array(self) -> np.ndarray:
         return self.palette.array[self.array]
 
     @property
-    def colored_premultiplied_array(self) -> ndarray:
+    def colored_premultiplied_array(self) -> np.ndarray:
         return self.palette.premultiplied_array[self.array]
 
     @property
@@ -114,14 +125,14 @@ class Image(Data):
 class FlatImage(Image):
     n_dims = 2
 
-    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
+    def __init__(self, array: np.ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
         super().__init__(array, palette, path, spatial)
 
 
 class VolumeImage(Image):
     n_dims = 3
 
-    def __init__(self, array: ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
+    def __init__(self, array: np.ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
         super().__init__(array, palette, path, spatial)
 
     def slice_pixels(self, plane_axis: PlaneAxis, slice_number: int) -> np.ndarray:

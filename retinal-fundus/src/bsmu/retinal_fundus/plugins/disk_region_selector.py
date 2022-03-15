@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QRectF, QPointF, QLineF, QMarginsF
 from PySide6.QtGui import QPainter, QColor, QPainterPath, QPen, QBrush
 from PySide6.QtWidgets import QWidget, QGridLayout, QFrame, QGraphicsItem, QGraphicsEllipseItem, QStyle
 
+from bsmu.retinal_fundus.plugins.table_visualizer import PatientRetinalFundusRecord
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.plugins.base import Plugin
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QStyleOptionGraphicsItem
 
     from bsmu.retinal_fundus.plugins.table_visualizer import RetinalFundusTableVisualizerPlugin, \
-        RetinalFundusTableVisualizer, PatientRetinalFundusRecord
+        RetinalFundusTableVisualizer
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
 
@@ -107,20 +108,26 @@ class RetinalFundusDiskRegionSelector(QWidget):
         disk_region = record.disk_bbox.scaled(1.2, 1.2)
         disk_region.clip_to_shape(record.image.shape)
 
-        disk_region_image_pixels = record.image.array[
-                                   disk_region.top:disk_region.bottom,
-                                   disk_region.left:disk_region.right,
-                                   ...]
+        disk_region_image_pixels = record.image.bboxed_pixels(disk_region)
         self._disk_viewer.data.add_layer_or_modify_pixels(self.DISK_LAYER_NAME, disk_region_image_pixels, FlatImage)
+        disk_mask_region_image_pixels = record.disk_mask.bboxed_pixels(disk_region)
+        disk_mask_layer = self._disk_viewer.data.add_layer_or_modify_pixels(
+            PatientRetinalFundusRecord.DISK_MASK_LAYER_NAME,
+            disk_mask_region_image_pixels,
+            FlatImage,
+            self._table_visualizer.disk_mask_palette)
+        disk_mask_layer_view = self._disk_viewer.layer_view_by_model(disk_mask_layer)
+        disk_mask_layer_view.opacity = 0.4
+
         self._disk_viewer.fit_image_in()
 
         disk_region_rect = QRectF(0, 0, disk_region.width, disk_region.height)
-        ellipse = CustomEllipse(QRectF(
-            (disk_region.width - record.disk_bbox.width) / 2,
-            (disk_region.height - record.disk_bbox.height) / 2,
-            record.disk_bbox.width, record.disk_bbox.height))
+        # ellipse = CustomEllipse(QRectF(
+        #     (disk_region.width - record.disk_bbox.width) / 2,
+        #     (disk_region.height - record.disk_bbox.height) / 2,
+        #     record.disk_bbox.width, record.disk_bbox.height))
         # ellipse.setFlag(QGraphicsItem.ItemIsSelectable)
-        self._disk_viewer.add_graphics_item(ellipse)
+        # self._disk_viewer.add_graphics_item(ellipse)
 
         disk_center = QPointF(disk_region.width, disk_region.height) / 2
 

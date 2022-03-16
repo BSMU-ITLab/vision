@@ -1,24 +1,28 @@
 from __future__ import annotations
 
 import math
+import time
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, QRectF, QPointF, QLineF, QMarginsF
+import numpy as np
+from PySide6.QtCore import Qt, QRectF, QPointF, QLineF, QMarginsF, QTimer
 from PySide6.QtGui import QPainter, QColor, QPainterPath, QPen, QBrush
-from PySide6.QtWidgets import QWidget, QGridLayout, QFrame, QGraphicsItem, QGraphicsEllipseItem, QStyle
+from PySide6.QtWidgets import QWidget, QGridLayout, QFrame, QGraphicsItem, QStyle
 
 from bsmu.retinal_fundus.plugins.table_visualizer import PatientRetinalFundusRecord
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
 
 if TYPE_CHECKING:
-    from typing import Any, Tuple
+    from typing import Tuple, Sequence
 
-    from PySide6.QtCore import QRect
     from PySide6.QtWidgets import QStyleOptionGraphicsItem
 
+    from bsmu.vision.core.image.layered import ImageLayer
+    from bsmu.vision.widgets.viewers.image.layered.flat import ImageLayerView
     from bsmu.retinal_fundus.plugins.table_visualizer import RetinalFundusTableVisualizerPlugin, \
         RetinalFundusTableVisualizer
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
@@ -81,6 +85,7 @@ class RetinalFundusDiskRegionSelectorPlugin(Plugin):
 
 class RetinalFundusDiskRegionSelector(QWidget):
     DISK_LAYER_NAME = 'disk'
+    SELECTED_SECTORS_LAYER_NAME = 'selected-sectors'
 
     def __init__(self, table_visualizer: RetinalFundusTableVisualizer):
         super().__init__()
@@ -92,6 +97,17 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._disk_viewer.graphics_view.setFrameShape(QFrame.NoFrame)
 
         self._table_visualizer.journal_viewer.record_selected.connect(self._on_journal_record_selected)
+
+        self._disk_region_image_pixels: np.ndarray | None = None
+        self._disk_mask_region_image_pixels: np.ndarray | None = None
+
+        self._selected_sectors_mask_layer: ImageLayer | None = None
+        self._selected_sectors_layer_view: ImageLayerView | None = None
+        self._selected_sectors_mask_palette = Palette.default_binary(255, [102, 183, 255])
+        self._selected_sectors_opacity_timer = QTimer()
+        self._selected_sectors_max_opacity = 0.75
+
+        self._disk_center: QPointF | None = None
 
         layout = QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -108,28 +124,24 @@ class RetinalFundusDiskRegionSelector(QWidget):
         disk_region = record.disk_bbox.scaled(1.2, 1.2)
         disk_region.clip_to_shape(record.image.shape)
 
-        disk_region_image_pixels = record.image.bboxed_pixels(disk_region)
-        self._disk_viewer.data.add_layer_or_modify_pixels(self.DISK_LAYER_NAME, disk_region_image_pixels, FlatImage)
-        disk_mask_region_image_pixels = record.disk_mask.bboxed_pixels(disk_region)
-        disk_mask_layer = self._disk_viewer.data.add_layer_or_modify_pixels(
-            PatientRetinalFundusRecord.DISK_MASK_LAYER_NAME,
-            disk_mask_region_image_pixels,
+        self._disk_region_image_pixels = record.image.bboxed_pixels(disk_region)
+        self._disk_viewer.data.add_layer_or_modify_pixels(
+            self.DISK_LAYER_NAME, self._disk_region_image_pixels, FlatImage)
+
+        self._disk_mask_region_image_pixels = record.disk_mask.bboxed_pixels(disk_region)
+
+        selected_sectors_mask_pixels = np.copy(self._disk_mask_region_image_pixels)
+        self._selected_sectors_mask_layer = self._disk_viewer.data.add_layer_or_modify_pixels(
+            self.SELECTED_SECTORS_LAYER_NAME,
+            selected_sectors_mask_pixels,
             FlatImage,
-            self._table_visualizer.disk_mask_palette)
-        disk_mask_layer_view = self._disk_viewer.layer_view_by_model(disk_mask_layer)
-        disk_mask_layer_view.opacity = 0.4
+            self._selected_sectors_mask_palette)
+        self._selected_sectors_layer_view = self._disk_viewer.layer_view_by_model(self._selected_sectors_mask_layer)
 
         self._disk_viewer.fit_image_in()
 
+        self._disk_center = QPointF(disk_region.width, disk_region.height) / 2
         disk_region_rect = QRectF(0, 0, disk_region.width, disk_region.height)
-        # ellipse = CustomEllipse(QRectF(
-        #     (disk_region.width - record.disk_bbox.width) / 2,
-        #     (disk_region.height - record.disk_bbox.height) / 2,
-        #     record.disk_bbox.width, record.disk_bbox.height))
-        # ellipse.setFlag(QGraphicsItem.ItemIsSelectable)
-        # self._disk_viewer.add_graphics_item(ellipse)
-
-        disk_center = QPointF(disk_region.width, disk_region.height) / 2
 
         angle_count = 12 #4
         angle = 360 / angle_count
@@ -137,18 +149,49 @@ class RetinalFundusDiskRegionSelector(QWidget):
         for i in range(angle_count):
             start_angle = i * angle + rotate
             end_angle = start_angle + angle
-            angle_item = GraphicsAngleItem(disk_center, start_angle, end_angle, disk_region_rect)
-            self._disk_viewer.add_graphics_item(angle_item)
+            sector_item = GraphicsSectorItem(self._disk_center, start_angle, end_angle, disk_region_rect)
+            self._disk_viewer.add_graphics_item(sector_item)
+
+        self._disk_viewer.graphics_scene.selectionChanged.connect(self._on_scene_selection_changed)
+
+        self._selected_sectors_opacity_timer.timeout.connect(self._change_selected_sectors_opacity)
+        self._selected_sectors_opacity_timer.start(20)
+
+    def _on_scene_selection_changed(self):
+        self._selected_sectors_mask_layer.image_pixels.fill(0)
+
+        at_least_one_sector_is_selected = False
+        for sector in self._disk_viewer.graphics_scene.selectedItems():
+            if not isinstance(sector, GraphicsSectorItem):
+                continue
+
+            at_least_one_sector_is_selected = True
+            curr_sector_mask = sector_mask(
+                self._disk_region_image_pixels.shape[:2],
+                (round(self._disk_center.y()), round(self._disk_center.x())),
+                (sector.start_angle, sector.end_angle))
+            self._selected_sectors_mask_layer.image_pixels[curr_sector_mask] = 255
+        if at_least_one_sector_is_selected:
+            self._selected_sectors_mask_layer.image_pixels[self._disk_mask_region_image_pixels == 0] = 0
+        else:
+            self._selected_sectors_mask_layer.image.array = np.copy(self._disk_mask_region_image_pixels)
+        self._selected_sectors_mask_layer.image.emit_pixels_modified()
+
+    def _change_selected_sectors_opacity(self):
+        # Generate periodic values in range [0; |self._selected_sectors_max_opacity|]
+        self._selected_sectors_layer_view.opacity = \
+            abs(math.sin(1.5 * time.time()) * self._selected_sectors_max_opacity)
 
 
-class GraphicsAngleItem(QGraphicsItem):
+class GraphicsSectorItem(QGraphicsItem):
     def __init__(
             self,
             center: QPointF,
             start_angle: float,
             end_angle: float,
             region_rect: QRectF,
-            parent: QGraphicsItem = None):
+            parent: QGraphicsItem = None,
+    ):
         super().__init__(parent)
 
         self._center = center
@@ -194,6 +237,14 @@ class GraphicsAngleItem(QGraphicsItem):
         self._fill_path.lineTo(self._end_point)
         self._fill_path.closeSubpath()
 
+    @property
+    def start_angle(self) -> float:
+        return self._start_angle
+
+    @property
+    def end_angle(self) -> float:
+        return self._end_angle
+
     def boundingRect(self) -> QRectF:
         return self._fill_path.boundingRect().marginsAdded(
             QMarginsF(self._pen_max_width, self._pen_max_width, self._pen_max_width, self._pen_max_width))
@@ -227,18 +278,32 @@ class GraphicsAngleItem(QGraphicsItem):
                 return intersection_point, bbox_line
 
 
-class CustomEllipse(QGraphicsEllipseItem):
-    def __init__(self, rect: QRectF | QRect, parent: QGraphicsItem = None):
-        super().__init__(rect, parent)
+def sector_mask(
+        rect_shape: Sequence,
+        center: Sequence,
+        angle_range: Sequence,
+        rotate: float = 270,
+) -> np.ndarray:
+    """
+    See: https://stackoverflow.com/questions/18352973/mask-a-circular-sector-in-a-numpy-array
+         https://stackoverflow.com/a/18354475/3605259
+    Returns a boolean mask for a sector within a rectangle.
+    The start/stop angles in the |angle_range| should be given in clockwise order in degrees.
+    0-degree angle with the default |rotate| value will start at 12 o'clock.
+    If |rotate| is equal to 0, then 0-degree angle value will start at 3 o'clock.
+    """
 
-    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
-        if change == QGraphicsItem.ItemSelectedChange:
-            if value:
-                self.setBrush(QColor(60, 200, 60))
-            else:
-                self.setBrush(Qt.transparent)
-        return super().itemChange(change, value)
+    row, col = np.ogrid[:rect_shape[0], :rect_shape[1]]
+    center_row, center_col = center
+    min_angle, max_angle = np.deg2rad(np.array(angle_range) + rotate)
 
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
-        option.state &= ~QStyle.State_Selected  # Do not draw a selection rectangle
-        super().paint(painter, option, widget)
+    # Ensure max angle > min angle
+    if max_angle < min_angle:
+        max_angle += 2 * np.pi
+
+    # Convert cartesian to polar coordinates
+    theta = np.arctan2(row - center_row, col - center_col) - min_angle
+    # Wrap angles between 0 and 2 * pi
+    theta %= 2 * np.pi
+
+    return theta <= max_angle - min_angle

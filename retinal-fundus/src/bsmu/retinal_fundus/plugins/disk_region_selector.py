@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import math
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide6.QtCore import Qt, QRectF, QPointF, QLineF, QMarginsF, QTimer
 from PySide6.QtGui import QPainter, QColor, QPainterPath, QPen, QBrush
-from PySide6.QtWidgets import QWidget, QGridLayout, QFrame, QGraphicsItem, QStyle
+from PySide6.QtWidgets import QWidget, QGridLayout, QFrame, QGraphicsItem, QStyle, QGroupBox, QFormLayout, QComboBox, \
+    QSpinBox, QHBoxLayout
 
 from bsmu.retinal_fundus.plugins.table_visualizer import PatientRetinalFundusRecord
 from bsmu.vision.core.image.base import FlatImage
@@ -83,9 +85,19 @@ class RetinalFundusDiskRegionSelectorPlugin(Plugin):
         raise NotImplementedError
 
 
+@dataclass
+class SectorsPreset:
+    name: str = ''
+    quantity: int = 4
+    rotation: int = 0
+
+
 class RetinalFundusDiskRegionSelector(QWidget):
     DISK_LAYER_NAME = 'disk'
     SELECTED_SECTORS_LAYER_NAME = 'selected-sectors'
+
+    ISNT_SECTORS_PRESET = SectorsPreset('ISNT', 4, 45)
+    CLOCK_SECTORS_PRESET = SectorsPreset('Clock', 12)
 
     def __init__(self, table_visualizer: RetinalFundusTableVisualizer):
         super().__init__()
@@ -108,11 +120,101 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._selected_sectors_max_opacity = 0.75
 
         self._disk_center: QPointF | None = None
+        self._disk_region_rect: QRectF | None = None
 
-        layout = QGridLayout()
+        self._sectors_recreation_enabled: bool = True
+        self._curr_sectors_config: SectorsPreset | None = None
+        self._sector_items = []
+
+        self._sectors_preset_combo_box: QComboBox | None = None
+        self._sectors_quantity_spin_box: QSpinBox | None = None
+        self._sectors_rotation_spin_box: QSpinBox | None = None
+
+        settings_ui_grid_layout = QGridLayout()
+        settings_ui_grid_layout.addWidget(self._create_settings_ui())
+        settings_ui_grid_layout.setContentsMargins(
+            self.style().pixelMetric(QStyle.PM_LayoutLeftMargin),
+            self.style().pixelMetric(QStyle.PM_LayoutTopMargin),
+            self.style().pixelMetric(QStyle.PM_LayoutRightMargin),
+            self.style().pixelMetric(QStyle.PM_LayoutBottomMargin))
+
+        layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._disk_viewer)
+        layout.addLayout(settings_ui_grid_layout)
         self.setLayout(layout)
+
+    def _create_settings_ui(self) -> QWidget:
+        self._sectors_quantity_spin_box = QSpinBox()
+        self._sectors_quantity_spin_box.setRange(2, 36)
+        self._sectors_quantity_spin_box.valueChanged.connect(self._on_sectors_quantity_changed)
+
+        self._sectors_rotation_spin_box = QSpinBox()
+        self._sectors_rotation_spin_box.setRange(0, 360)
+        self._sectors_rotation_spin_box.valueChanged.connect(self._on_sectors_rotation_changed)
+
+        self._sectors_preset_combo_box = QComboBox()
+        self._sectors_preset_combo_box.currentIndexChanged.connect(self._on_sectors_preset_changed)
+        self._sectors_preset_combo_box.addItem(self.ISNT_SECTORS_PRESET.name, self.ISNT_SECTORS_PRESET)
+        self._sectors_preset_combo_box.addItem(self.CLOCK_SECTORS_PRESET.name,  self.CLOCK_SECTORS_PRESET)
+
+        form_layout = QFormLayout()
+        form_layout.addRow('Preset:', self._sectors_preset_combo_box)
+        form_layout.addRow('Quantity:', self._sectors_quantity_spin_box)
+        form_layout.addRow('Rotation:', self._sectors_rotation_spin_box)
+
+        sectors_settings_group_box = QGroupBox('Sectors')
+        sectors_settings_group_box.setLayout(form_layout)
+        return sectors_settings_group_box
+
+    def _on_sectors_preset_changed(self, index: int):
+        self._sectors_recreation_enabled = False
+
+        sectors_preset = self._sectors_preset_combo_box.currentData()
+        self._sectors_quantity_spin_box.setValue(sectors_preset.quantity)
+        self._sectors_rotation_spin_box.setValue(sectors_preset.rotation)
+
+        self._sectors_recreation_enabled = True
+        self._recreate_sector_items()
+
+    def _on_sectors_quantity_changed(self, i: int):
+        self._recreate_sector_items()
+
+    def _on_sectors_rotation_changed(self, i: int):
+        self._recreate_sector_items()
+
+    def _recreate_sector_items(self):
+        if not self._sectors_recreation_enabled:
+            return
+
+        sectors_config = SectorsPreset(
+            quantity=self._sectors_quantity_spin_box.value(), rotation=self._sectors_rotation_spin_box.value())
+        if self._curr_sectors_config == sectors_config:
+            return
+
+        self._remove_sector_items()
+        self._create_sector_items(sectors_config)
+
+    def _remove_sector_items(self):
+        for sector_item in self._sector_items:
+            self._disk_viewer.remove_graphics_item(sector_item)
+
+        self._sector_items.clear()
+
+    def _create_sector_items(self, sectors_config: SectorsPreset):
+        if self._disk_region_rect is None:
+            return
+
+        angle = 360 / sectors_config.quantity
+        for i in range(sectors_config.quantity):
+            start_angle = i * angle + sectors_config.rotation
+            end_angle = start_angle + angle
+            sector_item = GraphicsSectorItem(self._disk_center, start_angle, end_angle, self._disk_region_rect)
+            self._disk_viewer.add_graphics_item(sector_item)
+
+            self._sector_items.append(sector_item)
+
+        self._curr_sectors_config = sectors_config
 
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
         disk_layer = self._disk_viewer.layer_by_name(self.DISK_LAYER_NAME)
@@ -141,17 +243,9 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._disk_viewer.fit_image_in()
 
         self._disk_center = QPointF(disk_region.width, disk_region.height) / 2
-        disk_region_rect = QRectF(0, 0, disk_region.width, disk_region.height)
+        self._disk_region_rect = QRectF(0, 0, disk_region.width, disk_region.height)
 
-        angle_count = 12 #4
-        angle = 360 / angle_count
-        rotate = 0 #45
-        for i in range(angle_count):
-            start_angle = i * angle + rotate
-            end_angle = start_angle + angle
-            sector_item = GraphicsSectorItem(self._disk_center, start_angle, end_angle, disk_region_rect)
-            self._disk_viewer.add_graphics_item(sector_item)
-
+        self._recreate_sector_items()
         self._disk_viewer.graphics_scene.selectionChanged.connect(self._on_scene_selection_changed)
 
         self._selected_sectors_opacity_timer.timeout.connect(self._change_selected_sectors_opacity)
@@ -208,7 +302,7 @@ class GraphicsSectorItem(QGraphicsItem):
 
         self.setFlag(QGraphicsItem.ItemIsSelectable)
 
-        self._pen_max_width = 3
+        self._pen_max_width = 2
         self._selected_pen = QPen(QColor(67, 114, 142), self._pen_max_width, Qt.SolidLine, Qt.RoundCap)
         self._selected_brush = QBrush(QColor(67, 114, 142, 63))
         self._unselected_pen = QPen(QColor(67, 114, 142), 1, Qt.DotLine)

@@ -447,6 +447,9 @@ class LayeredImageViewer(DataViewer):
     def add_graphics_item(self, item: QGraphicsItem):
         self.graphics_scene.addItem(item)
 
+    def remove_graphics_item(self, item: QGraphicsItem):
+        self.graphics_scene.removeItem(item)
+
     def _on_data_changing(self):
         if self.data is None:
             return

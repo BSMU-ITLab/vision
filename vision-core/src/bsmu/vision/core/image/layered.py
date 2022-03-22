@@ -19,6 +19,8 @@ class ImageLayer(QObject):
     max_id = 0
 
     image_updated = Signal(Image)
+
+    image_shape_changed = Signal(object, object)
     image_pixels_modified = Signal()
 
     def __init__(self, image: Image | None = None, name: str = ''):
@@ -63,6 +65,7 @@ class ImageLayer(QObject):
                     self.path = self._image.path.parent
                 self.palette = self._image.palette
                 self._image.pixels_modified.connect(self.image_pixels_modified)
+                self._image.shape_changed.connect(self.image_shape_changed)
 
     def _on_image_updated(self):
         self.image_updated.emit(self.image)
@@ -102,8 +105,10 @@ class LayeredImage(Data):
         layer = self.layer_by_name(name)
         if layer is None:
             layer = self.add_layer_from_image(image_type(pixels, palette), name)
+        elif layer.image is None:
+            layer.image = image_type(pixels, palette)
         else:
-            layer.image.array = pixels
+            layer.image.pixels = pixels
             layer.image.emit_pixels_modified()
         return layer
 

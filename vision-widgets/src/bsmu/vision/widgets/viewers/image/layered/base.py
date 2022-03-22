@@ -41,6 +41,7 @@ class ImageLayerView(QObject):
     DEFAULT_LAYER_OPACITY = 1
 
     image_changed = Signal(Image)
+    image_shape_changed = Signal(object, object)
     image_view_updated = Signal(FlatImage)
     visibility_changed = Signal(bool)
     opacity_changed = Signal(float)
@@ -51,6 +52,7 @@ class ImageLayerView(QObject):
 
         self._image_layer = image_layer
         self._image_layer.image_updated.connect(self._on_layer_image_updated)
+        self._image_layer.image_shape_changed.connect(self.image_shape_changed)
         self._image_layer.image_pixels_modified.connect(self._update_image_view)
         self._visible = visible
         self._opacity = opacity
@@ -255,6 +257,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
         layer_view.image_changed.connect(self._on_layer_image_changed)
+        layer_view.image_shape_changed.connect(self._on_layer_image_shape_changed)
         layer_view.image_view_updated.connect(self._on_layer_image_view_updated)
         layer_view.visibility_changed.connect(self._on_layer_view_visibility_changed)
         layer_view.opacity_changed.connect(self._on_layer_view_opacity_changed)
@@ -274,6 +277,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         self._layered_image_view.remove_layer_view(layer_view)
 
         layer_view.image_changed.disconnect(self._on_layer_image_changed)
+        layer_view.image_shape_changed.disconnect(self._on_layer_image_shape_changed)
         layer_view.image_view_updated.disconnect(self._on_layer_image_view_updated)
         layer_view.visibility_changed.disconnect(self._on_layer_view_visibility_changed)
         layer_view.opacity_changed.disconnect(self._on_layer_view_opacity_changed)
@@ -340,6 +344,9 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
                 painter.drawImage(QPointF(image_view_origin[1], image_view_origin[0]), layer_view.displayed_image)
 
     def _on_layer_image_changed(self, image: Image):
+        self._reset_bounding_rect_cache()
+
+    def _on_layer_image_shape_changed(self, old_shape: tuple[int] | None, new_shape: tuple[int] | None):
         self._reset_bounding_rect_cache()
 
     def _reset_bounding_rect_cache(self):
@@ -514,7 +521,7 @@ class LayeredImageViewer(DataViewer):
         self.graphics_view.set_visualized_scene_rect(rect)
 
     def _on_active_layer_image_view_updated(self, image_view: FlatImage):
-        self.data_name_changed.emit(image_view.path_name)
+        self.data_name_changed.emit('' if image_view is None else image_view.path_name)
 
     def print_layers(self):
         self.data.print_layers()

@@ -38,6 +38,7 @@ class Image(Data):
     n_dims = None  # Number of dimensions excluding channel dimension (2 for FlatImage, 3 for VolumeImage)
 
     pixels_modified = Signal()
+    shape_changed = Signal(object, object)  # old_shape: tuple[int] | None, new_shape: tuple[int] | None
 
     def __init__(self, array: np.ndarray = None, palette: Palette = None, path: Path = None,
                  spatial: SpatialAttrs = None):
@@ -64,8 +65,26 @@ class Image(Data):
         return cls.zeros_like(other_image, create_mask=True, palette=palette)
 
     @property
+    def pixels(self) -> np.ndarray:
+        return self.array
+
+    @pixels.setter
+    def pixels(self, value: np.ndarray):
+        if self.array is not value:
+            old_shape = self.shape_or_none
+            self.array = value
+
+            new_shape = self.shape_or_none
+            if old_shape != new_shape:
+                self.shape_changed.emit(old_shape, new_shape)
+
+    @property
     def shape(self) -> tuple:
         return self.array.shape
+
+    @property
+    def shape_or_none(self) -> tuple | None:
+        return None if self.array is None else self.shape
 
     def zeros_mask(self, palette: Palette = None) -> Image:
         return self.zeros_mask_like(self, palette=palette)

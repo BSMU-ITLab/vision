@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide6.QtCore import Qt, QRectF, QPointF, QLineF, QMarginsF, QTimer
+from PySide6.QtCore import Qt, QObject, QMetaObject, QRectF, QPointF, QLineF, QMarginsF, QTimer
 from PySide6.QtGui import QPainter, QColor, QPainterPath, QPen, QBrush
 from PySide6.QtWidgets import QWidget, QGridLayout, QFrame, QGraphicsItem, QStyle, QGroupBox, QFormLayout, QComboBox, \
     QSpinBox, QHBoxLayout
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from PySide6.QtWidgets import QStyleOptionGraphicsItem
 
+    from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.image.layered import ImageLayer
     from bsmu.vision.widgets.viewers.image.layered.flat import ImageLayerView
     from bsmu.retinal_fundus.plugins.table_visualizer import RetinalFundusTableVisualizerPlugin, \
@@ -108,8 +109,18 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._disk_viewer.graphics_view.setRenderHint(QPainter.Antialiasing)
         self._disk_viewer.graphics_view.setFrameShape(QFrame.NoFrame)
 
+        self._record_disk_bbox_changed_connection = QMetaObject.Connection()
+        self._record_image_layer_added_connection = QMetaObject.Connection()
+
+        self._scene_selection_changed_connection = QMetaObject.Connection()
+        self._selected_sectors_opacity_timer_timeout_connection = QMetaObject.Connection()
+
+        self._processed_record: PatientRetinalFundusRecord | None = None
+        self._is_visualization_started: bool
+        self.is_visualization_started = False
         self._table_visualizer.journal_viewer.record_selected.connect(self._on_journal_record_selected)
 
+        self._disk_region_image_layer: ImageLayer | None = None
         self._disk_region_image_pixels: np.ndarray | None = None
         self._disk_mask_region_image_pixels: np.ndarray | None = None
 
@@ -117,6 +128,7 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._selected_sectors_layer_view: ImageLayerView | None = None
         self._selected_sectors_mask_palette = Palette.default_binary(255, [102, 183, 255])
         self._selected_sectors_opacity_timer = QTimer()
+        self._selected_sectors_opacity_timer.setInterval(20)
         self._selected_sectors_max_opacity = 0.75
 
         self._disk_center: QPointF | None = None
@@ -143,6 +155,52 @@ class RetinalFundusDiskRegionSelector(QWidget):
         layout.addWidget(self._disk_viewer)
         layout.addLayout(settings_ui_grid_layout)
         self.setLayout(layout)
+
+    @property
+    def processed_record(self) -> PatientRetinalFundusRecord | None:
+        return self._processed_record
+
+    @processed_record.setter
+    def processed_record(self, value: PatientRetinalFundusRecord | None):
+        if self._processed_record != value:
+            self._stop_record_processing()
+            self._processed_record = value
+            self._start_record_processing()
+
+    @property
+    def is_visualization_started(self) -> bool:
+        return self._is_visualization_started
+
+    @is_visualization_started.setter
+    def is_visualization_started(self, value: bool):
+        self._is_visualization_started = value
+        self.setEnabled(self._is_visualization_started)
+
+    def _start_record_processing(self):
+        if self.processed_record is None:
+            return
+
+        self._record_disk_bbox_changed_connection = \
+            self.processed_record.disk_bbox_changed.connect(self._on_record_disk_bbox_changed)
+        self._record_image_layer_added_connection = \
+            self._processed_record.layered_image.layer_added.connect(self._on_record_image_layer_added)
+
+        self._start_visualization()
+
+    def _stop_record_processing(self):
+        if self.processed_record is None:
+            return
+
+        self._stop_visualization()
+
+        QObject.disconnect(self._record_disk_bbox_changed_connection)
+        QObject.disconnect(self._record_image_layer_added_connection)
+
+    def _on_record_disk_bbox_changed(self, disk_bbox: BBox):
+        self._restart_visualization()
+
+    def _on_record_image_layer_added(self, image_layer: ImageLayer):
+        self._start_visualization()
 
     def _create_settings_ui(self) -> QWidget:
         self._sectors_quantity_spin_box = QSpinBox()
@@ -183,12 +241,15 @@ class RetinalFundusDiskRegionSelector(QWidget):
     def _on_sectors_rotation_changed(self, i: int):
         self._recreate_sector_items()
 
+    def _ui_sectors_config(self) -> SectorsPreset:
+        return SectorsPreset(
+            quantity=self._sectors_quantity_spin_box.value(), rotation=self._sectors_rotation_spin_box.value())
+
     def _recreate_sector_items(self):
         if not self._sectors_recreation_enabled:
             return
 
-        sectors_config = SectorsPreset(
-            quantity=self._sectors_quantity_spin_box.value(), rotation=self._sectors_rotation_spin_box.value())
+        sectors_config = self._ui_sectors_config()
         if self._curr_sectors_config == sectors_config:
             return
 
@@ -200,6 +261,8 @@ class RetinalFundusDiskRegionSelector(QWidget):
             self._disk_viewer.remove_graphics_item(sector_item)
 
         self._sector_items.clear()
+
+        self._curr_sectors_config = None
 
     def _create_sector_items(self, sectors_config: SectorsPreset):
         if self._disk_region_rect is None:
@@ -217,20 +280,28 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._curr_sectors_config = sectors_config
 
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
-        disk_layer = self._disk_viewer.layer_by_name(self.DISK_LAYER_NAME)
-        print('dl:', disk_layer)
-        if record.disk_bbox is None:
-            print('disk_bbox is None')
+        self.processed_record = record
+
+    def _restart_visualization(self):
+        if self._is_visualization_started:
+            self._stop_visualization()
+        self._start_visualization()
+
+    def _start_visualization(self):
+        if self._is_visualization_started:
             return
 
-        disk_region = record.disk_bbox.scaled(1.2, 1.2)
-        disk_region.clip_to_shape(record.image.shape)
+        if self.processed_record.disk_bbox is None or self.processed_record.disk_mask is None:
+            return
 
-        self._disk_region_image_pixels = record.image.bboxed_pixels(disk_region)
-        self._disk_viewer.data.add_layer_or_modify_pixels(
+        disk_region = self.processed_record.disk_bbox.scaled(1.2, 1.2)
+        disk_region.clip_to_shape(self.processed_record.image.shape)
+
+        self._disk_region_image_pixels = self.processed_record.image.bboxed_pixels(disk_region)
+        self._disk_region_image_layer = self._disk_viewer.data.add_layer_or_modify_pixels(
             self.DISK_LAYER_NAME, self._disk_region_image_pixels, FlatImage)
 
-        self._disk_mask_region_image_pixels = record.disk_mask.bboxed_pixels(disk_region)
+        self._disk_mask_region_image_pixels = self.processed_record.disk_mask.bboxed_pixels(disk_region)
 
         selected_sectors_mask_pixels = np.copy(self._disk_mask_region_image_pixels)
         self._selected_sectors_mask_layer = self._disk_viewer.data.add_layer_or_modify_pixels(
@@ -245,11 +316,40 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._disk_center = QPointF(disk_region.width, disk_region.height) / 2
         self._disk_region_rect = QRectF(0, 0, disk_region.width, disk_region.height)
 
-        self._recreate_sector_items()
-        self._disk_viewer.graphics_scene.selectionChanged.connect(self._on_scene_selection_changed)
+        self._create_sector_items(self._ui_sectors_config())
 
-        self._selected_sectors_opacity_timer.timeout.connect(self._change_selected_sectors_opacity)
-        self._selected_sectors_opacity_timer.start(20)
+        self._scene_selection_changed_connection = \
+            self._disk_viewer.graphics_scene.selectionChanged.connect(self._on_scene_selection_changed)
+
+        self._selected_sectors_opacity_timer_timeout_connection = \
+            self._selected_sectors_opacity_timer.timeout.connect(self._change_selected_sectors_opacity)
+        self._selected_sectors_opacity_timer.start()
+
+        self.is_visualization_started = True
+
+    def _stop_visualization(self):
+        self._selected_sectors_opacity_timer.stop()
+        QObject.disconnect(self._selected_sectors_opacity_timer_timeout_connection)
+        QObject.disconnect(self._scene_selection_changed_connection)
+
+        self._remove_sector_items()
+
+        if self._disk_region_image_layer is not None:
+            self._disk_region_image_layer.image = None
+            self._disk_region_image_layer = None
+
+        if self._selected_sectors_mask_layer is not None:
+            self._selected_sectors_mask_layer.image = None
+            self._selected_sectors_mask_layer = None
+
+        self._disk_region_image_pixels = None
+        self._disk_mask_region_image_pixels = None
+        self._selected_sectors_layer_view = None
+
+        self._disk_center = None
+        self._disk_region_rect = None
+
+        self.is_visualization_started = False
 
     def _on_scene_selection_changed(self):
         self._selected_sectors_mask_layer.image_pixels.fill(0)
@@ -268,7 +368,7 @@ class RetinalFundusDiskRegionSelector(QWidget):
         if at_least_one_sector_is_selected:
             self._selected_sectors_mask_layer.image_pixels[self._disk_mask_region_image_pixels == 0] = 0
         else:
-            self._selected_sectors_mask_layer.image.array = np.copy(self._disk_mask_region_image_pixels)
+            self._selected_sectors_mask_layer.image.pixels = np.copy(self._disk_mask_region_image_pixels)
         self._selected_sectors_mask_layer.image.emit_pixels_modified()
 
     def _change_selected_sectors_opacity(self):

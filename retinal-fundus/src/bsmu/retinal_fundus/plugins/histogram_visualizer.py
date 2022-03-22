@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
     from PySide6.QtCharts import QAbstractSeries
 
+    from bsmu.retinal_fundus.plugins.disk_region_selector import RetinalFundusDiskRegionSelectorPlugin, \
+        RetinalFundusDiskRegionSelector
     from bsmu.retinal_fundus.plugins.table_visualizer import RetinalFundusTableVisualizerPlugin, \
         RetinalFundusTableVisualizer, PatientRetinalFundusRecord
     from bsmu.vision.core.image.layered import ImageLayer
@@ -31,6 +33,8 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'retinal_fundus_table_visualizer_plugin':
             'bsmu.retinal_fundus.plugins.table_visualizer.RetinalFundusTableVisualizerPlugin',
+        'retinal_fundus_disk_region_selector_plugin':
+            'bsmu.retinal_fundus.plugins.disk_region_selector.RetinalFundusDiskRegionSelectorPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
     }
 
@@ -38,7 +42,8 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
             self,
             main_window_plugin: MainWindowPlugin,
             retinal_fundus_table_visualizer_plugin: RetinalFundusTableVisualizerPlugin,
-            mdi_plugin: MdiPlugin
+            retinal_fundus_disk_region_selector_plugin: RetinalFundusDiskRegionSelectorPlugin,
+            mdi_plugin: MdiPlugin,
     ):
         super().__init__()
 
@@ -47,6 +52,9 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
 
         self._retinal_fundus_table_visualizer_plugin = retinal_fundus_table_visualizer_plugin
         self._table_visualizer: RetinalFundusTableVisualizer | None = None
+
+        self._retinal_fundus_disk_region_selector_plugin = retinal_fundus_disk_region_selector_plugin
+        self._disk_region_selector: RetinalFundusDiskRegionSelector | None = None
 
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
@@ -65,12 +73,13 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
     def _enable(self):
         self._main_window = self._main_window_plugin.main_window
         self._table_visualizer = self._retinal_fundus_table_visualizer_plugin.table_visualizer
+        self._disk_region_selector = self._retinal_fundus_disk_region_selector_plugin.disk_region_selector
         self._mdi = self._mdi_plugin.mdi
 
         self._rgb_histogram_visualizer = RetinalFundusHistogramVisualizer(
-            self._table_visualizer, RgbHistogramColorRepresentation)
+            self._table_visualizer, self._disk_region_selector, RgbHistogramColorRepresentation)
         self._hsv_histogram_visualizer = RetinalFundusHistogramVisualizer(
-            self._table_visualizer, HsvHistogramColorRepresentation)
+            self._table_visualizer, self._disk_region_selector, HsvHistogramColorRepresentation)
 
         histograms_menu = self._main_window.menu(HistogramsMenu)
         neuroretinal_rim_menu = histograms_menu.addMenu('Neuroretinal Rim')
@@ -91,6 +100,7 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
 
         self._mdi = None
         self._table_visualizer = None
+        self._disk_region_selector = None
         self._main_window = None
 
         raise NotImplementedError
@@ -143,16 +153,19 @@ class RetinalFundusHistogramVisualizer(QObject):
     def __init__(
             self,
             table_visualizer: RetinalFundusTableVisualizer,
-            histogram_color_representation: Type[HistogramColorRepresentation]
+            disk_region_selector: RetinalFundusDiskRegionSelector,
+            histogram_color_representation: Type[HistogramColorRepresentation],
     ):
         super().__init__()
 
         self._table_visualizer = table_visualizer
+        self._disk_region_selector = disk_region_selector
         self._histogram_color_representation = histogram_color_representation
 
         self._visualized_record: PatientRetinalFundusRecord | None = None
         self._visualized_record_image_layer_added_connection = QMetaObject.Connection()
         self._journal_record_selected_connection = QMetaObject.Connection()
+        self._disk_selected_regions_changed_connection = QMetaObject.Connection()
 
         self._neuroretinal_rim_histogram_visualizing: bool = False
 
@@ -172,6 +185,8 @@ class RetinalFundusHistogramVisualizer(QObject):
             self._create_chart_view()
             self._journal_record_selected_connection = \
                 self._table_visualizer.journal_viewer.record_selected.connect(self._on_journal_record_selected)
+            self._disk_selected_regions_changed_connection = \
+                self._disk_region_selector.selected_regions_changed.connect(self._on_disk_selected_regions_changed)
             self._start_to_visualize_neuroretinal_rim_histogram_for_record(self._table_visualizer.selected_record)
             self._table_visualizer.detailed_info_viewer.add_widget(self._chart_view)
             if len(self._chart.series()) == 0:
@@ -180,12 +195,16 @@ class RetinalFundusHistogramVisualizer(QObject):
             self._table_visualizer.detailed_info_viewer.remove_widget(self._chart_view)
             self._stop_to_visualize_neuroretinal_rim_histogram()
             QObject.disconnect(self._journal_record_selected_connection)
+            QObject.disconnect(self._disk_selected_regions_changed_connection)
             self._chart_view = None
             self._chart = None
 
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
         self._stop_to_visualize_neuroretinal_rim_histogram()
         self._start_to_visualize_neuroretinal_rim_histogram_for_record(record)
+
+    def _on_disk_selected_regions_changed(self):
+        self._visualize_neuroretinal_rim_histogram_without_repeated_calls()
 
     def _start_to_visualize_neuroretinal_rim_histogram_for_record(self, record: PatientRetinalFundusRecord):
         if record is None:
@@ -257,6 +276,12 @@ class RetinalFundusHistogramVisualizer(QObject):
             return
 
         neuroretinal_rim_float_mask = neuroretinal_rim_mask / 255
+
+        # Use mask of |self._disk_region_selector| to analyze only selected disk regions
+        if self._disk_region_selector.disk_region is not None:
+            neuroretinal_rim_float_mask_in_disk_region = \
+                self._disk_region_selector.disk_region.pixels(neuroretinal_rim_float_mask)
+            neuroretinal_rim_float_mask_in_disk_region[self._disk_region_selector.selected_sectors_mask == 0] = 0
 
         histogram_image_pixels = self._histogram_color_representation.from_rgb(self._visualized_record.image.array)
         # mean = np.mean(histogram_image_pixels, axis=(0, 1), where=neuroretinal_rim_float_mask > 0.5)

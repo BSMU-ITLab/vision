@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 if TYPE_CHECKING:
     from typing import Sequence
 
@@ -93,3 +95,6 @@ class BBox:
     def move_top(self, value: int):
         self.top -= value
         self.bottom -= value
+
+    def pixels(self, array: np.ndarray) -> np.ndarray:
+        return array[self.top:self.bottom, self.left:self.right]

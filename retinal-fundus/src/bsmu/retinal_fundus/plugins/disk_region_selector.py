@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide6.QtCore import Qt, QObject, QMetaObject, QRectF, QPointF, QLineF, QMarginsF, QTimer
+from PySide6.QtCore import Qt, QObject, Signal, QMetaObject, QRectF, QPointF, QLineF, QMarginsF, QTimer
 from PySide6.QtGui import QPainter, QColor, QPainterPath, QPen, QBrush
 from PySide6.QtWidgets import QWidget, QGridLayout, QFrame, QGraphicsItem, QStyle, QGroupBox, QFormLayout, QComboBox, \
     QSpinBox, QHBoxLayout
@@ -100,6 +100,8 @@ class RetinalFundusDiskRegionSelector(QWidget):
     ISNT_SECTORS_PRESET = SectorsPreset('ISNT', 4, 45)
     CLOCK_SECTORS_PRESET = SectorsPreset('Clock', 12)
 
+    selected_regions_changed = Signal()
+
     def __init__(self, table_visualizer: RetinalFundusTableVisualizer):
         super().__init__()
 
@@ -131,6 +133,7 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._selected_sectors_opacity_timer.setInterval(20)
         self._selected_sectors_max_opacity = 0.75
 
+        self._disk_region: BBox | None = None
         self._disk_center: QPointF | None = None
         self._disk_region_rect: QRectF | None = None
 
@@ -175,6 +178,14 @@ class RetinalFundusDiskRegionSelector(QWidget):
     def is_visualization_started(self, value: bool):
         self._is_visualization_started = value
         self.setEnabled(self._is_visualization_started)
+
+    @property
+    def disk_region(self) -> BBox | None:
+        return self._disk_region
+
+    @property
+    def selected_sectors_mask(self) -> np.ndarray | None:
+        return self._selected_sectors_mask_layer.image_pixels
 
     def _start_record_processing(self):
         if self.processed_record is None:
@@ -294,14 +305,14 @@ class RetinalFundusDiskRegionSelector(QWidget):
         if self.processed_record.disk_bbox is None or self.processed_record.disk_mask is None:
             return
 
-        disk_region = self.processed_record.disk_bbox.scaled(1.2, 1.2)
-        disk_region.clip_to_shape(self.processed_record.image.shape)
+        self._disk_region = self.processed_record.disk_bbox.scaled(1.2, 1.2)
+        self._disk_region.clip_to_shape(self.processed_record.image.shape)
 
-        self._disk_region_image_pixels = self.processed_record.image.bboxed_pixels(disk_region)
+        self._disk_region_image_pixels = self.processed_record.image.bboxed_pixels(self._disk_region)
         self._disk_region_image_layer = self._disk_viewer.data.add_layer_or_modify_pixels(
             self.DISK_LAYER_NAME, self._disk_region_image_pixels, FlatImage)
 
-        self._disk_mask_region_image_pixels = self.processed_record.disk_mask.bboxed_pixels(disk_region)
+        self._disk_mask_region_image_pixels = self.processed_record.disk_mask.bboxed_pixels(self._disk_region)
 
         selected_sectors_mask_pixels = np.copy(self._disk_mask_region_image_pixels)
         self._selected_sectors_mask_layer = self._disk_viewer.data.add_layer_or_modify_pixels(
@@ -313,8 +324,8 @@ class RetinalFundusDiskRegionSelector(QWidget):
 
         self._disk_viewer.fit_image_in()
 
-        self._disk_center = QPointF(disk_region.width, disk_region.height) / 2
-        self._disk_region_rect = QRectF(0, 0, disk_region.width, disk_region.height)
+        self._disk_center = QPointF(self._disk_region.width, self._disk_region.height) / 2
+        self._disk_region_rect = QRectF(0, 0, self._disk_region.width, self._disk_region.height)
 
         self._create_sector_items(self._ui_sectors_config())
 
@@ -346,6 +357,7 @@ class RetinalFundusDiskRegionSelector(QWidget):
         self._disk_mask_region_image_pixels = None
         self._selected_sectors_layer_view = None
 
+        self._disk_region = None
         self._disk_center = None
         self._disk_region_rect = None
 
@@ -370,6 +382,8 @@ class RetinalFundusDiskRegionSelector(QWidget):
         else:
             self._selected_sectors_mask_layer.image.pixels = np.copy(self._disk_mask_region_image_pixels)
         self._selected_sectors_mask_layer.image.emit_pixels_modified()
+
+        self.selected_regions_changed.emit()
 
     def _change_selected_sectors_opacity(self):
         # Generate periodic values in range [0; |self._selected_sectors_max_opacity|]

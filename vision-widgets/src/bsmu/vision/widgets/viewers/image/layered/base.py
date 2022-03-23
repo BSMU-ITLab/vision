@@ -198,7 +198,7 @@ class _LayeredImageView(QObject):
         self._names_layer_views[layer_view.name] = layer_view
         self._layers_views[layer_view.image_layer] = layer_view
 
-    def remove_layer_view(self, layer_view: ImageLayer):
+    def remove_layer_view(self, layer_view: ImageLayerView):
         del self._layers_views[layer_view.image_layer]
         del self._names_layer_views[layer_view.name]
         self._layer_views.remove(layer_view)

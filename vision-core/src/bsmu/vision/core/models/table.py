@@ -41,6 +41,10 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self.record_storage = None
 
     def record_row(self, record: QObject) -> int:
+        """
+        # This variant leads to memory leaks. May be the |record| is cached somewhere?
+        # Some other variants are listed here:
+        # https://wiki.qt.io/Technical_FAQ#How_can_a_QModelIndex_be_retrived_from_the_model_for_an_internal_data_item.3F
         matched_indexes = self.match(
             self.index(0, self.record_column_number),
             TableItemDataRole.RECORD_REF,
@@ -49,6 +53,9 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
             flags=Qt.MatchExactly
         )
         return matched_indexes[0].row()
+        """
+
+        return self.storage_records.index(record)
 
     @property
     def record_column_number(self) -> int:
@@ -108,6 +115,16 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
             return self._columns[section].TITLE
         elif orientation == Qt.Vertical:
             return section + 1
+
+    """
+    # Uncomment this method to add index internal pointers to record
+    def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
+        if not self.hasIndex(row, column, parent):
+            return QModelIndex()
+
+        internal_ptr = self.storage_records[row] if column == self.record_column_number else None
+        return self.createIndex(row, column, internal_ptr)
+    """
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if not index.isValid():

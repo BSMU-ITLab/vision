@@ -249,7 +249,6 @@ class Segmenter(QObject):
 
         resize_factor_x = image_shape_before_preresize[1] / mask.shape[1]
         resize_factor_y = image_shape_before_preresize[0] / mask.shape[0]
-        largest_component_bbox.resize(resize_factor_x, resize_factor_y)
 
         mask = cv.resize(
             mask,
@@ -258,12 +257,16 @@ class Segmenter(QObject):
         )
 
         if use_square_image:
-            largest_component_bbox.move_left(padding.left)
-            largest_component_bbox.move_top(padding.top)
-
             mask = padding_removed(mask, padding)
 
-        largest_component_bbox.clip_to_shape(src_image_shape)
+        if largest_component_bbox is not None:
+            largest_component_bbox.resize(resize_factor_x, resize_factor_y)
+
+            if use_square_image:
+                largest_component_bbox.move_left(padding.left)
+                largest_component_bbox.move_top(padding.top)
+
+            largest_component_bbox.clip_to_shape(src_image_shape)
 
         return mask, largest_component_bbox
 

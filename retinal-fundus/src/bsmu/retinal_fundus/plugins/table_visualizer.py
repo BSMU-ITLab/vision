@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QAbstractItemModel
     from PySide6.QtWidgets import QStyleOptionViewItem
 
+    from bsmu.vision.core.image.layered import ImageLayer
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
@@ -238,14 +239,15 @@ class PatientRetinalFundusRecord(QObject):
             self.disk_area = self._count_nonzero_layer_pixels(self.DISK_MASK_LAYER_NAME)
         return self._disk_area
 
-    def _calculate_cup_area(self):
+    def _calculate_cup_area(self) -> float:
         if self._cup_area is None:
             self.cup_area = self._count_nonzero_layer_pixels(self.CUP_MASK_LAYER_NAME)
         return self._cup_area
 
     def _calculate_cup_to_disk_area_ratio(self):
         if self._cup_to_disk_area_ratio is None:
-            self.cup_to_disk_area_ratio = self._calculate_cup_area() / self._calculate_disk_area()
+            self._calculate_disk_area()
+            self.cup_to_disk_area_ratio = self._calculate_cup_area() / self.disk_area if self.disk_area != 0 else None
         return self._cup_to_disk_area_ratio
 
     def _count_nonzero_layer_pixels(self, layer_name: str) -> int:
@@ -755,6 +757,15 @@ class RetinalFundusTableVisualizer(QObject):
     def show_journal_and_image_viewers(self):
         self._illustrated_journal_viewer.show_journal_and_image_viewers()
 
+    def _add_cup_mask_layer_to_record(
+            self,
+            record: PatientRetinalFundusRecord,
+            cup_mask_pixels: np.ndarray,
+    ) -> ImageLayer:
+        return record.layered_image.add_layer_from_image(
+            FlatImage(array=cup_mask_pixels, palette=self._cup_mask_palette),
+            PatientRetinalFundusRecord.CUP_MASK_LAYER_NAME)
+
     def _on_disk_segmented(
             self,
             record: PatientRetinalFundusRecord,
@@ -762,7 +773,21 @@ class RetinalFundusTableVisualizer(QObject):
             disk_mask_pixels: np.ndarray,
             disk_bbox: BBox,
     ):
+        disk_mask_pixels = image_converter.normalized_uint8(disk_mask_pixels)
+        disk_mask_layer = record.layered_image.add_layer_from_image(
+            FlatImage(array=disk_mask_pixels, palette=self._disk_mask_palette),
+            PatientRetinalFundusRecord.DISK_MASK_LAYER_NAME)
+
         record.disk_bbox = disk_bbox
+
+        if disk_bbox is None:
+            cup_mask_pixels = np.zeros_like(disk_mask_pixels)
+            cup_mask_layer = self._add_cup_mask_layer_to_record(record, cup_mask_pixels)
+
+            # Vessels segmentation
+            self._segment_vessels(record, image)
+            return
+
         disk_region_bbox = disk_bbox.margins_added(round((disk_bbox.width + disk_bbox.height) / 2))
         disk_region_bbox.clip_to_shape(image.array.shape)
 
@@ -774,11 +799,6 @@ class RetinalFundusTableVisualizer(QObject):
         disk_region_mask_layer = record.layered_image.add_layer_from_image(
             FlatImage(disk_region_mask_pixels, self._disk_mask_palette),
             PatientRetinalFundusRecord.DISK_REGION_MASK_LAYER_NAME)
-
-        disk_mask_pixels = image_converter.normalized_uint8(disk_mask_pixels)
-        disk_mask_layer = record.layered_image.add_layer_from_image(
-            FlatImage(array=disk_mask_pixels, palette=self._disk_mask_palette),
-            PatientRetinalFundusRecord.DISK_MASK_LAYER_NAME)
 
         # Optic cup segmentation
         self._cup_segmenter.segment_largest_connected_component_and_return_mask_with_bbox_async(
@@ -797,11 +817,12 @@ class RetinalFundusTableVisualizer(QObject):
         cup_mask_pixels = np.zeros_like(disk_mask_pixels)
         cup_mask_pixels[disk_bbox.top:disk_bbox.bottom, disk_bbox.left:disk_bbox.right, ...] = \
             cup_mask_pixels_on_disk_region
-        cup_mask_layer = record.layered_image.add_layer_from_image(
-            FlatImage(array=cup_mask_pixels, palette=self._cup_mask_palette),
-            PatientRetinalFundusRecord.CUP_MASK_LAYER_NAME)
+        cup_mask_layer = self._add_cup_mask_layer_to_record(record, cup_mask_pixels)
 
         # Vessels segmentation
+        self._segment_vessels(record, image)
+
+    def _segment_vessels(self, record: PatientRetinalFundusRecord, image: FlatImage):
         self._vessels_segmenter.segment_on_splitted_into_tiles_async(
             partial(self._on_vessels_segmented, record), image.array)
 

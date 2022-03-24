@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import typing
-from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, QModelIndex
@@ -94,12 +93,6 @@ class VisibilityTableColumn(TableColumn):
 
 class LayersTableModel(RecordTableModel):
     def __init__(self, record_storage: LayeredImageViewer = None, parent: QObject = None):
-        # Store handlers to disconnect signals.
-        # When https://bugreports.qt.io/projects/PYSIDE/issues/PYSIDE-1334?filter=allissues will be fixed
-        # we will be able to store connection objects instead.
-        self.visibility_changed_handler_by_record = {}
-        self.opacity_changed_handler_by_record = {}
-
         super().__init__(record_storage, ImageLayerView, (NameTableColumn, VisibilityTableColumn), parent)
 
     @property
@@ -136,29 +129,21 @@ class LayersTableModel(RecordTableModel):
         self.record_storage.layer_view_removed.connect(self._on_storage_record_removed)
 
     def _on_record_added(self, record: ImageLayerView, row: int):
-        # TODO: |self._on_visibility_changed| will always use the same row for the record.
-        #  This can lead to undefined behaviour when some records will be removed (and record row will change).
-        visibility_changed_handler = partial(self._on_visibility_changed, record, row)
-        self.visibility_changed_handler_by_record[record] = visibility_changed_handler
-        record.visibility_changed.connect(visibility_changed_handler)
-
-        opacity_changed_handler = partial(self._on_opacity_changed, record, row)
-        self.opacity_changed_handler_by_record[record] = opacity_changed_handler
-        record.opacity_changed.connect(opacity_changed_handler)
+        self._create_record_connections(
+            record,
+            ((record.visibility_changed, self._on_visibility_changed),
+             (record.opacity_changed, self._on_opacity_changed),
+             ))
 
     def _on_record_removing(self, record: ImageLayerView, row: int):
-        visibility_changed_handler = self.visibility_changed_handler_by_record.pop(record)
-        record.visibility_changed.disconnect(visibility_changed_handler)
+        self._remove_record_connections(record)
 
-        opacity_changed_handler = self.opacity_changed_handler_by_record.pop(record)
-        record.opacity_changed.disconnect(opacity_changed_handler)
-
-    def _on_visibility_changed(self, record: ImageLayerView, row: int, visible: bool):
-        visibility_model_index = self.index(row, self.column_number(VisibilityTableColumn))
+    def _on_visibility_changed(self, record: ImageLayerView, visible: bool):
+        visibility_model_index = self.index(self.record_row(record), self.column_number(VisibilityTableColumn))
         self.dataChanged.emit(visibility_model_index, visibility_model_index)
 
-    def _on_opacity_changed(self, record: ImageLayerView, row: int, opacity: float):
-        visibility_model_index = self.index(row, self.column_number(VisibilityTableColumn))
+    def _on_opacity_changed(self, record: ImageLayerView, opacity: float):
+        visibility_model_index = self.index(self.record_row(record), self.column_number(VisibilityTableColumn))
         self.dataChanged.emit(visibility_model_index, visibility_model_index)
 
 

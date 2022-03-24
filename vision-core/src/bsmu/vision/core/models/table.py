@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from enum import IntEnum
+from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
@@ -33,6 +34,11 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self._record_type = record_type
         self._columns = columns
         self._number_by_column = {column: number for number, column in enumerate(self._columns)}
+
+        # Store record signal and handler pairs to disconnect record property changed signals.
+        # We can store QMetaObject.Connection objects instead, but QObject.disconnect(connection) leads to memory leaks,
+        # when handler is created using functools.partial. Tested using Python 3.9.7, PySide 6.2.3, Windows 10.
+        self._property_changed_connections_by_record = {}
 
         self._record_storage = None
         self.record_storage = record_storage
@@ -196,6 +202,22 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
     def _on_storage_record_removed(self, record: QObject):
         self.endRemoveRows()
+
+    def _create_record_connections(self, record, signal_slot_pairs):
+        record_property_changed_connections = set()
+        for signal, slot in signal_slot_pairs:
+            record_property_changed_connections.add(self._create_record_connection(record, signal, slot))
+        self._property_changed_connections_by_record[record] = record_property_changed_connections
+
+    def _create_record_connection(self, record, signal, slot) -> tuple:
+        handler = partial(slot, record)
+        signal.connect(handler)
+        return signal, handler
+
+    def _remove_record_connections(self, record):
+        record_property_changed_connections = self._property_changed_connections_by_record.pop(record)
+        for signal, handler in record_property_changed_connections:
+            signal.disconnect(handler)
 
     @property
     @abstractmethod

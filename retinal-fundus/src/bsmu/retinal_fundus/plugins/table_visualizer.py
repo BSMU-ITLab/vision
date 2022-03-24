@@ -306,9 +306,6 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
             record_storage: PatientRetinalFundusJournal = None,
             parent: QObject = None
     ):
-        # Store connection objects to disconnect record property changed signals.
-        self._property_changed_connections_by_record = {}
-
         super().__init__(
             record_storage,
             PatientRetinalFundusRecord,
@@ -367,21 +364,15 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
         self.record_storage.record_removed.connect(self._on_storage_record_removed)
 
     def _on_record_added(self, record: PatientRetinalFundusRecord, row: int):
-        record_property_changed_connections = set()
-
-        record_property_changed_connections.add(
-            record.disk_area_changed.connect(partial(self._on_disk_area_changed, record)))
-        record_property_changed_connections.add(
-            record.cup_area_changed.connect(partial(self._on_cup_area_changed, record)))
-        record_property_changed_connections.add(
-            record.cup_to_disk_area_ratio_changed.connect(partial(self._on_cup_to_disk_area_ratio_changed, record)))
-
-        self._property_changed_connections_by_record[record] = record_property_changed_connections
+        self._create_record_connections(
+            record,
+            ((record.disk_area_changed, self._on_disk_area_changed),
+             (record.cup_area_changed, self._on_cup_area_changed),
+             (record.cup_to_disk_area_ratio_changed, self._on_cup_to_disk_area_ratio_changed),
+             ))
 
     def _on_record_removing(self, record: PatientRetinalFundusRecord, row: int):
-        record_property_changed_connections = self._property_changed_connections_by_record.pop(record)
-        for connection in record_property_changed_connections:
-            QObject.disconnect(connection)
+        self._remove_record_connections(record)
 
     def _on_disk_area_changed(self, record: PatientRetinalFundusRecord, disk_area: float):
         disk_area_model_index = self.index(self.record_row(record), self.column_number(DiskAreaTableColumn))

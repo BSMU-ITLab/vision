@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, \
     QAreaSeries
-from PySide6.QtCore import Qt, QObject, QMetaObject
-from PySide6.QtGui import QPainter, QColor, QPen
+from PySide6.QtCore import Qt, QObject, QMetaObject, QMargins
+from PySide6.QtGui import QPainter, QColor, QPen, QFont, QTextOption
 
 from bsmu.retinal_fundus.plugins.main_window import HistogramsMenu
 from bsmu.vision.core.image.base import FlatImage
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from typing import Type, List
 
     from PySide6.QtCharts import QAbstractSeries
+    from PySide6.QtWidgets import QWidget, QStyleOptionGraphicsItem, QGraphicsItem
 
     from bsmu.retinal_fundus.plugins.disk_region_selector import RetinalFundusDiskRegionSelectorPlugin, \
         RetinalFundusDiskRegionSelector
@@ -107,13 +109,13 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
 
 
 class HistogramColorRepresentation:
-    name = ''
-    channel_pens = (
+    NAME = ''
+    CHANNEL_PENS = (
         QPen(QColor(255, 158, 158), 2),
         QPen(QColor(143, 231, 143), 2),
         QPen(QColor(137, 180, 213), 2),
     )
-    channel_brushes = (
+    CHANNEL_BRUSHES = (
         QColor(255, 158, 158, 100),
         QColor(143, 231, 143, 100),
         QColor(137, 180, 213, 100),
@@ -125,11 +127,11 @@ class HistogramColorRepresentation:
 
 
 class RgbHistogramColorRepresentation(HistogramColorRepresentation):
-    name = 'RGB'
+    NAME = 'RGB'
 
 
 class HsvHistogramColorRepresentation(HistogramColorRepresentation):
-    name = 'HSV'
+    NAME = 'HSV'
 
     @staticmethod
     def from_rgb(rgb: np.ndarray):
@@ -142,6 +144,54 @@ class HsvHistogramColorRepresentation(HistogramColorRepresentation):
         hsv[..., 0] /= 360  # Normalize H-channel to [0; 1] range
 
         return hsv
+
+
+class Chart(QChart):
+    class DrawMode(Enum):
+        NO_DATA = 1
+        CHART = 2
+
+    NO_DATA_TEXT = 'Chart\nNo data to display'
+
+    def __init__(self, name: str = '', parent: QGraphicsItem = None):
+        super().__init__(parent)
+
+        self._name = name
+        self._no_data_text = self.NO_DATA_TEXT
+        if self._name:
+            self._no_data_text = f'{self._name} {self._no_data_text}'
+
+        self._draw_mode = None
+        self.draw_mode = self.DrawMode.NO_DATA
+
+        self._no_data_text_font = QFont()
+        self._no_data_text_font.setPixelSize(12)
+        self._no_data_text_font.setBold(True)
+
+        self.setMargins(QMargins(0, 0, 2, 0))
+
+    @property
+    def draw_mode(self) -> DrawMode:
+        return self._draw_mode
+
+    @draw_mode.setter
+    def draw_mode(self, value: DrawMode):
+        if self._draw_mode != value:
+            self._draw_mode = value
+
+            self.setBackgroundVisible(self._draw_mode == self.DrawMode.CHART)
+
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
+        super().paint(painter, option, widget)
+
+        if self.draw_mode == self.DrawMode.NO_DATA:
+            painter.save()
+
+            painter.setPen(Qt.darkGray)
+            painter.setFont(self._no_data_text_font)
+            painter.drawText(self.boundingRect(), self._no_data_text, QTextOption(Qt.AlignCenter))
+
+            painter.restore()
 
 
 class RetinalFundusHistogramVisualizer(QObject):
@@ -169,7 +219,7 @@ class RetinalFundusHistogramVisualizer(QObject):
 
         self._neuroretinal_rim_histogram_visualizing: bool = False
 
-        self._chart: QChart | None = None
+        self._chart: Chart | None = None
         self._chart_view: QChartView | None = None
 
         # Store QAreaSeries and QLineSeries of channels, because otherwise their C++ objects will be destroyed
@@ -190,7 +240,7 @@ class RetinalFundusHistogramVisualizer(QObject):
             self._start_to_visualize_neuroretinal_rim_histogram_for_record(self._table_visualizer.selected_record)
             self._table_visualizer.detailed_info_viewer.add_widget(self._chart_view)
             if len(self._chart.series()) == 0:
-                self._hide_chart_view()
+                self._hide_chart()
         else:
             self._table_visualizer.detailed_info_viewer.remove_widget(self._chart_view)
             self._stop_to_visualize_neuroretinal_rim_histogram()
@@ -249,13 +299,15 @@ class RetinalFundusHistogramVisualizer(QObject):
 
         return neuroretinal_rim_mask
 
-    def _show_chart_view(self):
-        if self._chart_view is not None and self._chart_view.isHidden() and self._chart_view.parentWidget() is not None:
-            self._chart_view.show()
+    def _show_chart(self):
+        self._chart.draw_mode = Chart.DrawMode.CHART
 
-    def _hide_chart_view(self):
-        if self._chart_view is not None and self._chart_view.isVisible():
-            self._chart_view.hide()
+    def _hide_chart(self):
+        self._chart.removeAllSeries()
+        for axis in self._chart.axes():
+            self._chart.removeAxis(axis)
+
+        self._chart.draw_mode = Chart.DrawMode.NO_DATA
 
     def _visualize_neuroretinal_rim_histogram_without_repeated_calls(self):
         if self._neuroretinal_rim_histogram_visualizing:
@@ -267,12 +319,12 @@ class RetinalFundusHistogramVisualizer(QObject):
 
     def _visualize_neuroretinal_rim_histogram(self):
         if self._visualized_record is None:
-            self._hide_chart_view()
+            self._hide_chart()
             return
 
         neuroretinal_rim_mask = self._calculate_record_neuroretinal_rim_mask(self._visualized_record)
         if neuroretinal_rim_mask is None:
-            self._hide_chart_view()
+            self._hide_chart()
             return
 
         neuroretinal_rim_float_mask = neuroretinal_rim_mask / 255
@@ -283,8 +335,13 @@ class RetinalFundusHistogramVisualizer(QObject):
                 self._disk_region_selector.disk_region.pixels(neuroretinal_rim_float_mask)
             neuroretinal_rim_float_mask_in_disk_region[self._disk_region_selector.selected_sectors_mask == 0] = 0
 
+        neuroretinal_rim_bool_mask = neuroretinal_rim_float_mask > 0.5
+        if not neuroretinal_rim_bool_mask.any():
+            self._hide_chart()
+            return
+
         histogram_image_pixels = self._histogram_color_representation.from_rgb(self._visualized_record.image.array)
-        # mean = np.mean(histogram_image_pixels, axis=(0, 1), where=neuroretinal_rim_float_mask > 0.5)
+        # mean = np.mean(histogram_image_pixels, axis=(0, 1), where=neuroretinal_rim_bool_mask)
         histogram_range = (histogram_image_pixels.min(), histogram_image_pixels.max())
         self._histogram_channel_area_series.clear()
         self._histogram_channel_line_series.clear()
@@ -292,22 +349,22 @@ class RetinalFundusHistogramVisualizer(QObject):
             channel_pixels = histogram_image_pixels[..., channel]
             channel_histogram, channel_histogram_bin_edges = np.histogram(
                 channel_pixels, bins=self.BIN_COUNT, range=histogram_range, weights=neuroretinal_rim_float_mask)
-            channel_mean = np.mean(channel_pixels, where=neuroretinal_rim_float_mask > 0.5)
-            channel_std = np.std(channel_pixels, where=neuroretinal_rim_float_mask > 0.5)
-            series_name = self._histogram_color_representation.name[channel]
+            channel_mean = np.mean(channel_pixels, where=neuroretinal_rim_bool_mask)
+            channel_std = np.std(channel_pixels, where=neuroretinal_rim_bool_mask)
+            series_name = self._histogram_color_representation.NAME[channel]
             series_name += f': μ={channel_mean:.2f}; σ={channel_std:.2f}'
             area_series, line_series = self._create_histogram_area_series(
                 channel_histogram,
                 channel_histogram_bin_edges,
                 series_name,
-                self._histogram_color_representation.channel_pens[channel],
-                self._histogram_color_representation.channel_brushes[channel],
+                self._histogram_color_representation.CHANNEL_PENS[channel],
+                self._histogram_color_representation.CHANNEL_BRUSHES[channel],
             )
             self._histogram_channel_area_series.append(area_series)
             self._histogram_channel_line_series.append(line_series)
         self._visualize_chart_with_series_list(self._histogram_channel_area_series)
 
-        self._show_chart_view()
+        self._show_chart()
 
     @staticmethod
     def _create_histogram_area_series(hist: np.ndarray, bin_edges: np.ndarray, name: str, pen: QPen, brush):
@@ -330,7 +387,7 @@ class RetinalFundusHistogramVisualizer(QObject):
         if self._chart is not None:
             return
 
-        self._chart = QChart()
+        self._chart = Chart(self._histogram_color_representation.NAME)
         self._chart.layout().setContentsMargins(0, 0, 0, 0)
         self._chart.setBackgroundRoundness(0)
 

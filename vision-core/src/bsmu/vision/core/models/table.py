@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
 
 from bsmu.vision.core.abc import QABCMeta
+from bsmu.vision.core.models.base import ObjectParameter, ObjectRecord
 
 if TYPE_CHECKING:
     from typing import Type, List, Tuple, Any, Sequence
@@ -15,6 +16,8 @@ if TYPE_CHECKING:
 
 class TableColumn:
     TITLE = ''
+    OBJECT_PARAMETER_TYPE: Type[ObjectParameter] = None
+    TEXT_ALIGNMENT = Qt.AlignCenter
 
 
 class TableItemDataRole(IntEnum):
@@ -25,15 +28,13 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
     def __init__(
             self,
             record_storage: QObject,
-            record_type: Type[QObject],
+            record_type: Type[ObjectRecord],
             columns: Sequence[Type[TableColumn]] = (),
             parent: QObject = None,
     ):
         super().__init__(parent)
 
         self._record_type = record_type
-        self._columns = columns
-        self._number_by_column = {column: number for number, column in enumerate(self._columns)}
 
         # Store record signal and handler pairs to disconnect record property changed signals.
         # We can store QMetaObject.Connection objects instead, but QObject.disconnect(connection) leads to memory leaks,
@@ -43,10 +44,28 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self._record_storage = None
         self.record_storage = record_storage
 
+        self._columns = []
+        self._number_by_column = {}
+        self._column_by_parameter_type = {}
+        for column in columns:
+            self.add_column(column)
+
+    def add_column(self, column: Type[TableColumn]):
+        assert column not in self._number_by_column, 'Such column already exists'
+        number = len(self._columns)
+
+        self.beginInsertColumns(QModelIndex(), number, number)
+
+        self._columns.append(column)
+        self._number_by_column[column] = number
+        self._column_by_parameter_type[column.OBJECT_PARAMETER_TYPE] = column
+
+        self.endInsertColumns()
+
     def clean_up(self):
         self.record_storage = None
 
-    def record_row(self, record: QObject) -> int:
+    def record_row(self, record: ObjectRecord) -> int:
         """
         # This variant leads to memory leaks. May be the |record| is cached somewhere?
         # Some other variants are listed here:
@@ -144,6 +163,15 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
             if index.column() == self.record_column_number:
                 return record
 
+        if role == Qt.DisplayRole:
+            column_type = self._columns[index.column()]
+            if column_type.OBJECT_PARAMETER_TYPE is not None:
+                return record.parameter_value_str_by_type(column_type.OBJECT_PARAMETER_TYPE)
+
+        if role == Qt.TextAlignmentRole:
+            column_type = self._columns[index.column()]
+            return column_type.TEXT_ALIGNMENT
+
         return self._record_data(record, index, role)
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.EditRole) -> bool:
@@ -185,22 +213,22 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self.endRemoveRows()
         return True
 
-    def _on_storage_record_adding(self, record: QObject):
+    def _on_storage_record_adding(self, record: ObjectRecord):
         # Append one row
         new_record_row = self.rowCount()
         self.beginInsertRows(QModelIndex(), new_record_row, new_record_row)
 
-    def _on_storage_record_added(self, record: QObject):
+    def _on_storage_record_added(self, record: ObjectRecord):
         self.endInsertRows()
         new_record_row = self.rowCount() - 1
         self._on_record_added(record, new_record_row)
 
-    def _on_storage_record_removing(self, record: QObject):
+    def _on_storage_record_removing(self, record: ObjectRecord):
         record_row = self.record_row(record)
         self._on_record_removing(record, record_row)
         self.beginRemoveRows(QModelIndex(), record_row, record_row)
 
-    def _on_storage_record_removed(self, record: QObject):
+    def _on_storage_record_removed(self, record: ObjectRecord):
         self.endRemoveRows()
 
     def _create_record_connections(self, record, signal_slot_pairs):
@@ -221,14 +249,14 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
     @property
     @abstractmethod
-    def storage_records(self) -> List[QObject]:
+    def storage_records(self) -> List[ObjectRecord]:
         pass
 
     @abstractmethod
-    def _record_data(self, record: QObject, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+    def _record_data(self, record: ObjectRecord, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         pass
 
-    def _set_record_data(self, record: QObject, index: QModelIndex, value: Any) -> bool | Tuple[bool, bool]:
+    def _set_record_data(self, record: ObjectRecord, index: QModelIndex, value: Any) -> bool | Tuple[bool, bool]:
         pass
 
     def _on_record_storage_changing(self):
@@ -237,8 +265,17 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
     def _on_record_storage_changed(self):
         pass
 
-    def _on_record_added(self, record: QObject, row: int):
-        pass
+    def _on_record_parameter_value_changed(self, record: ObjectRecord, parameter: ObjectParameter):
+        parameter_column = self._column_by_parameter_type[type(parameter)]
+        record_parameter_model_index = self.index(self.record_row(record), self.column_number(parameter_column))
+        self.dataChanged.emit(record_parameter_model_index, record_parameter_model_index)
 
-    def _on_record_removing(self, record: QObject, row: int):
-        pass
+    def _on_record_added(self, record: ObjectRecord, row: int):
+        self._create_record_connections(
+            record,
+            ((record.parameter_added, self._on_record_parameter_value_changed),
+             (record.parameter_value_changed, self._on_record_parameter_value_changed),
+             ))
+
+    def _on_record_removing(self, record: ObjectRecord, row: int):
+        self._remove_record_connections(record)

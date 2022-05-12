@@ -85,6 +85,8 @@ class LayersTableViewPlugin(Plugin):
 
 class NameTableColumn(TableColumn):
     TITLE = 'Name'
+    # use cast to int to fix the bug: https://bugreports.qt.io/browse/PYSIDE-20
+    TEXT_ALIGNMENT = int(Qt.AlignLeft | Qt.AlignVCenter)
 
 
 class VisibilityTableColumn(TableColumn):
@@ -129,14 +131,13 @@ class LayersTableModel(RecordTableModel):
         self.record_storage.layer_view_removed.connect(self._on_storage_record_removed)
 
     def _on_record_added(self, record: ImageLayerView, row: int):
+        # super()._on_record_added(record, row)
+
         self._create_record_connections(
             record,
             ((record.visibility_changed, self._on_visibility_changed),
              (record.opacity_changed, self._on_opacity_changed),
              ))
-
-    def _on_record_removing(self, record: ImageLayerView, row: int):
-        self._remove_record_connections(record)
 
     def _on_visibility_changed(self, record: ImageLayerView, visible: bool):
         visibility_model_index = self.index(self.record_row(record), self.column_number(VisibilityTableColumn))

@@ -5,6 +5,7 @@ plugins:
   - bsmu.retinal_fundus.plugins.table_visualizer.RetinalFundusTableVisualizerPlugin
   - bsmu.retinal_fundus.plugins.histogram_visualizer.RetinalFundusHistogramVisualizerPlugin
   - bsmu.retinal_fundus.plugins.disk_region_selector.RetinalFundusDiskRegionSelectorPlugin
+  - bsmu.retinal_fundus.plugins.ms_predictor.RetinalFundusMsPredictorPlugin
 
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin

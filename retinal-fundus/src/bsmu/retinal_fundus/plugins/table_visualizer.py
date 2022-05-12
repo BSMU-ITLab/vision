@@ -15,6 +15,7 @@ from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.models.base import ObjectRecord
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
@@ -26,7 +27,7 @@ from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewe
 from bsmu.vision.widgets.visibility_v2 import Visibility
 
 if TYPE_CHECKING:
-    from typing import List, Any
+    from typing import List, Any, Type
 
     from PySide6.QtCore import QAbstractItemModel
     from PySide6.QtWidgets import QStyleOptionViewItem
@@ -121,14 +122,12 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             self._table_visualizer.visualize_retinal_fundus_data)
 
 
-class PatientRetinalFundusRecord(QObject):
+class PatientRetinalFundusRecord(ObjectRecord):
     IMAGE_LAYER_NAME = 'image'
     DISK_REGION_MASK_LAYER_NAME = 'disk-region-mask'
     DISK_MASK_LAYER_NAME = 'disk-mask'
     CUP_MASK_LAYER_NAME = 'cup-mask'
     VESSELS_MASK_LAYER_NAME = 'vessels-mask'
-
-    UNKNOWN_VALUE_STR: str = '?'
 
     disk_bbox_changed = Signal(BBox)
 
@@ -254,12 +253,6 @@ class PatientRetinalFundusRecord(QObject):
         layer = self._layered_image.layer_by_name(layer_name)
         return np.count_nonzero(layer.image_pixels)
 
-    def _value_str(self, value: float | None) -> str:
-        if value is None:
-            return self.UNKNOWN_VALUE_STR
-
-        return f'{value:.2f}' if isinstance(value, float) else str(value)
-
 
 class PatientRetinalFundusJournal(Data):
     record_adding = Signal(PatientRetinalFundusRecord)
@@ -316,11 +309,6 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
             parent,
         )
 
-        self._center_text_alignment_columns = \
-            {NameTableColumn, DiskAreaTableColumn, CupAreaTableColumn, CupToDiskAreaRatioTableColumn}
-        self._center_text_alignment_column_numbers = \
-            {self.column_number(column) for column in self._center_text_alignment_columns}
-
         # Store numpy array's data for preview images, because QImage uses it without copying,
         # and QImage will crash if it's data buffer will be deleted
         self._preview_data_buffer_by_record = {}
@@ -349,9 +337,6 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
                     else QImage.Format_RGBA64_Premultiplied
                 preview_qimage = image_converter.numpy_rgba_image_to_qimage(preview_rgba_pixels, qimage_format)
                 return preview_qimage
-        elif role == Qt.TextAlignmentRole:
-            if index.column() in self._center_text_alignment_column_numbers:
-                return Qt.AlignCenter
 
     def _on_record_storage_changing(self):
         self.record_storage.record_adding.disconnect(self._on_storage_record_adding)
@@ -366,15 +351,14 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
         self.record_storage.record_removed.connect(self._on_storage_record_removed)
 
     def _on_record_added(self, record: PatientRetinalFundusRecord, row: int):
+        super()._on_record_added(record, row)
+
         self._create_record_connections(
             record,
             ((record.disk_area_changed, self._on_disk_area_changed),
              (record.cup_area_changed, self._on_cup_area_changed),
              (record.cup_to_disk_area_ratio_changed, self._on_cup_to_disk_area_ratio_changed),
              ))
-
-    def _on_record_removing(self, record: PatientRetinalFundusRecord, row: int):
-        self._remove_record_connections(record)
 
     def _on_disk_area_changed(self, record: PatientRetinalFundusRecord, disk_area: float):
         disk_area_model_index = self.index(self.record_row(record), self.column_number(DiskAreaTableColumn))
@@ -523,6 +507,9 @@ class PatientRetinalFundusJournalViewer(DataViewer):
     def resize_columns_to_contents(self):
         self._table_view.resizeColumnsToContents()
 
+    def add_column(self, column: Type[TableColumn]):
+        self._table_model.add_column(column)
+
 
 class RecordDetailedInfoViewer(QFrame):
     def __init__(self, parent: QWidget = None):
@@ -628,6 +615,9 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         # If some widget is maximized
         if 0 in self._splitter.sizes():
             self.show_journal_and_image_viewers_with_equal_sizes()
+
+    def add_column(self, column: Type[TableColumn]):
+        self.journal_viewer.add_column(column)
 
     def _maximize_splitter_widget(self, widget: QWidget):
         sizes = [0] * self._splitter.count()
@@ -756,6 +746,9 @@ class RetinalFundusTableVisualizer(QObject):
 
     def show_journal_and_image_viewers(self):
         self._illustrated_journal_viewer.show_journal_and_image_viewers()
+
+    def add_column(self, column: Type[TableColumn]):
+        self.illustrated_journal_viewer.add_column(column)
 
     def _add_cup_mask_layer_to_record(
             self,

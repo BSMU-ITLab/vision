@@ -3,27 +3,49 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import Qt, QObject
+from PySide6.QtWidgets import QStyledItemDelegate, QStyle
 
 from bsmu.vision.core.models.base import ObjectParameter
-from bsmu.vision.core.models.table import TableColumn
+from bsmu.vision.core.models.table import TableColumn, TableItemDataRole
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.dnn.inferencer import ModelParams as DnnModelParams
 from bsmu.vision.dnn.predictor import Predictor as DnnPredictor
 
 if TYPE_CHECKING:
+    from PySide6.QtCore import QModelIndex
+    from PySide6.QtGui import QPainter
+    from PySide6.QtWidgets import QStyleOptionViewItem
+
     from bsmu.retinal_fundus.plugins.table_visualizer import RetinalFundusTableVisualizerPlugin, \
         RetinalFundusTableVisualizer, PatientRetinalFundusRecord
     from bsmu.vision.core.bbox import BBox
 
 
-class MsProbabilityParameter(ObjectParameter):
-    NAME = 'MS Probability'
+class MsPredictionScoreParameter(ObjectParameter):
+    NAME = 'MS Prediction Score'
 
 
-class MsProbabilityTableColumn(TableColumn):
-    TITLE = 'MS\nProbability'
-    OBJECT_PARAMETER_TYPE = MsProbabilityParameter
+class MsPredictionScoreItemDelegate(QStyledItemDelegate):
+    def __init__(self, parent: QObject = None):
+        super().__init__(parent)
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        index_parameter = index.data(TableItemDataRole.PARAMETER)
+        if index_parameter is None or index_parameter.value < 0.8:
+            return super().paint(painter, option, index)
+
+        painter.save()
+        if option.state & QStyle.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
+        painter.setPen(Qt.red)
+        painter.drawText(option.rect, Qt.AlignCenter, index.data())
+        painter.restore()
+
+
+class MsPredictionScoreTableColumn(TableColumn):
+    TITLE = 'MS\nPrediction\nScore'
+    OBJECT_PARAMETER_TYPE = MsPredictionScoreParameter
 
 
 class RetinalFundusMsPredictorPlugin(Plugin):
@@ -61,7 +83,8 @@ class RetinalFundusMsPredictorPlugin(Plugin):
         )
         self._ms_predictor = RetinalFundusMsPredictor(self._table_visualizer, ms_predictor_model_params)
 
-        self._table_visualizer.add_column(MsProbabilityTableColumn)
+        ms_prediction_score_item_delegate = MsPredictionScoreItemDelegate(self._table_visualizer)
+        self._table_visualizer.add_column(MsPredictionScoreTableColumn, ms_prediction_score_item_delegate)
         self._table_visualizer.journal.record_added.connect(self._ms_predictor.add_observed_record)
 
     def _disable(self):
@@ -100,13 +123,12 @@ class RetinalFundusMsPredictor(QObject):
         # import skimage.io
         # skimage.io.imsave(r'D:\Temp\RetinalFundus-DB\test.png', disk_region_image)
 
-        ms_probability = self._ms_predictor.predict(disk_region_image)
-        #% temp_ms_probability = 30.3
-        ms_probability_parameter = MsProbabilityParameter(ms_probability)
+        ms_prediction_score = self._ms_predictor.predict(disk_region_image)
+        ms_prediction_score_parameter = MsPredictionScoreParameter(ms_prediction_score)
 
         # Get the parameter, maybe it's already exists
         # If it exists, then just update the value
-        record.add_parameter(ms_probability_parameter)
+        record.add_parameter(ms_prediction_score_parameter)
 
     def _on_record_disk_bbox_changed(self, record: PatientRetinalFundusRecord, disk_bbox: BBox):
         self._predict_for_record(record)

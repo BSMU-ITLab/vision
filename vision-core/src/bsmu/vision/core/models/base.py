@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
+import numpy as np
 from PySide6.QtCore import QObject, Signal
 
 if TYPE_CHECKING:
@@ -39,7 +40,7 @@ class ObjectParameter(QObject):
         if value is None:
             return cls.UNKNOWN_VALUE_STR
 
-        return f'{value:.2f}' if isinstance(value, float) else str(value)
+        return f'{value:.2f}' if isinstance(value, (float, np.single)) else str(value)
 
 
 class ObjectRecord(QObject):
@@ -54,10 +55,10 @@ class ObjectRecord(QObject):
         for parameter in parameters:
             self.add_parameter(parameter)
 
-    def parameter_by_type(self, parameter_type: Type[ObjectParameter]) -> ObjectParameter | None:
+    def parameter_by_type(self, parameter_type: Type[ObjectParameter] | None) -> ObjectParameter | None:
         return self._parameter_by_type.get(parameter_type)
 
-    def parameter_value_str_by_type(self, parameter_type: Type[ObjectParameter]) -> str:
+    def parameter_value_str_by_type(self, parameter_type: Type[ObjectParameter] | None) -> str:
         parameter = self.parameter_by_type(parameter_type)
         parameter_value = parameter and parameter.value
         return ObjectParameter.value_to_str(parameter_value)

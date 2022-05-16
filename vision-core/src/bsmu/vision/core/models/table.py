@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from enum import IntEnum
+from enum import IntEnum, auto
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -22,6 +22,7 @@ class TableColumn:
 
 class TableItemDataRole(IntEnum):
     RECORD_REF = Qt.UserRole
+    PARAMETER = auto()
 
 
 class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
@@ -50,7 +51,7 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         for column in columns:
             self.add_column(column)
 
-    def add_column(self, column: Type[TableColumn]):
+    def add_column(self, column: Type[TableColumn]) -> int:
         assert column not in self._number_by_column, 'Such column already exists'
         number = len(self._columns)
 
@@ -61,6 +62,7 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self._column_by_parameter_type[column.OBJECT_PARAMETER_TYPE] = column
 
         self.endInsertColumns()
+        return number
 
     def clean_up(self):
         self.record_storage = None
@@ -167,6 +169,11 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
             column_type = self._columns[index.column()]
             if column_type.OBJECT_PARAMETER_TYPE is not None:
                 return record.parameter_value_str_by_type(column_type.OBJECT_PARAMETER_TYPE)
+
+        if role == TableItemDataRole.PARAMETER:
+            column_type = self._columns[index.column()]
+            if column_type.OBJECT_PARAMETER_TYPE is not None:
+                return record.parameter_by_type(column_type.OBJECT_PARAMETER_TYPE)
 
         if role == Qt.TextAlignmentRole:
             column_type = self._columns[index.column()]

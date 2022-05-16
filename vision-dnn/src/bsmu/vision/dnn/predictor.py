@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class Predictor(Inferencer):
-    def predict_batch(self, images: Sequence[np.ndarray]) -> Sequence[float]:
+    def predict_batch(self, images: Sequence[np.ndarray]) -> np.ndarray:
         input_image_batch = []
 
         for image in images:
@@ -43,4 +43,5 @@ class Predictor(Inferencer):
         return output_batch
 
     def predict(self, image: np.ndarray) -> float:
-        return self.predict_batch([image])[0]
+        # Cast from numpy.float32 into float
+        return float(self.predict_batch([image])[0])

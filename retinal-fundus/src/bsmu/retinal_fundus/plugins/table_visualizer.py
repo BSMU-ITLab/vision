@@ -437,7 +437,7 @@ class PatientRetinalFundusJournalTableView(QTableView):
 
         self.setItemDelegateForColumn(
             self.model().column_number(PreviewTableColumn),
-            ImageCenterAlignmentDelegate(QSize(int(1.25 * self._row_height), self._row_height)))
+            ImageCenterAlignmentDelegate(QSize(int(1.25 * self._row_height), self._row_height), parent=self))
 
         self.selectionModel().currentRowChanged.connect(self._on_current_row_changed)
 
@@ -508,8 +508,11 @@ class PatientRetinalFundusJournalViewer(DataViewer):
     def resize_columns_to_contents(self):
         self._table_view.resizeColumnsToContents()
 
-    def add_column(self, column: Type[TableColumn]):
-        self._table_model.add_column(column)
+    def add_column(self, column: Type[TableColumn], column_delegate: QStyledItemDelegate):
+        column_number = self._table_model.add_column(column)
+        if column_delegate is not None:
+            self._table_view.setItemDelegateForColumn(column_number, column_delegate)
+        self.resize_columns_to_contents()
 
 
 class RecordDetailedInfoViewer(QFrame):
@@ -617,8 +620,8 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         if 0 in self._splitter.sizes():
             self.show_journal_and_image_viewers_with_equal_sizes()
 
-    def add_column(self, column: Type[TableColumn]):
-        self.journal_viewer.add_column(column)
+    def add_column(self, column: Type[TableColumn], column_delegate: QStyledItemDelegate):
+        self.journal_viewer.add_column(column, column_delegate)
 
     def _maximize_splitter_widget(self, widget: QWidget):
         sizes = [0] * self._splitter.count()
@@ -748,8 +751,8 @@ class RetinalFundusTableVisualizer(QObject):
     def show_journal_and_image_viewers(self):
         self._illustrated_journal_viewer.show_journal_and_image_viewers()
 
-    def add_column(self, column: Type[TableColumn]):
-        self.illustrated_journal_viewer.add_column(column)
+    def add_column(self, column: Type[TableColumn], column_delegate: QStyledItemDelegate = None):
+        self.illustrated_journal_viewer.add_column(column, column_delegate)
 
     def _add_cup_mask_layer_to_record(
             self,

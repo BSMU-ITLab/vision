@@ -19,7 +19,8 @@ from bsmu.vision.core.models.base import ObjectRecord
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter, ModelParams as DnnModelParams
+from bsmu.vision.dnn.inferencer import ModelParams as DnnModelParams
+from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer

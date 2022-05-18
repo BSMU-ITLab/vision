@@ -26,6 +26,11 @@ class MsPredictionScoreParameter(ObjectParameter):
     NAME = 'MS Prediction Score'
 
 
+class MsPredictionScoreTableColumn(TableColumn):
+    TITLE = 'MS\nPrediction\nScore'
+    OBJECT_PARAMETER_TYPE = MsPredictionScoreParameter
+
+
 class MsPredictionScoreItemDelegate(QStyledItemDelegate):
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
@@ -41,11 +46,6 @@ class MsPredictionScoreItemDelegate(QStyledItemDelegate):
         painter.setPen(Qt.red)
         painter.drawText(option.rect, Qt.AlignCenter, index.data())
         painter.restore()
-
-
-class MsPredictionScoreTableColumn(TableColumn):
-    TITLE = 'MS\nPrediction\nScore'
-    OBJECT_PARAMETER_TYPE = MsPredictionScoreParameter
 
 
 class RetinalFundusMsPredictorPlugin(Plugin):
@@ -86,6 +86,7 @@ class RetinalFundusMsPredictorPlugin(Plugin):
         ms_prediction_score_item_delegate = MsPredictionScoreItemDelegate(self._table_visualizer)
         self._table_visualizer.add_column(MsPredictionScoreTableColumn, ms_prediction_score_item_delegate)
         self._table_visualizer.journal.record_added.connect(self._ms_predictor.add_observed_record)
+        self._table_visualizer.journal.record_removing.connect(self._ms_predictor.remove_observed_record)
 
     def _disable(self):
         self._ms_predictor = None
@@ -102,15 +103,22 @@ class RetinalFundusMsPredictor(QObject):
         self._table_visualizer = table_visualizer
         self._ms_predictor = DnnPredictor(ms_predictor_model_params)
 
+        self._connections_by_record = {}
+
     def add_observed_record(self, record: PatientRetinalFundusRecord):
         self._predict_for_record(record)
 
-        record.disk_bbox_changed.connect(partial(self._on_record_disk_bbox_changed, record))
+        record_connections = set()
+        record_connections.add(
+            record.create_connection(record.disk_bbox_changed, self._on_record_disk_bbox_changed))
+        self._connections_by_record[record] = record_connections
+
+    def remove_observed_record(self, record: PatientRetinalFundusRecord):
+        record_connections = self._connections_by_record.pop(record)
+        for connection in record_connections:
+            connection.disconnect()
 
     def _predict_for_record(self, record: PatientRetinalFundusRecord):
-        print('!!! predict_for_record')
-        print('diskBbox', record.disk_bbox)
-
         if record.disk_bbox is None:
             return
 
@@ -119,16 +127,13 @@ class RetinalFundusMsPredictor(QObject):
         disk_region_bbox.clip_to_shape(record.image.shape)
         disk_region_image = disk_region_bbox.pixels(record.image.pixels)
 
-
-        # import skimage.io
-        # skimage.io.imsave(r'D:\Temp\RetinalFundus-DB\test.png', disk_region_image)
-
-        ms_prediction_score = self._ms_predictor.predict(disk_region_image)
-        ms_prediction_score_parameter = MsPredictionScoreParameter(ms_prediction_score)
-
-        # Get the parameter, maybe it's already exists
-        # If it exists, then just update the value
-        record.add_parameter(ms_prediction_score_parameter)
+        self._ms_predictor.predict_async(
+            partial(self._on_ms_predicted, record),
+            disk_region_image)
 
     def _on_record_disk_bbox_changed(self, record: PatientRetinalFundusRecord, disk_bbox: BBox):
         self._predict_for_record(record)
+
+    def _on_ms_predicted(self, record: PatientRetinalFundusRecord, ms_prediction_score: float):
+        ms_prediction_score_parameter = MsPredictionScoreParameter(ms_prediction_score)
+        ms_prediction_score_parameter = record.add_parameter_or_update_value(ms_prediction_score_parameter)

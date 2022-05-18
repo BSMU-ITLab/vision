@@ -9,7 +9,7 @@ import onnxruntime as ort
 from bsmu.vision.dnn.inferencer import Inferencer, preprocessed_image
 
 if TYPE_CHECKING:
-    from typing import Sequence, List
+    from typing import Callable, Sequence, List
 
 
 class Predictor(Inferencer):
@@ -45,3 +45,6 @@ class Predictor(Inferencer):
     def predict(self, image: np.ndarray) -> float:
         # Cast from numpy.float32 into float
         return float(self.predict_batch([image])[0])
+
+    def predict_async(self, callback: Callable, image: np.ndarray):
+        self._call_async_with_callback(callback, self.predict, image)

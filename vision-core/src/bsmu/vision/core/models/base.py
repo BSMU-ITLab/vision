@@ -43,6 +43,17 @@ class ObjectParameter(QObject):
         return f'{value:.2f}' if isinstance(value, (float, np.single)) else str(value)
 
 
+class Connection:
+    def __init__(self, signal, handler):
+        self._signal = signal
+        self._handler = handler
+
+        self._signal.connect(self._handler)
+
+    def disconnect(self):
+        self._signal.disconnect(self._handler)
+
+
 class ObjectRecord(QObject):
     parameter_added = Signal(ObjectParameter)
     parameter_value_changed = Signal(ObjectParameter)
@@ -69,6 +80,19 @@ class ObjectRecord(QObject):
         self._parameter_by_type[type(parameter)] = parameter
         self.parameter_added.emit(parameter)
         parameter.value_changed.connect(partial(self._on_parameter_value_changed, parameter))
+
+    def add_parameter_or_update_value(self, parameter: ObjectParameter) -> ObjectParameter:
+        existed_parameter = self.parameter_by_type(type(parameter))
+        if existed_parameter is None:
+            self.add_parameter(parameter)
+        else:
+            existed_parameter.value = parameter.value
+            parameter = existed_parameter
+        return parameter
+
+    def create_connection(self, signal, slot) -> Connection:
+        handler = partial(slot, self)
+        return Connection(signal, handler)
 
     def _on_parameter_value_changed(self, parameter: ObjectParameter, value: Any):
         self.parameter_value_changed.emit(parameter)

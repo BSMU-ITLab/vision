@@ -23,11 +23,13 @@ class ModelParams:
             self,
             path: Path,
             input_size: tuple = (256, 256, 3),
-            preprocessing_mode: str = 'image-net-torch'
+            preprocessing_mode: str = 'image-net-torch',
+            preload_model: bool = False,
     ):
         self._path = path
         self._input_size = input_size
         self._preprocessing_mode = preprocessing_mode
+        self._preload_model = preload_model
 
     @property
     def path(self) -> Path:
@@ -48,6 +50,10 @@ class ModelParams:
     @property
     def preprocessing_mode(self) -> str:
         return self._preprocessing_mode
+
+    @property
+    def preload_model(self) -> bool:
+        return self._preload_model
 
 
 def preprocessed_image(image: np.ndarray, normalize: bool = True, preprocessing_mode: str = 'image-net-torch') \
@@ -114,7 +120,7 @@ def padding_removed(image: np.ndarray, padding: Padding) -> np.ndarray:
 class Inferencer(QObject):
     async_finished = Signal(object, object)  # Signal(callback: Callable, result: Tuple | Any)
 
-    def __init__(self, model_params: ModelParams, preload_model: bool = True, parent: QObject = None):
+    def __init__(self, model_params: ModelParams, parent: QObject = None):
         super().__init__(parent)
 
         self._model_params = model_params
@@ -125,7 +131,7 @@ class Inferencer(QObject):
         # Use this signal to call slot in the thread, where inferencer was created (most often this is the main thread)
         self.async_finished.connect(self._call_async_callback_in_inferencer_thread)
 
-        if preload_model:
+        if self._model_params.preload_model:
             # Use zero timer to start method whenever there are no pending events (see QCoreApplication::exec doc)
             QTimer.singleShot(0, self._preload_model)
 

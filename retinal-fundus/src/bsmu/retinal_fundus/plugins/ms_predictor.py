@@ -80,6 +80,7 @@ class RetinalFundusMsPredictorPlugin(Plugin):
             self.data_path(self._DNN_MODELS_DIR_NAME, ms_predictor_model_props['name']),
             ms_predictor_model_props['input-size'],
             ms_predictor_model_props['preprocessing-mode'],
+            ms_predictor_model_props['preload'],
         )
         self._ms_predictor = RetinalFundusMsPredictor(self._table_visualizer, ms_predictor_model_params)
 

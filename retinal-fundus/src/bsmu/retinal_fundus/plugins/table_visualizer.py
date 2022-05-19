@@ -92,18 +92,21 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             self.data_path(self._DNN_MODELS_DIR_NAME, disk_segmenter_model_props['name']),
             disk_segmenter_model_props['input-size'],
             disk_segmenter_model_props['preprocessing-mode'],
+            disk_segmenter_model_props['preload'],
         )
         cup_segmenter_model_props = self.config.value('cup-segmenter-model')
         cup_segmenter_model_params = DnnModelParams(
             self.data_path(self._DNN_MODELS_DIR_NAME, cup_segmenter_model_props['name']),
             cup_segmenter_model_props['input-size'],
             cup_segmenter_model_props['preprocessing-mode'],
+            cup_segmenter_model_props['preload'],
         )
         vessels_segmenter_model_props = self.config.value('vessels-segmenter-model')
         vessels_segmenter_model_params = DnnModelParams(
             self.data_path(self._DNN_MODELS_DIR_NAME, vessels_segmenter_model_props['name']),
             vessels_segmenter_model_props['input-size'],
             vessels_segmenter_model_props['preprocessing-mode'],
+            vessels_segmenter_model_props['preload'],
         )
         self._table_visualizer = RetinalFundusTableVisualizer(
             self._data_visualization_manager, self._mdi,

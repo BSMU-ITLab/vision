@@ -2,13 +2,16 @@ disk-segmenter-model:
   name: 'disk-model-005.onnx'
   input-size: [352, 352, 3]
   preprocessing-mode: 'image-net-tf'
+  preload: false
 
 cup-segmenter-model:
   name: 'cup-model-006.onnx'
   input-size: [352, 352, 3]
   preprocessing-mode: 'image-net-tf'
+  preload: false
 
 vessels-segmenter-model:
   name: 'vessels-model-083.onnx'
   input-size: [352, 352, 3]
   preprocessing-mode: 'image-net-torch'
+  preload: false

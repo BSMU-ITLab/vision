@@ -7,6 +7,7 @@ from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import Image
+from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,7 +24,7 @@ class ImageLayer(QObject):
     image_shape_changed = Signal(object, object)
     image_pixels_modified = Signal()
 
-    def __init__(self, image: Image | None = None, name: str = ''):
+    def __init__(self, image: Image | None = None, name: str = '', visibility: Visibility = None):
         super().__init__()
         self.id = ImageLayer.max_id
         ImageLayer.max_id += 1
@@ -34,6 +35,8 @@ class ImageLayer(QObject):
         self._image = None
         self.image = image  # if image is not None else Image()
         self.name = name if name else 'Layer ' + str(self.id)
+
+        self._visibility = Visibility() if visibility is None else visibility
 
     @property
     def image_path(self) -> Path | None:
@@ -67,14 +70,19 @@ class ImageLayer(QObject):
                 self._image.pixels_modified.connect(self.image_pixels_modified)
                 self._image.shape_changed.connect(self.image_shape_changed)
 
+    @property
+    def visibility(self) -> Visibility:
+        return self._visibility
+
     def _on_image_updated(self):
         self.image_updated.emit(self.image)
 
 
 class LayeredImage(Data):
-    layer_adding = Signal(ImageLayer)
-    layer_added = Signal(ImageLayer)
-    layer_removed = Signal(ImageLayer)
+    layer_adding = Signal(ImageLayer, int)
+    layer_added = Signal(ImageLayer, int)
+    layer_removing = Signal(ImageLayer, int)
+    layer_removed = Signal(ImageLayer, int)
 
     def __init__(self, path: Path = None):
         super().__init__(path)
@@ -90,21 +98,29 @@ class LayeredImage(Data):
         return self._layer_by_name.get(name)
 
     def add_layer(self, layer: ImageLayer):
-        self.layer_adding.emit(layer)
+        layer_index = len(self._layers)
+        self.layer_adding.emit(layer, layer_index)
         self._layers.append(layer)
         self._layer_by_name[layer.name] = layer
-        self.layer_added.emit(layer)
+        self.layer_added.emit(layer, layer_index)
 
-    def add_layer_from_image(self, image: Image | None, name: str = '') -> ImageLayer:
-        image_layer = ImageLayer(image, name)
+    def add_layer_from_image(
+            self, image: Image | None, name: str = '', visibility: Visibility = None) -> ImageLayer:
+        image_layer = ImageLayer(image, name, visibility)
         self.add_layer(image_layer)
         return image_layer
 
     def add_layer_or_modify_pixels(
-            self, name: str, pixels: np.array, image_type: Type[Image], palette: Palette = None) -> ImageLayer:
+            self,
+            name: str,
+            pixels: np.array,
+            image_type: Type[Image],
+            palette: Palette = None,
+            visibility: Visibility = None,
+    ) -> ImageLayer:
         layer = self.layer_by_name(name)
         if layer is None:
-            layer = self.add_layer_from_image(image_type(pixels, palette), name)
+            layer = self.add_layer_from_image(image_type(pixels, palette), name, visibility)
         elif layer.image is None:
             layer.image = image_type(pixels, palette)
         else:

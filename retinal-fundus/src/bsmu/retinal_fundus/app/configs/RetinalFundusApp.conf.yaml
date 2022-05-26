@@ -3,9 +3,11 @@ plugins:
       replace: bsmu.vision.plugins.windows.main.MainWindowPlugin
       alias: main_window
   - bsmu.retinal_fundus.plugins.table_visualizer.RetinalFundusTableVisualizerPlugin
+  - bsmu.retinal_fundus.plugins.nrr_mask_calculator.RetinalFundusNrrMaskCalculatorPlugin
   - bsmu.retinal_fundus.plugins.histogram_visualizer.RetinalFundusHistogramVisualizerPlugin
   - bsmu.retinal_fundus.plugins.disk_region_selector.RetinalFundusDiskRegionSelectorPlugin
   - bsmu.retinal_fundus.plugins.ms_predictor.RetinalFundusMsPredictorPlugin
+  - bsmu.retinal_fundus.plugins.nrr_hsv_ms_predictor.RetinalFundusNrrHsvMsPredictorPlugin
 
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin

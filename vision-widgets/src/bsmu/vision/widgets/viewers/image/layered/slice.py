@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayerView
-from bsmu.vision.widgets.viewers.image.layered.flat import FlatImageLayerView
 from bsmu.vision.core.constants import PlaneAxis
 from bsmu.vision.core.image.base import FlatImage, SpatialAttrs, VolumeImage
+from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayerView
+from bsmu.vision.widgets.viewers.image.layered.flat import FlatImageLayerView
+
+if TYPE_CHECKING:
+    from bsmu.vision.core.image.base import Image
+    from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
 
 
 class VolumeSliceImageLayerView(ImageLayerView):
@@ -96,12 +101,14 @@ class VolumeSliceImageViewer(LayeredImageViewer):
 
         super().__init__(data, zoomable)
 
-    def _add_layer_view_from_model(self, image_layer: ImageLayer) -> VolumeSliceImageLayerView:
+    def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> VolumeSliceImageLayerView:
         if isinstance(image_layer.image, VolumeImage):
-            layer_view = VolumeSliceImageLayerView(self.plane_axis, self.slice_number, image_layer)
+            layer_view = VolumeSliceImageLayerView(
+                self.plane_axis, self.slice_number, image_layer,
+                image_layer.visibility.visible, image_layer.visibility.opacity)
         else:
-            layer_view = FlatImageLayerView(image_layer)
-        self._add_layer_view(layer_view)
+            layer_view = FlatImageLayerView(image_layer, image_layer.visibility.visible, image_layer.visibility.opacity)
+        self._add_layer_view(layer_view, layer_index)
         return layer_view
 
     def show_slice(self, slice_number: int):

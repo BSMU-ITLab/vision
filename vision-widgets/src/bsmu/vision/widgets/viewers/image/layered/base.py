@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide6.QtCore import QObject, Qt, Signal, QRectF, QPointF
@@ -12,6 +13,14 @@ from bsmu.vision.core.image.base import Image, FlatImage
 from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from PySide6.QtCore import QPoint
+    from PySide6.QtWidgets import QWidget, QStyleOptionGraphicsItem
+
+    from bsmu.vision.core.palette import Palette
 
 
 class IntensityWindowing:
@@ -193,8 +202,8 @@ class _LayeredImageView(QObject):
     def layer_view_by_model(self, image_layer: ImageLayer) -> ImageLayerView:
         return self._layers_views.get(image_layer)
 
-    def add_layer_view(self, layer_view: ImageLayerView):
-        self._layer_views.append(layer_view)
+    def add_layer_view(self, layer_view: ImageLayerView, layer_index: int):
+        self._layer_views.insert(layer_index, layer_view)
         self._names_layer_views[layer_view.name] = layer_view
         self._layers_views[layer_view.image_layer] = layer_view
 
@@ -205,10 +214,10 @@ class _LayeredImageView(QObject):
 
 
 class _LayeredImageGraphicsObject(QGraphicsObject):
-    layer_view_adding = Signal(ImageLayerView)
-    layer_view_added = Signal(ImageLayerView)
-    layer_view_removing = Signal(ImageLayerView)
-    layer_view_removed = Signal(ImageLayerView)
+    layer_view_adding = Signal(ImageLayerView, int)
+    layer_view_added = Signal(ImageLayerView, int)
+    layer_view_removing = Signal(ImageLayerView, int)
+    layer_view_removed = Signal(ImageLayerView, int)
 
     active_layer_view_changed = Signal(ImageLayerView, ImageLayerView)
     bounding_rect_changed = Signal(QRectF)
@@ -249,10 +258,13 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
     def layer_view_by_model(self, image_layer: ImageLayer) -> ImageLayerView:
         return self._layered_image_view.layer_view_by_model(image_layer)
 
-    def add_layer_view(self, layer_view: ImageLayerView):
-        self.layer_view_adding.emit(layer_view)
+    def add_layer_view(self, layer_view: ImageLayerView, layer_index: int = None):
+        if layer_index is None:
+            layer_index = len(self.layer_views)
 
-        self._layered_image_view.add_layer_view(layer_view)
+        self.layer_view_adding.emit(layer_view, layer_index)
+
+        self._layered_image_view.add_layer_view(layer_view, layer_index)
 
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
@@ -269,10 +281,11 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
         self._reset_bounding_rect_cache()  # self.prepareGeometryChange() will call update() if this is necessary.
 
-        self.layer_view_added.emit(layer_view)
+        self.layer_view_added.emit(layer_view, layer_index)
 
     def remove_layer_view(self, layer_view: ImageLayerView):
-        self.layer_view_removing.emit(layer_view)
+        layer_index = self.layer_views.index(layer_view)
+        self.layer_view_removing.emit(layer_view, layer_index)
 
         self._layered_image_view.remove_layer_view(layer_view)
 
@@ -289,7 +302,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
         self._reset_bounding_rect_cache()  # self.prepareGeometryChange() will call update() if this is necessary.
 
-        self.layer_view_removed.emit(layer_view)
+        self.layer_view_removed.emit(layer_view, layer_index)
 
     def remove_layer_view_by_model(self, image_layer):
         self.remove_layer_view(self._layered_image_view.layer_view_by_model(image_layer))
@@ -384,10 +397,10 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
 
 class LayeredImageViewer(DataViewer):
-    layer_view_adding = Signal(ImageLayerView)
-    layer_view_added = Signal(ImageLayerView)
-    layer_view_removing = Signal(ImageLayerView)
-    layer_view_removed = Signal(ImageLayerView)
+    layer_view_adding = Signal(ImageLayerView, int)
+    layer_view_added = Signal(ImageLayerView, int)
+    layer_view_removing = Signal(ImageLayerView, int)
+    layer_view_removed = Signal(ImageLayerView, int)
 
     data_name_changed = Signal(str)
 
@@ -475,10 +488,10 @@ class LayeredImageViewer(DataViewer):
         for layer in self.layers:
             self._add_layer_view_from_model(layer)
 
-    def _add_layer_view(self, layer_view: ImageLayerView):
-        self.layered_image_graphics_object.add_layer_view(layer_view)
+    def _add_layer_view(self, layer_view: ImageLayerView, layer_index: int = None):
+        self.layered_image_graphics_object.add_layer_view(layer_view, layer_index)
 
-    def _add_layer_view_from_model(self, image_layer: ImageLayer) -> ImageLayerView:
+    def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> ImageLayerView:
         pass
 
     def _remove_layer_view_by_model(self, image_layer: ImageLayer):

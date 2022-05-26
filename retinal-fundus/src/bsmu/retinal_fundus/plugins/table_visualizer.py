@@ -19,13 +19,13 @@ from bsmu.vision.core.models.base import ObjectRecord
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.visibility import Visibility
 from bsmu.vision.dnn.inferencer import ModelParams as DnnModelParams
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter
 from bsmu.vision.plugins.windows.main import WindowsMenu
 from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
-from bsmu.vision.widgets.visibility_v2 import Visibility
 
 if TYPE_CHECKING:
     from typing import List, Any, Type
@@ -259,10 +259,10 @@ class PatientRetinalFundusRecord(ObjectRecord):
 
 
 class PatientRetinalFundusJournal(Data):
-    record_adding = Signal(PatientRetinalFundusRecord)
-    record_added = Signal(PatientRetinalFundusRecord)
-    record_removing = Signal(PatientRetinalFundusRecord)
-    record_removed = Signal(PatientRetinalFundusRecord)
+    record_adding = Signal(PatientRetinalFundusRecord, int)
+    record_added = Signal(PatientRetinalFundusRecord, int)
+    record_removing = Signal(PatientRetinalFundusRecord, int)
+    record_removed = Signal(PatientRetinalFundusRecord, int)
 
     def __init__(self):
         super().__init__()
@@ -273,10 +273,12 @@ class PatientRetinalFundusJournal(Data):
     def records(self) -> List[PatientRetinalFundusRecord]:
         return self._records
 
-    def add_record(self, record: PatientRetinalFundusRecord):
-        self.record_adding.emit(record)
-        self.records.append(record)
-        self.record_added.emit(record)
+    def add_record(self, record: PatientRetinalFundusRecord, index: int = None):
+        if index is None:
+            index = len(self._records)
+        self.record_adding.emit(record, index)
+        self.records.insert(index, record)
+        self.record_added.emit(record, index)
 
 
 class PreviewTableColumn(TableColumn):

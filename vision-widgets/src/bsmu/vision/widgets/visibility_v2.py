@@ -7,36 +7,13 @@ from PySide6.QtCore import Qt, QObject, Signal, QSize, QPointF, QRectF, QMargins
 from PySide6.QtGui import QPainter, QPixmap, QPalette, QColor, QPen, QPolygonF, QIntValidator
 from PySide6.QtWidgets import QWidget, QStyledItemDelegate, QStyle, QLineEdit
 
+from bsmu.vision.core.visibility import Visibility
 from bsmu.vision.widgets.images import icons_rc  # noqa: F401
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QAbstractItemModel, QModelIndex, QRect
     from PySide6.QtGui import QPaintEvent, QMouseEvent
     from PySide6.QtWidgets import QStyleOptionViewItem
-
-
-class Visibility(QObject):
-    def __init__(self, visible: bool = True, opacity: float = 1):
-        super().__init__()
-
-        self._visible = visible
-        self._opacity = opacity
-
-    @property
-    def visible(self) -> bool:
-        return self._visible
-
-    @visible.setter
-    def visible(self, value: bool):
-        self._visible = value
-
-    @property
-    def opacity(self) -> float:
-        return self._opacity
-
-    @opacity.setter
-    def opacity(self, value: float):
-        self._opacity = value
 
 
 class _VisibilityDrawer:

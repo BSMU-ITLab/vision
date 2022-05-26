@@ -220,22 +220,18 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         self.endRemoveRows()
         return True
 
-    def _on_storage_record_adding(self, record: ObjectRecord):
-        # Append one row
-        new_record_row = self.rowCount()
-        self.beginInsertRows(QModelIndex(), new_record_row, new_record_row)
+    def _on_storage_record_adding(self, record: ObjectRecord, index: int):
+        self.beginInsertRows(QModelIndex(), index, index)
 
-    def _on_storage_record_added(self, record: ObjectRecord):
+    def _on_storage_record_added(self, record: ObjectRecord, index: int):
         self.endInsertRows()
-        new_record_row = self.rowCount() - 1
-        self._on_record_added(record, new_record_row)
+        self._on_record_added(record, index)
 
-    def _on_storage_record_removing(self, record: ObjectRecord):
-        record_row = self.record_row(record)
-        self._on_record_removing(record, record_row)
-        self.beginRemoveRows(QModelIndex(), record_row, record_row)
+    def _on_storage_record_removing(self, record: ObjectRecord, index: int):
+        self._on_record_removing(record, index)
+        self.beginRemoveRows(QModelIndex(), index, index)
 
-    def _on_storage_record_removed(self, record: ObjectRecord):
+    def _on_storage_record_removed(self, record: ObjectRecord, index: int):
         self.endRemoveRows()
 
     def _create_record_connections(self, record, signal_slot_pairs):
@@ -273,7 +269,8 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         pass
 
     def _on_record_parameter_value_changed(self, record: ObjectRecord, parameter: ObjectParameter):
-        parameter_column = self._column_by_parameter_type[type(parameter)]
+        if (parameter_column := self._column_by_parameter_type.get(type(parameter))) is None:
+            return
         record_parameter_model_index = self.index(self.record_row(record), self.column_number(parameter_column))
         self.dataChanged.emit(record_parameter_model_index, record_parameter_model_index)
 

@@ -130,7 +130,7 @@ class RetinalFundusNrrMaskCalculator(QObject):
 
     def _calculate_nrr_bbox_for_record(self, record: PatientRetinalFundusRecord):
         nrr_bbox_parameter = NrrBboxParameter(record.disk_bbox)
-        record.add_parameter_or_update_value(nrr_bbox_parameter)
+        record.add_parameter_or_modify_value(nrr_bbox_parameter)
 
     def _on_record_image_layer_added(
             self, record: PatientRetinalFundusRecord, image_layer: ImageLayer, layer_index: int):

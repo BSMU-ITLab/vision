@@ -81,7 +81,7 @@ class ObjectRecord(QObject):
         self.parameter_added.emit(parameter)
         parameter.value_changed.connect(partial(self._on_parameter_value_changed, parameter))
 
-    def add_parameter_or_update_value(self, parameter: ObjectParameter) -> ObjectParameter:
+    def add_parameter_or_modify_value(self, parameter: ObjectParameter) -> ObjectParameter:
         existed_parameter = self.parameter_by_type(type(parameter))
         if existed_parameter is None:
             self.add_parameter(parameter)
@@ -100,3 +100,20 @@ class ObjectRecord(QObject):
     @staticmethod
     def _value_str(value: float | None) -> str:
         return ObjectParameter.value_to_str(value)
+
+
+def positive_list_insert_index(some_list: list, index: int | None) -> int:
+    """
+    :param some_list: list to insert some element into |index|
+    :param index: index to insert element in the |some_list| which can be negative
+    (to insert the element into position from the end of the list),
+    or can be None (to insert some element into the end of the list).
+    :return: positive not None index for list.insert.
+    """
+    list_len = len(some_list)
+    if index is None or index > list_len:
+        index = list_len
+    elif index < 0:
+        index += list_len - 1
+        index = max(index, 0)
+    return index

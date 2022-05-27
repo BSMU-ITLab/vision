@@ -15,7 +15,7 @@ from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
-from bsmu.vision.core.models.base import ObjectRecord
+from bsmu.vision.core.models.base import ObjectRecord, positive_list_insert_index
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
@@ -274,8 +274,7 @@ class PatientRetinalFundusJournal(Data):
         return self._records
 
     def add_record(self, record: PatientRetinalFundusRecord, index: int = None):
-        if index is None:
-            index = len(self._records)
+        index = positive_list_insert_index(self.records, index)
         self.record_adding.emit(record, index)
         self.records.insert(index, record)
         self.record_added.emit(record, index)
@@ -388,7 +387,7 @@ class ImageCenterAlignmentDelegate(QStyledItemDelegate):
         self._border = border
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
-        option.widget.style().drawControl(QStyle.CE_ItemViewItem, option, painter)
+        option.widget.style().drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
 
         painter.save()
 

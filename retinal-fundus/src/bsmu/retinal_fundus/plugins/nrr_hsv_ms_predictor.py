@@ -118,4 +118,4 @@ class RetinalFundusNrrHsvMsPredictor(QObject):
 
     def _on_ms_predicted(self, record: PatientRetinalFundusRecord, ms_prediction_score: float):
         ms_prediction_parameter = NrrHsvMsPredictionParameter(ms_prediction_score)
-        ms_prediction_parameter = record.add_parameter_or_update_value(ms_prediction_parameter)
+        ms_prediction_parameter = record.add_parameter_or_modify_value(ms_prediction_parameter)

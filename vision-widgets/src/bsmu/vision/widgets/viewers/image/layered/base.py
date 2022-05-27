@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGra
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.core.image.base import Image, FlatImage
 from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
+from bsmu.vision.core.models.base import positive_list_insert_index
 from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
 
@@ -259,12 +260,10 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         return self._layered_image_view.layer_view_by_model(image_layer)
 
     def add_layer_view(self, layer_view: ImageLayerView, layer_index: int = None):
-        if layer_index is None:
-            layer_index = len(self.layer_views)
+        layer_view_index = positive_list_insert_index(self.layer_views, layer_index)
+        self.layer_view_adding.emit(layer_view, layer_view_index)
 
-        self.layer_view_adding.emit(layer_view, layer_index)
-
-        self._layered_image_view.add_layer_view(layer_view, layer_index)
+        self._layered_image_view.add_layer_view(layer_view, layer_view_index)
 
         # Calling update() several times normally results in just one paintEvent() call.
         # See QWidget::update() documentation.
@@ -281,7 +280,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
 
         self._reset_bounding_rect_cache()  # self.prepareGeometryChange() will call update() if this is necessary.
 
-        self.layer_view_added.emit(layer_view, layer_index)
+        self.layer_view_added.emit(layer_view, layer_view_index)
 
     def remove_layer_view(self, layer_view: ImageLayerView):
         layer_index = self.layer_views.index(layer_view)

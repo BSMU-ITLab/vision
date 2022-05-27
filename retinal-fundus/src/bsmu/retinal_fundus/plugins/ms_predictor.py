@@ -36,15 +36,16 @@ class MsPredictionScoreItemDelegate(QStyledItemDelegate):
         super().__init__(parent)
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
-        index_parameter = index.data(TableItemDataRole.PARAMETER)
-        if index_parameter is None or index_parameter.value < 0.8:
-            return super().paint(painter, option, index)
+        option.widget.style().drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
 
         painter.save()
-        if option.state & QStyle.State_Selected:
-            painter.fillRect(option.rect, option.palette.highlight())
-        painter.setPen(Qt.red)
+
+        index_parameter = index.data(TableItemDataRole.PARAMETER)
+        if index_parameter is not None and index_parameter.value > 0.75:
+            painter.setPen(Qt.red)
+
         painter.drawText(option.rect, Qt.AlignCenter, index.data())
+
         painter.restore()
 
 
@@ -137,4 +138,4 @@ class RetinalFundusMsPredictor(QObject):
 
     def _on_ms_predicted(self, record: PatientRetinalFundusRecord, ms_prediction_score: float):
         ms_prediction_score_parameter = MsPredictionScoreParameter(ms_prediction_score)
-        ms_prediction_score_parameter = record.add_parameter_or_update_value(ms_prediction_score_parameter)
+        ms_prediction_score_parameter = record.add_parameter_or_modify_value(ms_prediction_score_parameter)

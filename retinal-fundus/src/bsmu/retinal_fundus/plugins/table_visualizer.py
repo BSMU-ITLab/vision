@@ -379,18 +379,26 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
         self.dataChanged.emit(cup_to_disk_area_ratio_model_index, cup_to_disk_area_ratio_model_index)
 
 
-class ImageCenterAlignmentDelegate(QStyledItemDelegate):
+class StyledItemDelegate(QStyledItemDelegate):
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        option.widget.style().drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
+
+        painter.save()
+        self._paint(painter, option, index)
+        painter.restore()
+
+    def _paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        pass
+
+
+class ImageCenterAlignmentDelegate(StyledItemDelegate):
     def __init__(self, size_hint: QSize, border: int = 4, parent: QObject = None):
         super().__init__(parent)
 
         self._size_hint = size_hint
         self._border = border
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
-        option.widget.style().drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
-
-        painter.save()
-
+    def _paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
         image = index.data(Qt.DecorationRole)
         scaled_image_rect = option.rect
         scaled_image_rect = scaled_image_rect.marginsRemoved(
@@ -399,8 +407,6 @@ class ImageCenterAlignmentDelegate(QStyledItemDelegate):
 
         point_to_draw_image = option.rect.center() - image.rect().center()
         painter.drawImage(point_to_draw_image, image)
-
-        painter.restore()
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
         return self._size_hint

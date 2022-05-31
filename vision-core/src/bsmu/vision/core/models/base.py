@@ -69,10 +69,12 @@ class ObjectRecord(QObject):
     def parameter_by_type(self, parameter_type: Type[ObjectParameter] | None) -> ObjectParameter | None:
         return self._parameter_by_type.get(parameter_type)
 
-    def parameter_value_str_by_type(self, parameter_type: Type[ObjectParameter] | None) -> str:
+    def parameter_value_by_type(self, parameter_type: Type[ObjectParameter] | None) -> Any:
         parameter = self.parameter_by_type(parameter_type)
-        parameter_value = parameter and parameter.value
-        return ObjectParameter.value_to_str(parameter_value)
+        return parameter and parameter.value
+
+    def parameter_value_str_by_type(self, parameter_type: Type[ObjectParameter] | None) -> str:
+        return ObjectParameter.value_to_str(self.parameter_value_by_type(parameter_type))
 
     def add_parameter(self, parameter: ObjectParameter):
         assert type(parameter) not in self._parameter_by_type, 'Parameter with such type already exists'

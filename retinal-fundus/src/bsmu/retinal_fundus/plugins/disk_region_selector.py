@@ -87,17 +87,38 @@ class RetinalFundusDiskRegionSelectorPlugin(Plugin):
 
 
 @dataclass
+class Sector:
+    start_angle: float
+    end_angle: float
+    name: str = ''
+
+
+@dataclass
 class SectorsPreset:
     name: str = ''
     quantity: int = 4
     rotation: int = 0
+    sector_names: Sequence[str] = None
+
+    def sectors(self) -> list[Sector]:
+        assert self.sector_names is None or len(self.sector_names) == self.quantity, 'Incorrect number of sector names'
+
+        sectors = []
+        angle = 360 / self.quantity
+        for i in range(self.quantity):
+            start_angle = i * angle + self.rotation
+            end_angle = start_angle + angle
+            name = '' if self.sector_names is None else self.sector_names[i]
+            sector = Sector(start_angle, end_angle, name)
+            sectors.append(sector)
+        return sectors
 
 
 class RetinalFundusDiskRegionSelector(QWidget):
     DISK_LAYER_NAME = 'disk'
     SELECTED_SECTORS_LAYER_NAME = 'selected-sectors'
 
-    ISNT_SECTORS_PRESET = SectorsPreset('ISNT', 4, 45)
+    ISNT_SECTORS_PRESET = SectorsPreset('ISNT', 4, 45, ('Nasal', 'Inferior', 'Temporal', 'Superior'))
     CLOCK_SECTORS_PRESET = SectorsPreset('Clock', 12)
 
     selected_regions_changed = Signal()
@@ -279,11 +300,10 @@ class RetinalFundusDiskRegionSelector(QWidget):
         if self._disk_region_rect is None:
             return
 
-        angle = 360 / sectors_config.quantity
-        for i in range(sectors_config.quantity):
-            start_angle = i * angle + sectors_config.rotation
-            end_angle = start_angle + angle
-            sector_item = GraphicsSectorItem(self._disk_center, start_angle, end_angle, self._disk_region_rect)
+        sectors = sectors_config.sectors()
+        for sector in sectors:
+            sector_item = GraphicsSectorItem(
+                self._disk_center, sector.start_angle, sector.end_angle, self._disk_region_rect)
             self._disk_viewer.add_graphics_item(sector_item)
 
             self._sector_items.append(sector_item)

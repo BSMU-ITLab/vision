@@ -4,8 +4,8 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QObject
-from PySide6.QtWidgets import QStyledItemDelegate, QStyle
 
+from bsmu.retinal_fundus.plugins.table_visualizer import StyledItemDelegate
 from bsmu.vision.core.models.base import ObjectParameter
 from bsmu.vision.core.models.table import TableColumn, TableItemDataRole
 from bsmu.vision.core.plugins.base import Plugin
@@ -31,22 +31,16 @@ class MsPredictionScoreTableColumn(TableColumn):
     OBJECT_PARAMETER_TYPE = MsPredictionScoreParameter
 
 
-class MsPredictionScoreItemDelegate(QStyledItemDelegate):
+class MsPredictionScoreItemDelegate(StyledItemDelegate):
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
-        option.widget.style().drawControl(QStyle.CE_ItemViewItem, option, painter, option.widget)
-
-        painter.save()
-
+    def _paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
         index_parameter = index.data(TableItemDataRole.PARAMETER)
         if index_parameter is not None and index_parameter.value > 0.75:
             painter.setPen(Qt.red)
 
         painter.drawText(option.rect, Qt.AlignCenter, index.data())
-
-        painter.restore()
 
 
 class RetinalFundusMsPredictorPlugin(Plugin):

@@ -135,15 +135,10 @@ class RetinalFundusNrrHsvMsPredictor(QObject):
         if record.parameter_value_by_type(self.prediction_parameter_type) is not None:
             return
 
-        nrr_mask = record.image_by_layer_name(RetinalFundusNrrMaskCalculator.NRR_SOFT_MASK_LAYER_NAME)
-        if nrr_mask is None:
-            nrr_mask = record.image_by_layer_name(
-                RetinalFundusNrrMaskCalculator.NRR_BINARY_MASK_LAYER_NAME)
-        if nrr_mask is None:
+        if (nrr_mask := RetinalFundusNrrMaskCalculator.record_nrr_mask(record)) is None:
             return
 
-        nrr_bbox = record.parameter_value_by_type(NrrBboxParameter)
-        if nrr_bbox is None:
+        if (nrr_bbox := record.parameter_value_by_type(NrrBboxParameter)) is None:
             return
 
         nrr_image_in_region = nrr_bbox.pixels(record.image.pixels)

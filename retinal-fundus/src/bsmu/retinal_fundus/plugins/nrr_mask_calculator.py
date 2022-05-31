@@ -101,6 +101,13 @@ class RetinalFundusNrrMaskCalculator(QObject):
     def _mask_palette(self) -> Palette:
         return self._nrr_mask_binary_palette if self._binary_mask else self._nrr_mask_soft_palette
 
+    @classmethod
+    def record_nrr_mask(cls, record: PatientRetinalFundusRecord) -> FlatImage | None:
+        nrr_mask = record.image_by_layer_name(cls.NRR_SOFT_MASK_LAYER_NAME)
+        if nrr_mask is None:
+            nrr_mask = record.image_by_layer_name(cls.NRR_BINARY_MASK_LAYER_NAME)
+        return nrr_mask
+
     def _calculate_nrr_mask_for_record(self, record: PatientRetinalFundusRecord):
         if record.image_by_layer_name(self._mask_layer_name) is not None:
             return

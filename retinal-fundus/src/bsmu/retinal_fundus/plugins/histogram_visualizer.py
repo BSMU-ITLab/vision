@@ -11,8 +11,7 @@ from PySide6.QtCore import Qt, QObject, QMetaObject, QMargins
 from PySide6.QtGui import QPainter, QColor, QPen, QFont, QTextOption
 
 from bsmu.retinal_fundus.plugins.main_window import HistogramsMenu
-from bsmu.vision.core.image.base import FlatImage
-from bsmu.vision.core.palette import Palette
+from bsmu.retinal_fundus.plugins.nrr_mask_calculator import RetinalFundusNrrMaskCalculator, NrrBboxParameter
 from bsmu.vision.core.plugins.base import Plugin
 
 if TYPE_CHECKING:
@@ -26,6 +25,7 @@ if TYPE_CHECKING:
     from bsmu.retinal_fundus.plugins.table_visualizer import RetinalFundusTableVisualizerPlugin, \
         RetinalFundusTableVisualizer, PatientRetinalFundusRecord
     from bsmu.vision.core.image.layered import ImageLayer
+    from bsmu.vision.core.models.base import ObjectParameter
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
@@ -84,17 +84,17 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
             self._table_visualizer, self._disk_region_selector, HsvHistogramColorRepresentation)
 
         histograms_menu = self._main_window.menu(HistogramsMenu)
-        neuroretinal_rim_menu = histograms_menu.addMenu('Neuroretinal Rim')
-        rgb_neuroretinal_rim_histogram_action = neuroretinal_rim_menu.addAction('RGB', None, Qt.CTRL + Qt.Key_R)
-        hsv_neuroretinal_rim_histogram_action = neuroretinal_rim_menu.addAction('HSV', None, Qt.CTRL + Qt.Key_H)
+        nrr_menu = histograms_menu.addMenu('Neuroretinal Rim')
+        rgb_nrr_histogram_action = nrr_menu.addAction('RGB', None, Qt.CTRL + Qt.Key_R)
+        hsv_nrr_histogram_action = nrr_menu.addAction('HSV', None, Qt.CTRL + Qt.Key_H)
 
-        rgb_neuroretinal_rim_histogram_action.setCheckable(True)
-        hsv_neuroretinal_rim_histogram_action.setCheckable(True)
+        rgb_nrr_histogram_action.setCheckable(True)
+        hsv_nrr_histogram_action.setCheckable(True)
 
-        rgb_neuroretinal_rim_histogram_action.triggered.connect(
-            self._rgb_histogram_visualizer.on_visualize_neuroretinal_rim_histogram_toggled)
-        hsv_neuroretinal_rim_histogram_action.triggered.connect(
-            self._hsv_histogram_visualizer.on_visualize_neuroretinal_rim_histogram_toggled)
+        rgb_nrr_histogram_action.triggered.connect(
+            self._rgb_histogram_visualizer.on_visualize_nrr_histogram_toggled)
+        hsv_nrr_histogram_action.triggered.connect(
+            self._hsv_histogram_visualizer.on_visualize_nrr_histogram_toggled)
 
     def _disable(self):
         self._rgb_histogram_visualizer = None
@@ -197,9 +197,6 @@ class Chart(QChart):
 class RetinalFundusHistogramVisualizer(QObject):
     BIN_COUNT = 70
 
-    NEURORETINAL_RIM_BINARY_MASK_LAYER_NAME = 'neuroretinal-rim-binary-mask'
-    NEURORETINAL_RIM_SOFT_MASK_LAYER_NAME = 'neuroretinal-rim-soft-mask'
-
     def __init__(
             self,
             table_visualizer: RetinalFundusTableVisualizer,
@@ -214,10 +211,11 @@ class RetinalFundusHistogramVisualizer(QObject):
 
         self._visualized_record: PatientRetinalFundusRecord | None = None
         self._visualized_record_image_layer_added_connection = QMetaObject.Connection()
+        self._visualized_record_parameter_added_connection = QMetaObject.Connection()
         self._journal_record_selected_connection = QMetaObject.Connection()
         self._disk_selected_regions_changed_connection = QMetaObject.Connection()
 
-        self._neuroretinal_rim_histogram_visualizing: bool = False
+        self._updated_histogram_visualizing: bool = False
 
         self._chart: Chart | None = None
         self._chart_view: QChartView | None = None
@@ -226,10 +224,7 @@ class RetinalFundusHistogramVisualizer(QObject):
         self._histogram_channel_area_series = []
         self._histogram_channel_line_series = []
 
-        self._neuroretinal_rim_mask_binary_palette = Palette.default_binary(255, [16, 107, 107])
-        self._neuroretinal_rim_mask_soft_palette = Palette.default_soft([16, 107, 107])
-
-    def on_visualize_neuroretinal_rim_histogram_toggled(self, checked: bool):
+    def on_visualize_nrr_histogram_toggled(self, checked: bool):
         if checked:
             self._create_chart()
             self._create_chart_view()
@@ -237,67 +232,51 @@ class RetinalFundusHistogramVisualizer(QObject):
                 self._table_visualizer.journal_viewer.record_selected.connect(self._on_journal_record_selected)
             self._disk_selected_regions_changed_connection = \
                 self._disk_region_selector.selected_regions_changed.connect(self._on_disk_selected_regions_changed)
-            self._start_to_visualize_neuroretinal_rim_histogram_for_record(self._table_visualizer.selected_record)
+            self._start_to_visualize_nrr_histogram_for_record(self._table_visualizer.selected_record)
             self._table_visualizer.detailed_info_viewer.add_widget(self._chart_view)
             if len(self._chart.series()) == 0:
                 self._hide_chart()
         else:
             self._table_visualizer.detailed_info_viewer.remove_widget(self._chart_view)
-            self._stop_to_visualize_neuroretinal_rim_histogram()
+            self._stop_to_visualize_nrr_histogram()
             QObject.disconnect(self._journal_record_selected_connection)
             QObject.disconnect(self._disk_selected_regions_changed_connection)
             self._chart_view = None
             self._chart = None
 
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
-        self._stop_to_visualize_neuroretinal_rim_histogram()
-        self._start_to_visualize_neuroretinal_rim_histogram_for_record(record)
+        self._stop_to_visualize_nrr_histogram()
+        self._start_to_visualize_nrr_histogram_for_record(record)
 
     def _on_disk_selected_regions_changed(self):
-        self._visualize_neuroretinal_rim_histogram_without_repeated_calls()
+        self._updated_histogram_visualizing = False
+        self._visualize_histogram()
 
-    def _start_to_visualize_neuroretinal_rim_histogram_for_record(self, record: PatientRetinalFundusRecord):
+    def _start_to_visualize_nrr_histogram_for_record(self, record: PatientRetinalFundusRecord):
         if record is None:
             return
 
         self._visualized_record = record
-        # Disk, cup or vessels mask layers can be added later, so we have to be notified about |layer_added| signal
+        # NRR-mask layer or Bbox-parameter can be added later, so we have to be notified about corresponding signals
         self._visualized_record_image_layer_added_connection = \
             self._visualized_record.layered_image.layer_added.connect(self._on_visualized_record_image_layer_added)
-        self._visualize_neuroretinal_rim_histogram_without_repeated_calls()
+        self._visualized_record_parameter_added_connection = \
+            self._visualized_record.parameter_added.connect(self._on_visualized_record_parameter_added)
 
-    def _stop_to_visualize_neuroretinal_rim_histogram(self):
+        self._visualize_histogram()
+
+    def _stop_to_visualize_nrr_histogram(self):
         QObject.disconnect(self._visualized_record_image_layer_added_connection)
+        QObject.disconnect(self._visualized_record_parameter_added_connection)
+
         self._visualized_record = None
+        self._updated_histogram_visualizing = False
 
     def _on_visualized_record_image_layer_added(self, image_layer: ImageLayer):
-        self._visualize_neuroretinal_rim_histogram_without_repeated_calls()
+        self._visualize_histogram()
 
-    def _calculate_record_neuroretinal_rim_mask(
-            self, record: PatientRetinalFundusRecord, binary: bool = False) -> np.ndarray | None:
-        if record.disk_mask is None or record.cup_mask is None or record.vessels_mask is None:
-            return None
-
-        neuroretinal_rim_mask = np.copy(record.disk_mask.array)
-        if binary:
-            neuroretinal_rim_mask[(record.cup_mask.array > 31) | (record.vessels_mask.array > 31)] = 0
-        else:
-            cup_and_vessels_union = np.maximum(record.cup_mask.array, record.vessels_mask.array)
-            cup_and_vessels_union_in_disk_region = np.minimum(cup_and_vessels_union, neuroretinal_rim_mask)
-
-            neuroretinal_rim_mask -= cup_and_vessels_union_in_disk_region
-
-            # cup_and_vessels_union_in_disk_region_layer_name = 'cup-and-vessels-union-in-disk-region-mask'
-            # cup_and_vessels_union_in_disk_region_layer = record.layered_image.add_layer_or_modify_pixels(
-            #     cup_and_vessels_union_in_disk_region_layer_name, cup_and_vessels_union_in_disk_region, FlatImage)
-
-        neuroretinal_rim_mask_layer = record.layered_image.add_layer_or_modify_pixels(
-            self.NEURORETINAL_RIM_BINARY_MASK_LAYER_NAME if binary else self.NEURORETINAL_RIM_SOFT_MASK_LAYER_NAME,
-            neuroretinal_rim_mask,
-            FlatImage,
-            self._neuroretinal_rim_mask_binary_palette if binary else self._neuroretinal_rim_mask_soft_palette)
-
-        return neuroretinal_rim_mask
+    def _on_visualized_record_parameter_added(self, parameter: ObjectParameter):
+        self._visualize_histogram()
 
     def _show_chart(self):
         self._chart.draw_mode = Chart.DrawMode.CHART
@@ -309,48 +288,46 @@ class RetinalFundusHistogramVisualizer(QObject):
 
         self._chart.draw_mode = Chart.DrawMode.NO_DATA
 
-    def _visualize_neuroretinal_rim_histogram_without_repeated_calls(self):
-        if self._neuroretinal_rim_histogram_visualizing:
+    def _visualize_histogram(self):
+        if self._updated_histogram_visualizing:
             return
 
-        self._neuroretinal_rim_histogram_visualizing = True
-        self._visualize_neuroretinal_rim_histogram()
-        self._neuroretinal_rim_histogram_visualizing = False
-
-    def _visualize_neuroretinal_rim_histogram(self):
-        if self._visualized_record is None:
+        if self._visualized_record is None \
+                or (nrr_mask := RetinalFundusNrrMaskCalculator.record_nrr_mask(self._visualized_record)) is None \
+                or (nrr_bbox := self._visualized_record.parameter_value_by_type(NrrBboxParameter)) is None:
             self._hide_chart()
             return
 
-        neuroretinal_rim_mask = self._calculate_record_neuroretinal_rim_mask(self._visualized_record)
-        if neuroretinal_rim_mask is None:
-            self._hide_chart()
-            return
+        self._updated_histogram_visualizing = True
 
-        neuroretinal_rim_float_mask = neuroretinal_rim_mask / 255
+        nrr_mask = np.copy(nrr_mask.pixels)
 
         # Use mask of |self._disk_region_selector| to analyze only selected disk regions
         if self._disk_region_selector.disk_region is not None:
-            neuroretinal_rim_float_mask_in_disk_region = \
-                self._disk_region_selector.disk_region.pixels(neuroretinal_rim_float_mask)
-            neuroretinal_rim_float_mask_in_disk_region[self._disk_region_selector.selected_sectors_mask == 0] = 0
+            nrr_mask_in_disk_region = \
+                self._disk_region_selector.disk_region.pixels(nrr_mask)
+            nrr_mask_in_disk_region[self._disk_region_selector.selected_sectors_mask == 0] = 0
 
-        neuroretinal_rim_bool_mask = neuroretinal_rim_float_mask > 0.5
-        if not neuroretinal_rim_bool_mask.any():
+        cropped_nrr_image = nrr_bbox.pixels(self._visualized_record.image.pixels)
+        cropped_nrr_mask = nrr_bbox.pixels(nrr_mask)
+        cropped_nrr_float_mask = cropped_nrr_mask / 255
+
+        cropped_nrr_bool_mask = cropped_nrr_float_mask > 0.5
+        if not cropped_nrr_bool_mask.any():
             self._hide_chart()
             return
 
-        histogram_image_pixels = self._histogram_color_representation.from_rgb(self._visualized_record.image.array)
-        # mean = np.mean(histogram_image_pixels, axis=(0, 1), where=neuroretinal_rim_bool_mask)
+        histogram_image_pixels = self._histogram_color_representation.from_rgb(cropped_nrr_image)
+        # mean = np.mean(histogram_image_pixels, axis=(0, 1), where=cropped_nrr_bool_mask)
         histogram_range = (histogram_image_pixels.min(), histogram_image_pixels.max())
         self._histogram_channel_area_series.clear()
         self._histogram_channel_line_series.clear()
         for channel in range(histogram_image_pixels.shape[-1]):
             channel_pixels = histogram_image_pixels[..., channel]
             channel_histogram, channel_histogram_bin_edges = np.histogram(
-                channel_pixels, bins=self.BIN_COUNT, range=histogram_range, weights=neuroretinal_rim_float_mask)
-            channel_mean = np.mean(channel_pixels, where=neuroretinal_rim_bool_mask)
-            channel_std = np.std(channel_pixels, where=neuroretinal_rim_bool_mask)
+                channel_pixels, bins=self.BIN_COUNT, range=histogram_range, weights=cropped_nrr_float_mask)
+            channel_mean = np.mean(channel_pixels, where=cropped_nrr_bool_mask)
+            channel_std = np.std(channel_pixels, where=cropped_nrr_bool_mask)
             series_name = self._histogram_color_representation.NAME[channel]
             series_name += f': μ={channel_mean:.2f}; σ={channel_std:.2f}'
             area_series, line_series = self._create_histogram_area_series(

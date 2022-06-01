@@ -114,7 +114,11 @@ class AppBuilder:
     ):
         self._file_dir = file_dir
         self._script_path_relative_to_file_dir = script_path_relative_to_file_dir
-        self._build_dir = self._file_dir / self._BUILD_DIR_NAME if build_dir is None else build_dir
+        self._build_name = f'{app_name.replace(" ", "")}-{app_version}'
+        console_suffix = '-c' if app_base is None else ''
+        self._build_name_with_console_suffix = self._build_name + console_suffix
+        self._build_dir = self._file_dir / self._BUILD_DIR_NAME / self._build_name_with_console_suffix \
+            if build_dir is None else build_dir
         self._dist_dir = self._file_dir / self._DIST_DIR_NAME if dist_dir is None else dist_dir
 
         self._app_name = app_name
@@ -160,7 +164,7 @@ class AppBuilder:
             executables=[Executable(
                 self._file_dir / self._script_path_relative_to_file_dir,
                 base=self._app_base,
-                target_name=f'{self._app_name.replace(" ", "")}-{self._app_version}',
+                target_name=self._build_name_with_console_suffix,
                 shortcut_name=self._app_name,
                 shortcut_dir='DesktopFolder',
                 icon=self._icon_path,

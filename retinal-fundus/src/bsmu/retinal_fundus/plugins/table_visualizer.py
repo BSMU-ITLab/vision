@@ -698,12 +698,16 @@ class RetinalFundusTableVisualizer(QObject):
         self._vessels_mask_palette = Palette.default_soft([102, 183, 255])
 
         self._journal = PatientRetinalFundusJournal()
+
+        """
+        # Add test images
         self._journal.add_record(PatientRetinalFundusRecord.from_flat_image(FlatImage(
             array=np.random.randint(low=0, high=256, size=(50, 50), dtype=np.uint8),
-            path=Path(r'D:\Temp\Void-1.png'))))
+            path=Path('Void-1.png'))))
         self._journal.add_record(PatientRetinalFundusRecord.from_flat_image(FlatImage(
             array=np.random.randint(low=0, high=256, size=(50, 50), dtype=np.uint8),
-            path=Path(r'D:\Temp\Void-2.png'))))
+            path=Path('Void-2.png'))))
+        """
 
         self._image_sub_windows_by_record = {}
 

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import skimage.io
 
-from bsmu.vision.plugins.loaders.image.base import ImageFileLoaderPlugin, ImageFileLoader
 from bsmu.vision.core.image.base import FlatImage
+from bsmu.vision.plugins.loaders.image.base import ImageFileLoaderPlugin, ImageFileLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class SimpleImageFileLoaderPlugin(ImageFileLoaderPlugin):
@@ -13,7 +18,7 @@ class SimpleImageFileLoaderPlugin(ImageFileLoaderPlugin):
 
 
 class SimpleImageFileLoader(ImageFileLoader):
-    _FORMATS = ('png', 'jpg', 'bmp')
+    _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tiff', 'svs')
 
     def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
         print('Load Simple Image')

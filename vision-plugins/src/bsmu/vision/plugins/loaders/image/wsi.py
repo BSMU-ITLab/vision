@@ -12,18 +12,20 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class SimpleImageFileLoaderPlugin(ImageFileLoaderPlugin):
+class WholeSlideImageFileLoaderPlugin(ImageFileLoaderPlugin):
     def __init__(self):
-        super().__init__(SimpleImageFileLoader)
+        super().__init__(WholeSlideImageFileLoader)
 
 
-class SimpleImageFileLoader(ImageFileLoader):
-    _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tiff')
+class WholeSlideImageFileLoader(ImageFileLoader):
+    _FORMATS = ('tiff', 'svs')
 
     def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
-        print('Load Simple Image')
+        print('Load Whole-Slide Image')
 
-        pixels = skimage.io.imread(str(path), as_gray=as_gray or palette is not None, **kwargs)
+        multi_image_level = 1
+        pixels = skimage.io.MultiImage(
+            str(path), as_gray=as_gray or palette is not None, key=multi_image_level, **kwargs)[0]
         flat_image = FlatImage(pixels, palette, path)
         if palette is not None:
             flat_image.pixels = np.rint(flat_image.pixels).astype(np.uint8)

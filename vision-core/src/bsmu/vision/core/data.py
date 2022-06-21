@@ -23,7 +23,7 @@ class Data(QObject):
 
     @property
     def dir_name(self):
-        return self.path.parent.name
+        return '' if self.path is None else self.path.parent.name
 
     def update(self):
         self.updated.emit()

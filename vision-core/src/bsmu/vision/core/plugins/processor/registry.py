@@ -52,12 +52,13 @@ class ProcessorRegistry:
 
     def register_processor_cls(self, processor_cls: Type[Processor]):
         for processed_key in processor_cls.processed_keys:
-            assert processed_key not in self._registry, 'Duplicate processed key'
+            assert processed_key not in self._registry, f'Duplicate processed key: {processed_key}'
             self._registry[processed_key] = processor_cls
 
     def unregister_processor_cls(self, processor_cls: Type[Processor]):
         for processed_key in processor_cls.processed_keys:
-            assert self._registry[processed_key] == processor_cls, 'Processed key is registered for other processor'
+            assert self._registry[processed_key] == processor_cls, \
+                f'Processed key is registered for other processor {processed_key}'
             del self._registry[processed_key]
 
     def processor_cls(self, processed_key: Hashable) -> Type[Processor] | None:

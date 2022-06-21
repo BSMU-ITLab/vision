@@ -30,7 +30,7 @@ class Plugin(QObject, DataFileProvider):
         self._print_action('inited')
 
     def __del__(self):
-        self._print_action('del')
+        self._print_action('deleted')
 
     @classmethod
     @property
@@ -76,4 +76,4 @@ class Plugin(QObject, DataFileProvider):
 
     @classmethod
     def _print_action(cls, action_str: str):
-        print(f'{action_str} {cls.name()} plugin')
+        print(f'Plugin {action_str}:\t{cls.name()}')

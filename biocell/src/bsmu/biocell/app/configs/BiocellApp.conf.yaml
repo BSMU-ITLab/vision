@@ -2,9 +2,11 @@ plugins:
   - bsmu.biocell.plugins.main_window.BiocellMainWindowPlugin:
       replace: bsmu.vision.plugins.windows.main.MainWindowPlugin
       alias: main_window
+  - bsmu.biocell.plugins.pc_isup_predictor.BiocellPcIsupPredictorPlugin
 
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
-  - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
+#  - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
+  - bsmu.vision.plugins.loaders.image.wsi.WholeSlideImageFileLoaderPlugin
 #  - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
 #  - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin

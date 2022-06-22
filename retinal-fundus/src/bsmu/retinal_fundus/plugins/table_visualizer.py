@@ -87,27 +87,15 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self._post_load_conversion_manager = self._post_load_conversion_manager_plugin.post_load_conversion_manager
         self._mdi = self._mdi_plugin.mdi
 
-        disk_segmenter_model_props = self.config.value('disk-segmenter-model')
-        disk_segmenter_model_params = DnnModelParams(
-            self.data_path(self._DNN_MODELS_DIR_NAME, disk_segmenter_model_props['name']),
-            disk_segmenter_model_props['input-size'],
-            disk_segmenter_model_props['preprocessing-mode'],
-            disk_segmenter_model_props['preload'],
-        )
-        cup_segmenter_model_props = self.config.value('cup-segmenter-model')
-        cup_segmenter_model_params = DnnModelParams(
-            self.data_path(self._DNN_MODELS_DIR_NAME, cup_segmenter_model_props['name']),
-            cup_segmenter_model_props['input-size'],
-            cup_segmenter_model_props['preprocessing-mode'],
-            cup_segmenter_model_props['preload'],
-        )
-        vessels_segmenter_model_props = self.config.value('vessels-segmenter-model')
-        vessels_segmenter_model_params = DnnModelParams(
-            self.data_path(self._DNN_MODELS_DIR_NAME, vessels_segmenter_model_props['name']),
-            vessels_segmenter_model_props['input-size'],
-            vessels_segmenter_model_props['preprocessing-mode'],
-            vessels_segmenter_model_props['preload'],
-        )
+        disk_segmenter_model_params = DnnModelParams.from_config(
+            self.config.value('disk-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
+
+        cup_segmenter_model_params = DnnModelParams.from_config(
+            self.config.value('cup-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
+
+        vessels_segmenter_model_params = DnnModelParams.from_config(
+            self.config.value('vessels-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
+
         self._table_visualizer = RetinalFundusTableVisualizer(
             self._data_visualization_manager, self._mdi,
             disk_segmenter_model_params, cup_segmenter_model_params, vessels_segmenter_model_params)

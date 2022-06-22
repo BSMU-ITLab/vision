@@ -107,7 +107,7 @@ class Palette:
                 else:
                     return Palette.default_binary(foreground_value_prop, rgb_color_prop)
 
-        warnings.warn('Incorrect palette config')
+        warnings.warn('Incorrect Palette config')
         return None
 
     @staticmethod

@@ -70,13 +70,8 @@ class RetinalFundusMsPredictorPlugin(Plugin):
     def _enable(self):
         self._table_visualizer = self._retinal_fundus_table_visualizer_plugin.table_visualizer
 
-        ms_predictor_model_props = self.config.value('ms-predictor-model')
-        ms_predictor_model_params = DnnModelParams(
-            self.data_path(self._DNN_MODELS_DIR_NAME, ms_predictor_model_props['name']),
-            ms_predictor_model_props['input-size'],
-            ms_predictor_model_props['preprocessing-mode'],
-            ms_predictor_model_props['preload'],
-        )
+        ms_predictor_model_params = DnnModelParams.from_config(
+            self.config.value('ms-predictor-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
         self._ms_predictor = RetinalFundusMsPredictor(self._table_visualizer, ms_predictor_model_params)
 
         ms_prediction_score_item_delegate = MsPredictionScoreItemDelegate(self._table_visualizer)

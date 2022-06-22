@@ -1,0 +1,8 @@
+predictor-model:
+  name: 'efficientnet-b1_kfold_1.onnx'
+  input-size: [3, 1536, 1536]
+  channels-axis: 0
+  channels-order: 'bgr'
+  normalize: false
+  preprocessing-mode: ''
+  preload: false

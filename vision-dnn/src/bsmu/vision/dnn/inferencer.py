@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -41,8 +42,8 @@ class ModelParams:
     def default_if_none(value: Any, default: Any) -> Any:
         return default if value is None else value
 
-    @classmethod
-    def from_config(cls, config_data: dict, model_dir: Path) -> ModelParams:
+    @staticmethod
+    def from_config(config_data: dict, model_dir: Path) -> ModelParams:
         return ModelParams(
             model_dir / config_data['name'],
             config_data.get('input-size'),
@@ -52,6 +53,11 @@ class ModelParams:
             config_data.get('preprocessing-mode'),
             config_data.get('preload'),
         )
+
+    def copy_but_change_name(self, new_name: str) -> ModelParams:
+        model_params_copy = copy.deepcopy(self)
+        model_params_copy._path = model_params_copy.path.parent / new_name
+        return model_params_copy
 
     @property
     def path(self) -> Path:
@@ -196,6 +202,10 @@ class Inferencer(QObject):
         if self._model_params.preload_model:
             # Use zero timer to start method whenever there are no pending events (see QCoreApplication::exec doc)
             QTimer.singleShot(0, self._preload_model)
+
+    @property
+    def model_params(self) -> ModelParams:
+        return self._model_params
 
     def _preload_model(self):
         QThreadPool.globalInstance().start(self._create_inference_session_with_delay)

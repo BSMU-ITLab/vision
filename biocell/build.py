@@ -1,9 +1,9 @@
 """
 To build *.exe use the next command in the terminal:
-    (vision) D:/Projects/vision>   python biocell/build.py build
+    (vision) D:/Projects/vision/biocell>   python build.py build
 
 To create an msi-installer:
-    (vision) D:/Projects/vision>   python biocell/build.py bdist_msi
+    (vision) D:/Projects/vision/biocell>   python build.py bdist_msi
 """
 
 

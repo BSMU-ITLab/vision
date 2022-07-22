@@ -1,9 +1,9 @@
 """
 To build *.exe use the next command in the terminal:
-    (vision) D:/Projects/vision>   python retinal-fundus/build.py build
+    (vision) D:/Projects/vision/retinal-fundus>   python build.py build
 
 To create an msi-installer:
-    (vision) D:/Projects/vision>   python retinal-fundus/build.py bdist_msi
+    (vision) D:/Projects/vision/retinal-fundus>   python build.py bdist_msi
 """
 
 

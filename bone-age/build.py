@@ -1,9 +1,9 @@
 """
 To build *.exe use the next command in the terminal:
-    (vision) D:/Projects/vision>   python bone-age/build.py build
+    (vision) D:/Projects/vision/bone-age>   python build.py build
 
 To create an msi-installer:
-    (vision) D:/Projects/vision>   python bone-age/build.py bdist_msi
+    (vision) D:/Projects/vision/bone-age>   python build.py bdist_msi
 """
 
 

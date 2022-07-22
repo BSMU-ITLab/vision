@@ -1,9 +1,9 @@
 """
 To build *.exe use the next command in the terminal:
-    (vision) D:/Projects/vision>   python vision-app/build.py build
+    (vision) D:/Projects/vision/vision-app>   python build.py build
 
 To create an msi-installer:
-    (vision) D:/Projects/vision>   python vision-app/build.py bdist_msi
+    (vision) D:/Projects/vision/vision-app>   python build.py bdist_msi
 
 To build app, install all required packages using pip
 For local dev packages (e.g. bsmu.vision.plugins) use:

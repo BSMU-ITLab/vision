@@ -62,6 +62,7 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         scene = slide.get_scene(0)
         full_resolution_width = scene.rect[2]
         region = scene.read_block(size=(round(full_resolution_width / 7.53), 0))
+        # region = scene.read_block(size=(round(full_resolution_width / 4), 0))
 
         if palette is not None:
             region = region[..., 0]

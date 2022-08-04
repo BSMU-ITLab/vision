@@ -62,8 +62,8 @@ class Segmenter(Inferencer):
         assert len(outputs) == 1, 'Segmenter can process only models with one output'
         output_mask_batch = outputs[0]
 
-        # Squeeze channels axis
-        output_mask_batch = np.squeeze(output_mask_batch, axis=3)
+        # Squeeze channels axis. Use '+ 1' to skip the batch axis
+        output_mask_batch = np.squeeze(output_mask_batch, axis=self.model_params.channels_axis + 1)
         return output_mask_batch
 
     def _segment_without_postresize(self, image: np.ndarray) -> np.ndarray:
@@ -84,7 +84,8 @@ class Segmenter(Inferencer):
                 mask = postprocessing_result
 
         src_image_shape = image.shape
-        mask = cv.resize(mask, (src_image_shape[1], src_image_shape[0]), interpolation=cv.INTER_LINEAR_EXACT)
+        if src_image_shape[:2] != mask.shape[:2]:
+            mask = cv.resize(mask, (src_image_shape[1], src_image_shape[0]), interpolation=cv.INTER_LINEAR_EXACT)
 
         return mask
 

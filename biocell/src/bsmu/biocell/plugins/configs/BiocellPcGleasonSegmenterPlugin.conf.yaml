@@ -1,0 +1,8 @@
+gleason-segmenter-model:
+  name: 'u-tu-resnetv2_50x1_bitm_in21k-panda.onnx'  # 'u-vgg16_bn-panda_color_jitter.onnx'  # 'u-vgg16_bn-panda_hue_jitter.onnx'  # 'u-vgg16_bn-panda_no_jitter.onnx'
+  input-size: [3, 256, 256]
+  channels-axis: 0
+  channels-order: 'rgb'
+  normalize: false
+  preprocessing-mode: ''
+  preload: false

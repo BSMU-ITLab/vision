@@ -510,7 +510,7 @@ class PatientRetinalFundusJournalViewer(DataViewer):
         column_number = self._table_model.add_column(column)
         if column_delegate is not None:
             self._table_view.setItemDelegateForColumn(column_number, column_delegate)
-        self.resize_columns_to_contents()
+        self._table_view.resizeColumnToContents(column_number)
 
 
 class RecordDetailedInfoViewer(QFrame):
@@ -681,6 +681,8 @@ class RetinalFundusTableVisualizer(QObject):
         self._cup_segmenter = DnnSegmenter(cup_segmenter_model_params)
         self._vessels_segmenter = DnnSegmenter(vessels_segmenter_model_params)
 
+        self._columns_resized_to_contents_once = False
+
         self._disk_mask_palette = Palette.default_binary(255, [102, 255, 128])
         self._cup_mask_palette = Palette.default_binary(255, [189, 103, 255])
         self._vessels_mask_palette = Palette.default_soft([102, 183, 255])
@@ -836,7 +838,9 @@ class RetinalFundusTableVisualizer(QObject):
             PatientRetinalFundusRecord.VESSELS_MASK_LAYER_NAME)
 
         record.calculate_params()
-        self.journal_viewer.resize_columns_to_contents()
+        if not self._columns_resized_to_contents_once:
+            self.journal_viewer.resize_columns_to_contents()
+            self._columns_resized_to_contents_once = True
 
     def visualize_retinal_fundus_data(self, data: Data):
         if not isinstance(data, LayeredImage):

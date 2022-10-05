@@ -16,6 +16,6 @@ plugins:
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
   - bsmu.vision.plugins.layers_view.LayersTableViewPlugin
 
-enable-high-dpi-scaling: true
+enable-gui: true
 
 warn-with-traceback: true

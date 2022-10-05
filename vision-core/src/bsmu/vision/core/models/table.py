@@ -85,6 +85,10 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         return self.storage_records.index(record)
 
     @property
+    def columns(self) -> Sequence[Type[TableColumn]]:
+        return self._columns
+
+    @property
     def record_column_number(self) -> int:
         return 0  # Use zero column to store record reference
 

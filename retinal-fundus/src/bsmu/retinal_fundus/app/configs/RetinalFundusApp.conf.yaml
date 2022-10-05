@@ -8,6 +8,7 @@ plugins:
   - bsmu.retinal_fundus.plugins.disk_region_selector.RetinalFundusDiskRegionSelectorPlugin
   - bsmu.retinal_fundus.plugins.ms_predictor.RetinalFundusMsPredictorPlugin
   - bsmu.retinal_fundus.plugins.nrr_hsv_ms_predictor.RetinalFundusNrrHsvMsPredictorPlugin
+  - bsmu.retinal_fundus.plugins.journal_csv_exporter.PatientRetinalFundusJournalCsvExporterPlugin
 
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin

@@ -9,6 +9,10 @@ if TYPE_CHECKING:
     from typing import Tuple, Type
 
 
+class TableMenu(MainMenu):
+    name = 'Table'
+
+
 class HistogramsMenu(MainMenu):
     name = 'Histograms'
 
@@ -16,7 +20,8 @@ class HistogramsMenu(MainMenu):
 class RetinalFundusMenuBar(MenuBar):
     def __init__(
             self,
-            menu_order: Tuple[MainMenu] = (FileMenu, ViewMenu, ToolsMenu, HistogramsMenu, WindowsMenu, HelpMenu)
+            menu_order: Tuple[MainMenu] = (
+                    FileMenu, ViewMenu, TableMenu, ToolsMenu, HistogramsMenu, WindowsMenu, HelpMenu)
     ):
         super().__init__(menu_order)
 

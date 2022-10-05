@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import partial
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -28,7 +27,7 @@ from bsmu.vision.widgets.viewers.base import DataViewer
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
 
 if TYPE_CHECKING:
-    from typing import List, Any, Type
+    from typing import List, Any, Type, Sequence
 
     from PySide6.QtCore import QAbstractItemModel
     from PySide6.QtWidgets import QStyleOptionViewItem
@@ -498,6 +497,10 @@ class PatientRetinalFundusJournalViewer(DataViewer):
     @property
     def selected_record(self) -> PatientRetinalFundusRecord | None:
         return self._table_view.selected_record
+
+    @property
+    def columns(self) -> Sequence[Type[TableColumn]]:
+        return self._table_model.columns
 
     def select_record(self, record: PatientRetinalFundusRecord):
         row = self._table_model.record_row(record)

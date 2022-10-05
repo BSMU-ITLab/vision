@@ -57,7 +57,7 @@ class PluginManager(QObject):
 
         self._setup_observer_plugin_connections(plugin)
 
-        plugin.enable()
+        plugin.enable(self._app.gui_enabled)
         self._enabled_plugin_by_full_name[full_name] = plugin
         if replace_full_name is not None:
             self._enabled_plugin_by_full_name[replace_full_name] = plugin

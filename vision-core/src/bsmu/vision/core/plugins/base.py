@@ -45,13 +45,18 @@ class Plugin(QObject, DataFileProvider):
     def dependency_plugin_by_key(self, value: dict):
         self._dependency_plugin_by_key = value
 
-    def enable(self):
+    def enable(self, enable_gui: bool):
         self.enabling.emit(self)
         self._enable()
+        if enable_gui:
+            self._enable_gui()
         self._print_action('enabled')
         self.enabled.emit(self)
 
     def _enable(self):
+        pass
+
+    def _enable_gui(self):
         pass
 
     def disable(self):

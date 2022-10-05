@@ -6,7 +6,7 @@ import traceback
 import warnings
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QObject, Signal, QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from bsmu.vision.app.plugin_manager import PluginManager
@@ -18,22 +18,22 @@ if TYPE_CHECKING:
     from typing import List
 
 
-class App(QApplication, DataFileProvider):
+class App(QObject, DataFileProvider):
     plugin_enabled = Signal(Plugin)
     plugin_disabled = Signal(Plugin)
 
     def __init__(self):
-        super().__init__(sys.argv)
+        super().__init__()
 
         print(f'App started. Prefix: {sys.prefix}')
 
-        self._config = UnitedConfig(type(self), App)
-
-        if self._config.value('enable-high-dpi-scaling'):
-            QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-
         # Set to users preferred locale to output correct decimal point (comma or point):
         locale.setlocale(locale.LC_NUMERIC, '')
+
+        self._config = UnitedConfig(type(self), App)
+
+        self._gui_enabled = self._config.value('enable-gui')
+        self._qApp = QApplication(sys.argv) if self._gui_enabled else QCoreApplication(sys.argv)
 
         if self._config.value('warn-with-traceback'):
             warnings.showwarning = warn_with_traceback
@@ -47,11 +47,15 @@ class App(QApplication, DataFileProvider):
         if configured_plugins is not None:
             self._plugin_manager.enable_plugins(configured_plugins)
 
+    @property
+    def gui_enabled(self) -> bool:
+        return self._gui_enabled
+
     def enabled_plugins(self) -> List[Plugin]:
         return self._plugin_manager.enabled_plugins
 
     def run(self):
-        sys.exit(self.exec())
+        sys.exit(self._qApp.exec())
 
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):

@@ -65,7 +65,7 @@ class FileLoadingManager(QObject):
         e.g. for NiftiFile.nii.gz
         at first check 'nii.gz', then check 'gz'
         """
-        file_format = path.name
+        file_format = path.name.lower()
         while True:
             loader_cls = self.file_loader_registry.processor_cls(file_format)
             if loader_cls is not None:

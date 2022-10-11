@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 class TableColumn:
     TITLE = ''
     OBJECT_PARAMETER_TYPE: Type[ObjectParameter] = None
+    EDITABLE = False
     TEXT_ALIGNMENT = Qt.AlignCenter
 
 
@@ -135,7 +136,8 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
             return Qt.ItemIsEnabled
 
         flags = super().flags(index)
-        flags |= Qt.ItemIsEditable
+        if self._columns[index.column()].EDITABLE:
+            flags |= Qt.ItemIsEditable
         return flags
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:

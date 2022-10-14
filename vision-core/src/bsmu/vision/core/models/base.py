@@ -116,6 +116,23 @@ def positive_list_insert_index(some_list: list, index: int | None) -> int:
     if index is None or index > list_len:
         index = list_len
     elif index < 0:
-        index += list_len - 1
+        index += list_len
+        index = max(index, 0)
+    return index
+
+
+def positive_list_remove_index(some_list: list, index: int | None) -> int:
+    """
+    :param some_list: list to remove some element by |index|
+    :param index: index to remove element in the |some_list| which can be negative
+    (to remove an element from the end of the list),
+    or can be None (to remove the last element of the list).
+    :return: positive not None index for del list[index].
+    """
+    list_len = len(some_list)
+    if index is None or index > list_len:
+        index = list_len - 1
+    elif index < 0:
+        index += list_len
         index = max(index, 0)
     return index

@@ -10,11 +10,12 @@ from PySide6.QtWidgets import QWidget, QGridLayout, QTableView, QHeaderView, QSt
     QAbstractItemView, QStyle, QFrame
 
 import bsmu.vision.core.converters.image as image_converter
+from bsmu.retinal_fundus.plugins.main_window import TableMenu
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.image.layered import LayeredImage
-from bsmu.vision.core.models.base import ObjectRecord, positive_list_insert_index
+from bsmu.vision.core.models.base import ObjectRecord, positive_list_insert_index, positive_list_remove_index
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
@@ -100,6 +101,8 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             disk_segmenter_model_params, cup_segmenter_model_params, vessels_segmenter_model_params)
 
         self._post_load_conversion_manager.data_converted.connect(self._table_visualizer.visualize_retinal_fundus_data)
+
+        self._main_window.add_menu_action(TableMenu, 'Clear', self._table_visualizer.clear_journal)
 
         self._main_window.add_menu_action(
             WindowsMenu, 'Table', self._table_visualizer.maximize_journal_viewer, Qt.CTRL + Qt.Key_1)
@@ -260,11 +263,29 @@ class PatientRetinalFundusJournal(Data):
     def records(self) -> List[PatientRetinalFundusRecord]:
         return self._records
 
+    """
+    If |index| is None then add record to the end 
+    """
     def add_record(self, record: PatientRetinalFundusRecord, index: int = None):
         index = positive_list_insert_index(self.records, index)
         self.record_adding.emit(record, index)
         self.records.insert(index, record)
         self.record_added.emit(record, index)
+
+    """
+    If |index| is None then remove last record
+    """
+    def remove_record(self, index: int = None):
+        index = positive_list_remove_index(self.records, index)
+        record = self._records[index]
+        self.record_removing.emit(record, index)
+        del self._records[index]
+        self.record_removed.emit(record, index)
+
+    def clear(self):
+        # Remove records from the end
+        for i in range(len(self._records) - 1, -1, -1):
+            self.remove_record(i)
 
 
 class PreviewTableColumn(TableColumn):
@@ -653,7 +674,7 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
             layer_view.opacity = layer_visibility_to_restore.opacity
 
     def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
-        self._layered_image_viewer.data = record.layered_image
+        self._layered_image_viewer.data = record and record.layered_image
         self.layered_image_viewer.fit_image_in()
 
 
@@ -760,6 +781,9 @@ class RetinalFundusTableVisualizer(QObject):
 
     def add_column(self, column: Type[TableColumn], column_delegate: QStyledItemDelegate = None):
         self.illustrated_journal_viewer.add_column(column, column_delegate)
+
+    def clear_journal(self):
+        self._journal.clear()
 
     def _add_cup_mask_layer_to_record(
             self,

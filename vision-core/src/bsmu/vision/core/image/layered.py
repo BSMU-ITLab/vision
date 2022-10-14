@@ -60,15 +60,22 @@ class ImageLayer(QObject):
 
     @image.setter
     def image(self, value: Image):
-        if self._image != value:
-            self._image = value
-            self._on_image_updated()
-            if self._image is not None:
-                if self._image.path is not None:
-                    self.path = self._image.path.parent
-                self.palette = self._image.palette
-                self._image.pixels_modified.connect(self.image_pixels_modified)
-                self._image.shape_changed.connect(self.image_shape_changed)
+        if self._image == value:
+            return
+
+        if self._image is not None:
+            self._image.pixels_modified.disconnect(self.image_pixels_modified)
+            self._image.shape_changed.disconnect(self.image_shape_changed)
+
+        self._image = value
+        self._on_image_updated()
+
+        if self._image is not None:
+            if self._image.path is not None:
+                self.path = self._image.path.parent
+            self.palette = self._image.palette
+            self._image.pixels_modified.connect(self.image_pixels_modified)
+            self._image.shape_changed.connect(self.image_shape_changed)
 
     @property
     def visibility(self) -> Visibility:

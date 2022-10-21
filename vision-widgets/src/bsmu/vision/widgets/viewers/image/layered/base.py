@@ -194,7 +194,7 @@ class _LayeredImageView(QObject):
         self._layers_views = {}  # {ImageLayer: ImageLayerView}
 
     @property
-    def layer_views(self):
+    def layer_views(self) -> list[ImageLayerView]:
         return self._layer_views
 
     def layer_view_by_name(self, name: str) -> ImageLayerView:
@@ -246,7 +246,7 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
             self.active_layer_view_changed.emit(prev_active_layer_view, self._active_layer_view)
 
     @property
-    def layer_views(self):
+    def layer_views(self) -> list[ImageLayerView]:
         return self._layered_image_view.layer_views
 
     @property
@@ -404,14 +404,10 @@ class LayeredImageViewer(DataViewer):
     data_name_changed = Signal(str)
 
     def __init__(self, data: LayeredImage = None, zoomable: bool = True):
+        super().__init__()  # do not pass |data| as parameter, cause we need at first create _LayeredImageGraphicsObject
+        # Thus, |data| is assigned later, when _LayeredImageGraphicsObject will be created
+
         self.layered_image_graphics_object = _LayeredImageGraphicsObject()
-
-        super().__init__(data)
-
-        self.graphics_scene = QGraphicsScene()
-
-        self.graphics_view = GraphicsView(self.graphics_scene, zoomable)
-
         self.layered_image_graphics_object.active_layer_view_changed.connect(
             self._on_active_layer_view_changed)
         self.layered_image_graphics_object.bounding_rect_changed.connect(
@@ -422,6 +418,11 @@ class LayeredImageViewer(DataViewer):
         self.layered_image_graphics_object.layer_view_added.connect(self.layer_view_added)
         self.layered_image_graphics_object.layer_view_removing.connect(self.layer_view_removing)
         self.layered_image_graphics_object.layer_view_removed.connect(self.layer_view_removed)
+
+        self.data = data
+
+        self.graphics_scene = QGraphicsScene()
+        self.graphics_view = GraphicsView(self.graphics_scene, zoomable)
 
         self.graphics_scene.addItem(self.layered_image_graphics_object)
 
@@ -443,7 +444,7 @@ class LayeredImageViewer(DataViewer):
         return self.data.layers
 
     @property
-    def layer_views(self):
+    def layer_views(self) -> list[ImageLayerView]:
         return self.layered_image_graphics_object.layer_views
 
     def layer_view_by_name(self, name: str) -> ImageLayerView:

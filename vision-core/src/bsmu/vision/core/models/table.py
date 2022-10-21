@@ -107,13 +107,17 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         if self._record_storage is not None:
             self._on_record_storage_changing()
             for record in self.storage_records:
-                self._on_record_removing(record, self.record_row(record))
+                record_row = self.record_row(record)
+                self._on_record_removing(record, record_row)
+                self._on_record_removed(record, record_row)
 
         self._record_storage = value
 
         if self._record_storage is not None:
             for record in self.storage_records:
-                self._on_record_added(record, self.record_row(record))
+                record_row = self.record_row(record)
+                self._on_record_adding(record, record_row)
+                self._on_record_added(record, record_row)
             self._on_record_storage_changed()
 
         self.endResetModel()
@@ -227,6 +231,7 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         return True
 
     def _on_storage_record_adding(self, record: ObjectRecord, index: int):
+        self._on_record_adding(record, index)
         self.beginInsertRows(QModelIndex(), index, index)
 
     def _on_storage_record_added(self, record: ObjectRecord, index: int):
@@ -239,12 +244,13 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
     def _on_storage_record_removed(self, record: ObjectRecord, index: int):
         self.endRemoveRows()
+        self._on_record_removed(record, index)
 
     def _create_record_connections(self, record, signal_slot_pairs):
-        record_property_changed_connections = set()
+        record_property_changed_connections = \
+            self._property_changed_connections_by_record.setdefault(record, set())
         for signal, slot in signal_slot_pairs:
             record_property_changed_connections.add(self._create_record_connection(record, signal, slot))
-        self._property_changed_connections_by_record[record] = record_property_changed_connections
 
     def _create_record_connection(self, record, signal, slot) -> tuple:
         handler = partial(slot, record)
@@ -280,6 +286,9 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         record_parameter_model_index = self.index(self.record_row(record), self.column_number(parameter_column))
         self.dataChanged.emit(record_parameter_model_index, record_parameter_model_index)
 
+    def _on_record_adding(self, record: ObjectRecord, row: int):
+        pass
+
     def _on_record_added(self, record: ObjectRecord, row: int):
         self._create_record_connections(
             record,
@@ -289,3 +298,6 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
 
     def _on_record_removing(self, record: ObjectRecord, row: int):
         self._remove_record_connections(record)
+
+    def _on_record_removed(self, record: ObjectRecord, row: int):
+        pass

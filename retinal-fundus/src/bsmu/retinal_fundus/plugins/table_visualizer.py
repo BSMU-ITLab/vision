@@ -325,6 +325,8 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
         # Store numpy array's data for preview images, because QImage uses it without copying,
         # and QImage will crash if it's data buffer will be deleted
         self._preview_data_buffer_by_record = {}
+        # Cache QImage preview for better performance
+        self._preview_qimage_by_record = {}
 
     @property
     def storage_records(self) -> List[PatientRetinalFundusRecord]:
@@ -342,14 +344,7 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
                 return record.cup_to_disk_area_ratio_str
         elif role == Qt.DecorationRole:
             if index.column() == self.column_number(PreviewTableColumn):
-                preview_rgba_pixels = image_converter.converted_to_rgba(record.image.array)
-                # Keep reference to numpy data, otherwise QImage will crash
-                self._preview_data_buffer_by_record[record] = preview_rgba_pixels.data
-
-                qimage_format = QImage.Format_RGBA8888_Premultiplied if preview_rgba_pixels.itemsize == 1 \
-                    else QImage.Format_RGBA64_Premultiplied
-                preview_qimage = image_converter.numpy_rgba_image_to_qimage(preview_rgba_pixels, qimage_format)
-                return preview_qimage
+                return self._preview_qimage_by_record[record]
 
     def _on_record_storage_changing(self):
         self.record_storage.record_adding.disconnect(self._on_storage_record_adding)
@@ -363,6 +358,26 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
         self.record_storage.record_removing.connect(self._on_storage_record_removing)
         self.record_storage.record_removed.connect(self._on_storage_record_removed)
 
+    def _generate_record_preview(self, record: PatientRetinalFundusRecord):
+        preview_rgba_pixels = image_converter.converted_to_rgba(record.image.array)
+        # Keep reference to numpy data, otherwise QImage will crash
+        self._preview_data_buffer_by_record[record] = preview_rgba_pixels.data
+
+        qimage_format = QImage.Format_RGBA8888_Premultiplied if preview_rgba_pixels.itemsize == 1 \
+            else QImage.Format_RGBA64_Premultiplied
+        preview_qimage = image_converter.numpy_rgba_image_to_qimage(preview_rgba_pixels, qimage_format)
+
+        self._preview_qimage_by_record[record] = preview_qimage
+
+    def _delete_record_preview(self, record: PatientRetinalFundusRecord):
+        del self._preview_data_buffer_by_record[record]
+        del self._preview_qimage_by_record[record]
+
+    def _on_record_adding(self, record: PatientRetinalFundusRecord, row: int):
+        super()._on_record_adding(record, row)
+
+        self._generate_record_preview(record)
+
     def _on_record_added(self, record: PatientRetinalFundusRecord, row: int):
         super()._on_record_added(record, row)
 
@@ -372,6 +387,11 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
              (record.cup_area_changed, self._on_cup_area_changed),
              (record.cup_to_disk_area_ratio_changed, self._on_cup_to_disk_area_ratio_changed),
              ))
+
+    def _on_record_removed(self, record: ObjectRecord, row: int):
+        super()._on_record_removed(record, row)
+
+        self._delete_record_preview(record)
 
     def _on_disk_area_changed(self, record: PatientRetinalFundusRecord, disk_area: float):
         disk_area_model_index = self.index(self.record_row(record), self.column_number(DiskAreaTableColumn))
@@ -723,8 +743,6 @@ class RetinalFundusTableVisualizer(QObject):
             path=Path('Void-2.png'))))
         """
 
-        self._image_sub_windows_by_record = {}
-
         self._illustrated_journal_viewer = PatientRetinalFundusIllustratedJournalViewer(self._journal)
         self.journal_viewer.resize_columns_to_contents()
 
@@ -891,10 +909,3 @@ class RetinalFundusTableVisualizer(QObject):
         self._mdi.setActiveSubWindow(self._journal_sub_window)
 
         # self.journal_sub_window.raise_()
-
-    def _on_journal_record_selected(self, record: PatientRetinalFundusRecord):
-        image_sub_windows = self._image_sub_windows_by_record.get(record, [])
-        for image_sub_window in image_sub_windows:
-            image_sub_window.show_normal()
-
-            image_sub_window.raise_()

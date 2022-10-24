@@ -15,7 +15,7 @@ class ObjectParameter(QObject):
 
     UNKNOWN_VALUE_STR: str = '?'
 
-    value_changed = Signal(object)
+    value_changed = Signal(object)  # ObjectParameter
 
     def __init__(self, value: Any = None):
         super().__init__()
@@ -30,7 +30,7 @@ class ObjectParameter(QObject):
     def value(self, value: Any):
         if self._value != value:
             self._value = value
-            self.value_changed.emit(self._value)
+            self.value_changed.emit(self)
 
     def value_str(self) -> str:
         return ObjectParameter.value_to_str(self._value)
@@ -81,7 +81,7 @@ class ObjectRecord(QObject):
         self._parameters.append(parameter)
         self._parameter_by_type[type(parameter)] = parameter
         self.parameter_added.emit(parameter)
-        parameter.value_changed.connect(partial(self._on_parameter_value_changed, parameter))
+        parameter.value_changed.connect(self._on_parameter_value_changed)
 
     def add_parameter_or_modify_value(self, parameter: ObjectParameter) -> ObjectParameter:
         existed_parameter = self.parameter_by_type(type(parameter))
@@ -96,7 +96,7 @@ class ObjectRecord(QObject):
         handler = partial(slot, self)
         return Connection(signal, handler)
 
-    def _on_parameter_value_changed(self, parameter: ObjectParameter, value: Any):
+    def _on_parameter_value_changed(self, parameter: ObjectParameter):
         self.parameter_value_changed.emit(parameter)
 
     @staticmethod

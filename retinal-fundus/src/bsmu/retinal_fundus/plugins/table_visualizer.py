@@ -7,7 +7,7 @@ import numpy as np
 from PySide6.QtCore import QObject, Qt, Signal, QModelIndex, QSize, QMargins
 from PySide6.QtGui import QImage, QPainter, QFont, QPalette, QColor
 from PySide6.QtWidgets import QWidget, QGridLayout, QTableView, QHeaderView, QStyledItemDelegate, QSplitter, \
-    QAbstractItemView, QStyle, QFrame
+    QAbstractItemView, QStyle, QFrame, QMessageBox
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.retinal_fundus.plugins.main_window import TableMenu
@@ -102,7 +102,7 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
 
         self._post_load_conversion_manager.data_converted.connect(self._table_visualizer.visualize_retinal_fundus_data)
 
-        self._main_window.add_menu_action(TableMenu, 'Clear', self._table_visualizer.clear_journal)
+        self._main_window.add_menu_action(TableMenu, 'Clear', self._confirm_and_clear_journal)
 
         self._main_window.add_menu_action(
             WindowsMenu, 'Table', self._table_visualizer.maximize_journal_viewer, Qt.CTRL + Qt.Key_1)
@@ -114,6 +114,13 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
     def _disable(self):
         self._post_load_conversion_manager.data_converted.disconnect(
             self._table_visualizer.visualize_retinal_fundus_data)
+
+    def _confirm_and_clear_journal(self):
+        if QMessageBox.question(
+                self._main_window,
+                'Clear Table?',
+                'Are you sure you want to delete all records from the table?') == QMessageBox.Yes:
+            self._table_visualizer.clear_journal()
 
 
 class PatientRetinalFundusRecord(ObjectRecord):

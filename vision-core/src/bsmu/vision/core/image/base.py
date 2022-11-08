@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+import cv2 as cv
 import numpy as np
 from PySide6.QtCore import Signal
 
@@ -130,7 +131,21 @@ class Image(Data):
 
     @property
     def colored_premultiplied_array(self) -> np.ndarray:
-        return self.palette.premultiplied_array[self.array]
+        # We can use "fancy indexing" of numpy to get colored array, but cv.LUT works faster
+        # return self.palette.premultiplied_array[self.array]
+
+        # cv.LUT needs next image shape: (w, h, c)
+        # And LUT shape: (1, 256, c), where c - number of channels (we use 4 channels)
+        # So we need to convert our image with (w, h) shape to (w, h, 4) (use 4 identical channels)
+        # We do not use np.stack, cause methods of OpenCV are faster
+        rgba_image = cv.cvtColor(self.array, cv.COLOR_GRAY2RGBA)
+        # COLOR_GRAY2RGBA will assign 255 for alpha-channel, but we need the same alpha-value, like other channels
+        # Use cv.mixChannels as a faster alternative for: rgba_image[..., 3] = rgba_image[..., 0]
+        cv.mixChannels([rgba_image], [rgba_image], [0, 3])
+
+        # Change LUT shape from (256, 4) to (1, 256, 4)
+        lut_with_added_axis = np.expand_dims(self.palette.premultiplied_array, axis=0)
+        return cv.LUT(rgba_image, lut_with_added_axis)
 
     @property
     def n_channels(self) -> int:

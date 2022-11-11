@@ -1,3 +1,4 @@
+import cv2 as cv
 import numpy as np
 from PySide6.QtGui import QImage
 from skimage.color import gray2rgba
@@ -18,7 +19,7 @@ def converted_to_rgba(image):
         image = gray2rgba(image)
     elif image.ndim == 3 and image.shape[2] == 3:  # 3-channel image
         # Add alpha-channel
-        image = np.dstack((image, np.full(image.shape[:2], 255, np.uint8)))
+        image = cv.cvtColor(image, cv.COLOR_RGB2RGBA)
     return image
 
 

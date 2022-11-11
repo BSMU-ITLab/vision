@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 
+from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.image.base import Image
 from bsmu.vision.core.visibility import Visibility
@@ -22,7 +23,7 @@ class ImageLayer(QObject):
     image_updated = Signal(Image)
 
     image_shape_changed = Signal(object, object)
-    image_pixels_modified = Signal()
+    image_pixels_modified = Signal(BBox)
 
     def __init__(self, image: Image | None = None, name: str = '', visibility: Visibility = None):
         super().__init__()

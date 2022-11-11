@@ -12,8 +12,10 @@ from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubW
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
 
 if TYPE_CHECKING:
-    from PySide6.QtCore import Qt
+    import numpy as np
+    from PySide6.QtCore import Qt, QPoint, QPointF
     from bsmu.vision.core.config.united import UnitedConfig
+    from bsmu.vision.core.image.base import Image
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
@@ -206,6 +208,9 @@ class LayeredImageViewerTool(ViewerTool):
 
     def pos_to_image_pixel_indexes(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
         return self.viewer.viewport_pos_to_image_pixel_indexes(viewport_pos, image)
+
+    def pos_f_to_image_pixel_indexes(self, viewport_pos_f: QPointF, image: Image) -> np.ndarray:
+        return self.pos_to_image_pixel_indexes(viewport_pos_f.toPoint(), image)
 
     def pos_to_image_pixel_indexes_rounded(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
         return self.viewer.viewport_pos_to_image_pixel_indexes_rounded(viewport_pos, image)

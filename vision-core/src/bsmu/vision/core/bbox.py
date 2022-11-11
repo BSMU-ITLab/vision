@@ -30,6 +30,10 @@ class BBox:
     def height(self) -> int:
         return self.bottom - self.top
 
+    @property
+    def empty(self) -> bool:
+        return self.width == 0 or self.height == 0
+
     def resize(self, resize_factor_x: float, resize_factor_y: float):
         self.left = round(resize_factor_x * self.left)
         self.right = round(resize_factor_x * self.right)
@@ -52,19 +56,8 @@ class BBox:
         return scaled_bbox
 
     def clip_to_shape(self, shape: Sequence[int]):
-        if self.left < 0:
-            self.left = 0
-
-        if self.top < 0:
-            self.top = 0
-
-        shape_width = shape[1]
-        if self.right > shape_width:
-            self.right = shape_width
-
-        shape_height = shape[0]
-        if self.bottom > shape_height:
-            self.bottom = shape_height
+        self.left, self.right = np.clip([self.left, self.right], 0, shape[1])
+        self.top, self.bottom = np.clip([self.top, self.bottom], 0, shape[0])
 
     def clipped_to_shape(self, shape: Sequence[int]) -> BBox:
         clipped_bbox = copy.copy(self)
@@ -98,3 +91,10 @@ class BBox:
 
     def pixels(self, array: np.ndarray) -> np.ndarray:
         return array[self.top:self.bottom, self.left:self.right]
+
+    def map_rc_point(self, point: tuple) -> tuple:
+        """Map point into coordinates of this BBox
+        :param point: point in (row, col) format
+        :return: mapped point in (row, col) format
+        """
+        return point[0] - self.top, point[1] - self.left

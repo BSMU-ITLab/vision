@@ -9,13 +9,17 @@ import skimage.draw
 import skimage.measure
 from PySide6.QtCore import QEvent, Qt
 
+from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool
 
 if TYPE_CHECKING:
+    from PySide6.QtCore import QObject
+
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
 
 class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):
@@ -57,6 +61,8 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         self.tool_eraser_class = self.tool_mask_palette.row_index_by_name('eraser')
         self.tool_unconnected_component_class = self.tool_mask_palette.row_index_by_name('unconnected_component')
 
+        self._brush_bbox = None
+
     def activate(self):
         super().activate()
 
@@ -96,7 +102,7 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         #     return
 
         self.update_mode(event)
-        image_pixel_indexes = self.pos_to_image_pixel_indexes(event.pos(), self.tool_mask)
+        image_pixel_indexes = self.pos_f_to_image_pixel_indexes(event.position(), self.tool_mask)
         self.draw_brush(*image_pixel_indexes)
 
     def draw_brush(self, row_f: float, col_f: float):
@@ -104,12 +110,21 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         col = int(round(col_f))
 
         # Erase old tool mask
-        self.tool_mask.array.fill(self.tool_background_class)
+        if self._brush_bbox is not None:
+            self.tool_mask.bboxed_pixels(self._brush_bbox).fill(self.tool_background_class)
+            self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
+        row_spatial_radius, col_spatial_radius = \
+            self.tool_mask.spatial_size_to_indexed(np.array([self.radius, self.radius]))
         rr, cc = skimage.draw.ellipse(  # we can use rounded row, col and radii,
             # but float values give more precise resulting ellipse indexes
-            row_f, col_f, *self.tool_mask.spatial_size_to_indexed(np.array([self.radius, self.radius])),
-            shape=self.tool_mask.array.shape)
+            row_f, col_f, row_spatial_radius, col_spatial_radius, shape=self.tool_mask.shape)
+        self._brush_bbox = BBox(
+            int(round(col_f - col_spatial_radius)), int(round(col_f + col_spatial_radius)) + 1,
+            int(round(row_f - row_spatial_radius)), int(round(row_f + row_spatial_radius)) + 1)
+        self._brush_bbox.clip_to_shape(self.tool_mask.shape)
+        if self._brush_bbox.empty:
+            return
 
         if self.mode == Mode.ERASE:
             self.erase_region(rr, cc)
@@ -152,21 +167,26 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         tool_mask_circle_pixels[label == painted_cluster_label] = self.tool_foreground_class
         self.tool_mask.array[rr, cc] = tool_mask_circle_pixels
 
+        tool_mask_in_brush_bbox = self.tool_mask.bboxed_pixels(self._brush_bbox)
         if self.paint_central_pixel_cluster and self.paint_connected_component:
-            labeled_tool_mask = skimage.measure.label(self.tool_mask.array, background=self.tool_background_class)
-            label_under_mouse = labeled_tool_mask[row, col]
-            self.tool_mask.array[(self.tool_mask.array == self.tool_foreground_class) &
-                                 (labeled_tool_mask != label_under_mouse)] = self.tool_unconnected_component_class
+            labeled_tool_mask_in_brush_bbox = skimage.measure.label(
+                tool_mask_in_brush_bbox, background=self.tool_background_class)
+            row_col_mapped_to_brush_bbox = self._brush_bbox.map_rc_point((row, col))
+            label_under_mouse = labeled_tool_mask_in_brush_bbox[row_col_mapped_to_brush_bbox]
+            tool_mask_in_brush_bbox[
+                (tool_mask_in_brush_bbox == self.tool_foreground_class) &
+                (labeled_tool_mask_in_brush_bbox != label_under_mouse)] = self.tool_unconnected_component_class
 
         if self.mode == Mode.DRAW:
-            self.mask.array[self.tool_mask.array == self.tool_foreground_class] = self.mask_foreground_class
-            self.mask.emit_pixels_modified()
+            mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
+            mask_in_brush_bbox[tool_mask_in_brush_bbox == self.tool_foreground_class] = self.mask_foreground_class
+            self.mask.emit_pixels_modified(self._brush_bbox)
 
-        self.tool_mask.emit_pixels_modified()
+        self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
     def erase_region(self, rr, cc):
         self.tool_mask.array[rr, cc] = self.tool_eraser_class
         self.mask.array[rr, cc] = self.mask_background_class
 
-        self.tool_mask.emit_pixels_modified()
-        self.mask.emit_pixels_modified()
+        self.tool_mask.emit_pixels_modified(self._brush_bbox)
+        self.mask.emit_pixels_modified(self._brush_bbox)

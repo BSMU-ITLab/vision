@@ -38,7 +38,7 @@ class SpatialAttrs:
 class Image(Data):
     n_dims = None  # Number of dimensions excluding channel dimension (2 for FlatImage, 3 for VolumeImage)
 
-    pixels_modified = Signal()
+    pixels_modified = Signal(BBox)
     shape_changed = Signal(object, object)  # old_shape: tuple[int] | None, new_shape: tuple[int] | None
 
     def __init__(self, array: np.ndarray = None, palette: Palette = None, path: Path = None,
@@ -90,8 +90,9 @@ class Image(Data):
     def zeros_mask(self, palette: Palette = None) -> Image:
         return self.zeros_mask_like(self, palette=palette)
 
-    def emit_pixels_modified(self):
-        self.pixels_modified.emit()
+    def emit_pixels_modified(self, bbox: BBox = None):
+        if bbox is None or not bbox.empty:
+            self.pixels_modified.emit(bbox)
 
     def pos_to_pixel_indexes(self, pos: np.ndarray) -> np.ndarray:
         return (pos - self.spatial.origin) / self.spatial.spacing
@@ -126,30 +127,37 @@ class Image(Data):
             self._check_array_palette_matching()
 
     @property
+    def n_channels(self) -> int:
+        return 1 if len(self.array.shape) == self.n_dims else self.array.shape[self.n_dims]
+
+    @property
     def colored_array(self) -> np.ndarray:
-        return self.palette.array[self.array]
+        return self.apply_palette_to_indexed_array(self.array, self.palette.array)
 
     @property
     def colored_premultiplied_array(self) -> np.ndarray:
+        return self.apply_palette_to_indexed_array(self.array, self.palette.premultiplied_array)
+
+    def colored_premultiplied_array_in_bbox(self, bbox: BBox) -> np.ndarray:
+        return self.apply_palette_to_indexed_array(self.bboxed_pixels(bbox), self.palette.premultiplied_array)
+
+    @staticmethod
+    def apply_palette_to_indexed_array(indexed_array: np.ndarray, palette_array: np.ndarray) -> np.ndarray:
         # We can use "fancy indexing" of numpy to get colored array, but cv.LUT works faster
-        # return self.palette.premultiplied_array[self.array]
+        # return self.palette_array[indexed_array]
 
         # cv.LUT needs next image shape: (w, h, c)
-        # And LUT shape: (1, 256, c), where c - number of channels (we use 4 channels)
+        # And needs LUT shape: (1, 256, c), where c - number of channels (we use 4 channels)
         # So we need to convert our image with (w, h) shape to (w, h, 4) (use 4 identical channels)
         # We do not use np.stack, cause methods of OpenCV are faster
-        rgba_image = cv.cvtColor(self.array, cv.COLOR_GRAY2RGBA)
+        rgba_image = cv.cvtColor(indexed_array, cv.COLOR_GRAY2RGBA)
         # COLOR_GRAY2RGBA will assign 255 for alpha-channel, but we need the same alpha-value, like other channels
         # Use cv.mixChannels as a faster alternative for: rgba_image[..., 3] = rgba_image[..., 0]
         cv.mixChannels([rgba_image], [rgba_image], [0, 3])
 
         # Change LUT shape from (256, 4) to (1, 256, 4)
-        lut_with_added_axis = np.expand_dims(self.palette.premultiplied_array, axis=0)
+        lut_with_added_axis = np.expand_dims(palette_array, axis=0)
         return cv.LUT(rgba_image, lut_with_added_axis)
-
-    @property
-    def n_channels(self) -> int:
-        return 1 if len(self.array.shape) == self.n_dims else self.array.shape[self.n_dims]
 
     def _check_array_palette_matching(self):
         assert (not self.is_indexed) or self.n_channels == 1, \

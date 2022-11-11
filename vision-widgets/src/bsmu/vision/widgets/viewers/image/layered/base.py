@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QPoint
     from PySide6.QtWidgets import QWidget, QStyleOptionGraphicsItem
 
+    from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.palette import Palette
 
 
@@ -70,10 +71,14 @@ class ImageLayerView(QObject):
         self._image_view = None
 
         self._displayed_qimage_cache = None
+        # Store numpy array, because QImage uses it's data without copying,
+        # and QImage will crash if it's data buffer will be deleted.
+        # Moreover, it is used to update only |self._modified_cache_bboxes|.
+        self._displayed_rgba_pixels = None
+        # Bounding boxes of modified regions, which we have to update in the |self._displayed_rgba_pixels|.
+        self._modified_cache_bboxes = []
+
         self._view_min_spacing = None
-        # Store numpy array's data, because QImage uses it without copying,
-        # and QImage will crash if it's data buffer will be deleted
-        self._displayed_pixels_data = None
 
     @property
     def image_view(self) -> FlatImage:
@@ -139,44 +144,60 @@ class ImageLayerView(QObject):
             self._displayed_qimage_cache = None
 
     @property
-    def displayed_image(self):
-        if self._displayed_qimage_cache is None:
-            if self.image_view.is_indexed:
-                displayed_rgba_pixels = self.image_view.colored_premultiplied_array
-            else:
-                # displayed_rgba_pixels = image_converter.converted_to_normalized_uint8(self.image.array)
-                # displayed_rgba_pixels = image_converter.converted_to_rgba(displayed_rgba_pixels)
-
-                displayed_rgba_pixels = image_converter.converted_to_rgba(self.image_view.array)
-
-            if not displayed_rgba_pixels.flags['C_CONTIGUOUS']:
-                displayed_rgba_pixels = np.ascontiguousarray(displayed_rgba_pixels)
-            self._displayed_pixels_data = displayed_rgba_pixels.data
-            displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied if displayed_rgba_pixels.itemsize == 1 \
-                else QImage.Format_RGBA64_Premultiplied
-
-            self._displayed_qimage_cache = image_converter.numpy_rgba_image_to_qimage(
-                displayed_rgba_pixels, displayed_qimage_format)
-
-            # Scale image to take into account spatial attributes (spacings)
-            width_spacing = self.image_view.spatial.spacing[1]
-            height_spacing = self.image_view.spatial.spacing[0]
-            spatial_width = width_spacing / self.view_min_spacing * self._displayed_qimage_cache.width()
-            spatial_height = height_spacing / self.view_min_spacing * self._displayed_qimage_cache.height()
-
-            self._displayed_qimage_cache = self._displayed_qimage_cache.scaled(
-                spatial_width, spatial_height, mode=Qt.SmoothTransformation)
+    def displayed_image(self) -> QImage:
+        if self._displayed_qimage_cache is None or self._modified_cache_bboxes:
+            self._update_displayed_qimage_cache()
         return self._displayed_qimage_cache
 
     def calculate_view_min_spacing(self) -> float:
         return float(self.image_view.spatial.spacing.min())  # cast to float, else it will have numpy.float type
 
+    def _update_displayed_qimage_cache(self):
+        if self.image_view.is_indexed:
+            if self._modified_cache_bboxes:
+                for changed_bbox in self._modified_cache_bboxes:
+                    changed_bbox.pixels(self._displayed_rgba_pixels)[...] = \
+                        self.image_view.colored_premultiplied_array_in_bbox(changed_bbox)
+            else:
+                self._displayed_rgba_pixels = self.image_view.colored_premultiplied_array
+        else:
+            # self._displayed_rgba_pixels = image_converter.converted_to_normalized_uint8(self.image.array)
+            # self._displayed_rgba_pixels = image_converter.converted_to_rgba(self._displayed_rgba_pixels)
+
+            self._displayed_rgba_pixels = image_converter.converted_to_rgba(self.image_view.array)
+
+        if not self._displayed_rgba_pixels.flags['C_CONTIGUOUS']:
+            self._displayed_rgba_pixels = np.ascontiguousarray(self._displayed_rgba_pixels)
+
+        displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied \
+            if self._displayed_rgba_pixels.itemsize == 1 \
+            else QImage.Format_RGBA64_Premultiplied
+        self._displayed_qimage_cache = image_converter.numpy_rgba_image_to_qimage(
+            self._displayed_rgba_pixels, displayed_qimage_format)
+
+        # Scale image to take into account spatial attributes (spacings)
+        width_spacing = self.image_view.spatial.spacing[1]
+        height_spacing = self.image_view.spatial.spacing[0]
+        spatial_width = width_spacing / self.view_min_spacing * self._displayed_qimage_cache.width()
+        spatial_height = height_spacing / self.view_min_spacing * self._displayed_qimage_cache.height()
+
+        self._displayed_qimage_cache = self._displayed_qimage_cache.scaled(
+            spatial_width, spatial_height, mode=Qt.SmoothTransformation)
+
+        self._modified_cache_bboxes = []
+
     def _on_layer_image_updated(self, image: Image):
         self.image_changed.emit(image)
         self._update_image_view()
 
-    def _update_image_view(self):
-        self._displayed_qimage_cache = None
+    def _update_image_view(self, bbox: BBox = None):
+        if bbox is None:
+            # Have to update the whole image
+            self._displayed_qimage_cache = None
+            self._modified_cache_bboxes = []
+        else:
+            self._modified_cache_bboxes.append(bbox)
+
         self._image_view = self._create_image_view()
         if self._image_view is not None and self._image_view.n_channels == 1 and not self._image_view.is_indexed:
             self.intensity_windowing = IntensityWindowing(self._image_view.array)

@@ -31,6 +31,14 @@ class BBox:
         return self.bottom - self.top
 
     @property
+    def size(self) -> tuple[int, int]:
+        return self.width, self.height
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self.height, self.width
+
+    @property
     def empty(self) -> bool:
         return self.width == 0 or self.height == 0
 
@@ -59,10 +67,27 @@ class BBox:
         self.left, self.right = np.clip([self.left, self.right], 0, shape[1])
         self.top, self.bottom = np.clip([self.top, self.bottom], 0, shape[0])
 
+    def clip_to_shape_and_return_clip_bbox(self, shape: Sequence[int]) -> BBox:
+        src_bbox = copy.copy(self)
+        self.clip_to_shape(shape)
+        return self.calculate_clip_bbox(src_bbox)
+
     def clipped_to_shape(self, shape: Sequence[int]) -> BBox:
         clipped_bbox = copy.copy(self)
         clipped_bbox.clip_to_shape(shape)
         return clipped_bbox
+
+    def calculate_clip_bbox(self, src_bbox: BBox) -> BBox:
+        """Calculates bbox, which have to be applied to |src_bbox| to get |self| (clipped bbox)
+        :param src_bbox: source (not clipped) bbox
+        :return: calculated bbox
+        """
+        return BBox(
+            self.left - src_bbox.left,
+            src_bbox.width - (src_bbox.right - self.right),
+            self.top - src_bbox.top,
+            src_bbox.height - (src_bbox.bottom - self.bottom)
+        )
 
     def add_margins(self, margin_size: int):
         self.left -= margin_size
@@ -92,7 +117,7 @@ class BBox:
     def pixels(self, array: np.ndarray) -> np.ndarray:
         return array[self.top:self.bottom, self.left:self.right]
 
-    def map_rc_point(self, point: tuple) -> tuple:
+    def map_rc_point(self, point: Sequence) -> tuple:
         """Map point into coordinates of this BBox
         :param point: point in (row, col) format
         :return: mapped point in (row, col) format

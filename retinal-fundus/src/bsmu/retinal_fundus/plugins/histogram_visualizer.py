@@ -110,6 +110,7 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
 
 class HistogramColorRepresentation:
     NAME = ''
+    CHANNEL_DECIMALS_COUNT = (2, 2, 2)
     CHANNEL_PENS = (
         QPen(QColor(255, 158, 158), 2),
         QPen(QColor(143, 231, 143), 2),
@@ -132,6 +133,7 @@ class RgbHistogramColorRepresentation(HistogramColorRepresentation):
 
 class HsvHistogramColorRepresentation(HistogramColorRepresentation):
     NAME = 'HSV'
+    CHANNEL_DECIMALS_COUNT = (3, 2, 2)
 
     @staticmethod
     def from_rgb(rgb: np.ndarray):
@@ -329,7 +331,8 @@ class RetinalFundusHistogramVisualizer(QObject):
             channel_mean = np.mean(channel_pixels, where=cropped_nrr_bool_mask)
             channel_std = np.std(channel_pixels, where=cropped_nrr_bool_mask)
             series_name = self._histogram_color_representation.NAME[channel]
-            series_name += f': μ={channel_mean:.2f}; σ={channel_std:.2f}'
+            decimals_count = self._histogram_color_representation.CHANNEL_DECIMALS_COUNT[channel]
+            series_name += f': μ={channel_mean:.{decimals_count}f}; σ={channel_std:.{decimals_count}f}'
             area_series, line_series = self._create_histogram_area_series(
                 channel_histogram,
                 channel_histogram_bin_edges,

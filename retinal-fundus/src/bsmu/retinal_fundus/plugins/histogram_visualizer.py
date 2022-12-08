@@ -133,7 +133,7 @@ class RgbHistogramColorRepresentation(HistogramColorRepresentation):
 
 class HsvHistogramColorRepresentation(HistogramColorRepresentation):
     NAME = 'HSV'
-    CHANNEL_DECIMALS_COUNT = (3, 2, 2)
+    CHANNEL_DECIMALS_COUNT = (3, 3, 3)
 
     @staticmethod
     def from_rgb(rgb: np.ndarray):

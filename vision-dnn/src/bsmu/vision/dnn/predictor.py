@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import onnxruntime as ort
 
-from bsmu.vision.dnn.inferencer import Inferencer, preprocessed_image_batch
+from bsmu.vision.dnn.inferencer import Inferencer
 
 if TYPE_CHECKING:
     from typing import Callable, Sequence, List
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 class Predictor(Inferencer):
     def predict_batch(self, images: Sequence[np.ndarray]) -> np.ndarray:
-        input_image_batch = preprocessed_image_batch(images, self._model_params)
+        input_image_batch = self._model_params.preprocessed_input_batch(images)
 
         self._create_inference_session()
         model_inputs: List[ort.NodeArg] = self._inference_session.get_inputs()
@@ -35,3 +35,19 @@ class Predictor(Inferencer):
 
     def predict_async(self, callback: Callable, image: np.ndarray):
         self._call_async_with_callback(callback, self.predict, image)
+
+
+class MlPredictor(Inferencer):
+    """
+    Predictor for machine learning models, converted to ONNX (e.g. XGBoost models)
+    """
+
+    def predict(self, params: list) -> float:
+        self._create_inference_session()
+
+        # See: http://onnx.ai/sklearn-onnx/auto_tutorial/plot_gexternal_xgboost.html
+        predict = self._inference_session.run(None, {'input': [params]})
+        predicted_class = int(predict[0])  # Cast from numpy.int64 into int
+        predicted_class_probabilities = predict[1][0]
+        predicted_class_1_probability = predicted_class_probabilities[1]
+        return predicted_class_1_probability

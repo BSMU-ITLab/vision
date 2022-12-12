@@ -16,7 +16,7 @@ from bsmu.retinal_fundus.plugins.table_visualizer import PatientRetinalFundusRec
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.models.base import ObjectParameter
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.dnn.inferencer import ModelParams as DnnModelParams
+from bsmu.vision.dnn.inferencer import ImageModelParams as DnnModelParams
 from bsmu.vision.dnn.predictor import Predictor as DnnPredictor
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter
 

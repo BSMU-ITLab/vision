@@ -21,9 +21,11 @@ from bsmu.retinal_fundus.plugins.disk_region_selector import RetinalFundusDiskRe
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.models.base import ObjectParameter
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.dnn.inferencer import ModelParams as DnnModelParams
+from bsmu.vision.dnn.inferencer import ImageModelParams as DnnModelParams
 from bsmu.vision.dnn.predictor import Predictor as DnnPredictor
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter
+from bsmu.retinal_fundus.core.statistics import calculate_hsv_parameters
+
 
 if TYPE_CHECKING:
     from typing import Type, Any
@@ -559,19 +561,6 @@ def analyze_record_hsv_parameters(record: PatientRetinalFundusRecord):
     add_record_parameter(record, DiskHMaxBin3ObjectParameter, disk_hsv_max_bin_3[0])
     add_record_parameter(record, DiskSMaxBin3ObjectParameter, disk_hsv_max_bin_3[1])
     add_record_parameter(record, DiskVMaxBin3ObjectParameter, disk_hsv_max_bin_3[2])
-
-
-def calculate_hsv_parameters(hsv: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    hsv_mean = np.mean(hsv, axis=0)
-    hsv_std = np.std(hsv, axis=0)
-    # hsv_min = np.min(hsv, axis=0)
-    # hsv_max = np.max(hsv, axis=0)
-
-    kth = int(hsv.shape[0] * 0.03)  # 3% of max/min pixels
-    hsv_min_bin_3 = np.mean(np.partition(hsv, kth, axis=0)[:kth, :], axis=0)
-    hsv_max_bin_3 = np.mean(np.partition(hsv, -kth, axis=0)[-kth:, :], axis=0)
-
-    return hsv_mean, hsv_std, hsv_min_bin_3, hsv_max_bin_3
 
 
 def add_record_parameter(record: PatientRetinalFundusRecord, parameter_type: Type[ObjectParameter], value: Any):

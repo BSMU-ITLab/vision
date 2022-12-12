@@ -1,0 +1,22 @@
+ms-predictor-model:
+  name: 'xgboost-ms-model-002.onnx'
+  preload: false
+
+  parameters: [
+    'NRR H Mean', 'NRR S Mean', 'NRR V Mean',
+    'NRR H Std', 'NRR S Std', 'NRR V Std',
+    'NRR H Min Bin 3', 'NRR S Min Bin 3', 'NRR V Min Bin 3',
+    'NRR H Max Bin 3', 'NRR S Max Bin 3', 'NRR V Max Bin 3',
+    'NRR I Sector - H Mean', 'NRR I Sector - S Mean', 'NRR I Sector - V Mean',
+    'NRR S Sector - H Mean', 'NRR S Sector - S Mean', 'NRR S Sector - V Mean',
+    'NRR N Sector - H Mean', 'NRR N Sector - S Mean', 'NRR N Sector - V Mean',
+    'NRR T Sector - H Mean', 'NRR T Sector - S Mean', 'NRR T Sector - V Mean',
+    'Disk Region H Mean', 'Disk Region S Mean', 'Disk Region V Mean',
+    'Disk Region H Std', 'Disk Region S Std', 'Disk Region V Std',
+    'Disk Region H Min Bin 3', 'Disk Region S Min Bin 3', 'Disk Region V Min Bin 3',
+    'Disk Region H Max Bin 3', 'Disk Region S Max Bin 3', 'Disk Region V Max Bin 3',
+    'Disk H Mean', 'Disk S Mean', 'Disk V Mean',
+    'Disk H Std', 'Disk S Std', 'Disk V Std',
+    'Disk H Min Bin 3', 'Disk S Min Bin 3', 'Disk V Min Bin 3',
+    'Disk H Max Bin 3', 'Disk S Max Bin 3', 'Disk V Max Bin 3',
+  ]

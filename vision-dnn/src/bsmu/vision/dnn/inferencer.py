@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -14,139 +15,117 @@ from PySide6.QtCore import QObject, Signal, QThreadPool, QTimer
 import bsmu.vision.core.converters.image as image_converter
 
 if TYPE_CHECKING:
-    from typing import Callable, Tuple, Sequence, Any
+    from typing import Callable, Tuple, Sequence
     from pathlib import Path
     from concurrent.futures import Future
 
 
+@dataclass
 class ModelParams:
-    def __init__(
-            self,
-            path: Path,
-            input_size: tuple | None = None,
-            channels_axis: int | None = None,
-            channels_order: str | None = None,
-            normalize: bool | None = None,
-            preprocessing_mode: str | None = None,
-            preload_model: bool | None = None,
-    ):
-        self._path = path
-        self._input_size = self.default_if_none(input_size, (256, 256, 3))
-        self._channels_axis = self.default_if_none(channels_axis, 2)
-        self._channels_order = self.default_if_none(channels_order, 'rgb')
-        self._normalize = self.default_if_none(normalize, True)
-        self._preprocessing_mode = self.default_if_none(preprocessing_mode, 'image-net-torch')
-        self._preload_model = self.default_if_none(preload_model, False)
+    DEFAULT_PRELOAD_MODEL = False
 
-    @staticmethod
-    def default_if_none(value: Any, default: Any) -> Any:
-        return default if value is None else value
+    path: Path
+    preload_model: bool = DEFAULT_PRELOAD_MODEL
 
-    @staticmethod
-    def from_config(config_data: dict, model_dir: Path) -> ModelParams:
+    @classmethod
+    def from_config(cls, config_data: dict, model_dir: Path) -> ModelParams:
         return ModelParams(
-            model_dir / config_data['name'],
-            config_data.get('input-size'),
-            config_data.get('channels-axis'),
-            config_data.get('channels-order'),
-            config_data.get('normalize'),
-            config_data.get('preprocessing-mode'),
-            config_data.get('preload'),
+            path=model_dir / config_data['name'],
+            preload_model=config_data.get('preload', cls.DEFAULT_PRELOAD_MODEL),
         )
 
-    def copy_but_change_name(self, new_name: str) -> ModelParams:
+    def preprocessed_input(self, src: np.ndarray) -> np.ndarray:
+        pass
+
+    def preprocessed_input_batch(self, src_batch: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
+        preprocessed_batch = []
+        for src in src_batch:
+            src = self.preprocessed_input(src)
+            preprocessed_batch.append(src)
+        return preprocessed_batch
+
+
+@dataclass
+class ImageModelParams(ModelParams):
+    DEFAULT_INPUT_SIZE = (256, 256, 3)
+    DEFAULT_CHANNELS_AXIS = 2
+    DEFAULT_CHANNELS_ORDER = 'rgb'
+    DEFAULT_NORMALIZE = True
+    DEFAULT_PREPROCESSING_MODE = 'image-net-torch'
+
+    input_size: Sequence = DEFAULT_INPUT_SIZE
+    channels_axis: int = DEFAULT_CHANNELS_AXIS
+    channels_order: str = DEFAULT_CHANNELS_ORDER
+    normalize: bool = DEFAULT_NORMALIZE
+    preprocessing_mode: str = DEFAULT_PREPROCESSING_MODE
+
+    @classmethod
+    def from_config(cls, config_data: dict, model_dir: Path) -> ImageModelParams:
+        return ImageModelParams(
+            path=model_dir / config_data['name'],
+            preload_model=config_data.get('preload', cls.DEFAULT_PRELOAD_MODEL),
+            input_size=config_data.get('input-size', cls.DEFAULT_INPUT_SIZE),
+            channels_axis=config_data.get('channels-axis', cls.DEFAULT_CHANNELS_AXIS),
+            channels_order=config_data.get('channels-order', cls.DEFAULT_CHANNELS_ORDER),
+            normalize=config_data.get('normalize', cls.DEFAULT_NORMALIZE),
+            preprocessing_mode=config_data.get('preprocessing-mode', cls.DEFAULT_PREPROCESSING_MODE),
+        )
+
+    def copy_but_change_name(self, new_name: str) -> ImageModelParams:
         model_params_copy = copy.deepcopy(self)
-        model_params_copy._path = model_params_copy.path.parent / new_name
+        model_params_copy.path = model_params_copy.path.parent / new_name
         return model_params_copy
-
-    @property
-    def path(self) -> Path:
-        return self._path
-
-    @property
-    def input_size(self) -> tuple:
-        return self._input_size
 
     @property
     def input_image_size(self) -> Sequence:
         input_size_list = list(self.input_size)
-        del input_size_list[self._channels_axis]
+        del input_size_list[self.channels_axis]
         return input_size_list
 
     @property
-    def input_channels_qty(self) -> int:
-        return self.input_size[self._channels_axis]
+    def input_channels_count(self) -> int:
+        return self.input_size[self.channels_axis]
 
-    @property
-    def channels_axis(self) -> int:
-        return self._channels_axis
+    def preprocessed_input(self, image: np.ndarray) -> np.ndarray:
+        """
+        :param image: image to preprocess in RGB, channels-last format
+        :return: preprocessed image
+        """
+        DEFAULT_CHANNELS_AXIS = 2
+        # If it's an RGBA-image
+        if image.shape[DEFAULT_CHANNELS_AXIS] == 4:
+            # Remove alpha-channel
+            image = image[:, :, :3]
 
-    @property
-    def channels_order(self) -> str:
-        return self._channels_order
+        if image.shape[:DEFAULT_CHANNELS_AXIS] != self.input_image_size:
+            image = cv.resize(image, self.input_image_size, interpolation=cv.INTER_AREA)
 
-    @property
-    def normalize(self) -> bool:
-        return self._normalize
+        if self.normalize:
+            image = image_converter.normalized(image).astype(np.float_)
 
-    @property
-    def preprocessing_mode(self) -> str:
-        return self._preprocessing_mode
+        mean = None
+        std = None
+        if self.preprocessing_mode == 'image-net-torch':
+            # Normalize each channel with respect to the ImageNet dataset
+            mean = [0.485, 0.456, 0.406]
+            std = [0.229, 0.224, 0.225]
+        elif self.preprocessing_mode == 'image-net-tf':
+            # Scale pixels between -1 and 1, sample-wise
+            image *= 2
+            image -= 1
 
-    @property
-    def preload_model(self) -> bool:
-        return self._preload_model
+        if mean is not None:
+            image -= mean
 
+        if std is not None:
+            image /= std
 
-def preprocessed_image(image: np.ndarray, model_params: ModelParams) -> np.ndarray:
-    """
-    :param image: image to preprocess in RGB, channels-last format
-    :param model_params: model parameters used for preprocessing
-    :return: preprocessed image
-    """
-    DEFAULT_CHANNELS_AXIS = 2
-    # If it's an RGBA-image
-    if image.shape[DEFAULT_CHANNELS_AXIS] == 4:
-        # Remove alpha-channel
-        image = image[:, :, :3]
+        if self.channels_order == 'bgr':
+            image = image[..., ::-1]
 
-    if image.shape[:DEFAULT_CHANNELS_AXIS] != model_params.input_image_size:
-        image = cv.resize(image, model_params.input_image_size, interpolation=cv.INTER_AREA)
+        image = image.swapaxes(self.channels_axis, DEFAULT_CHANNELS_AXIS)
 
-    if model_params.normalize:
-        image = image_converter.normalized(image).astype(np.float_)
-
-    mean = None
-    std = None
-    if model_params.preprocessing_mode == 'image-net-torch':
-        # Normalize each channel with respect to the ImageNet dataset
-        mean = [0.485, 0.456, 0.406]
-        std = [0.229, 0.224, 0.225]
-    elif model_params.preprocessing_mode == 'image-net-tf':
-        # Scale pixels between -1 and 1, sample-wise
-        image *= 2
-        image -= 1
-
-    if mean is not None:
-        image -= mean
-
-    if std is not None:
-        image /= std
-
-    if model_params.channels_order == 'bgr':
-        image = image[..., ::-1]
-
-    image = image.swapaxes(model_params.channels_axis, DEFAULT_CHANNELS_AXIS)
-
-    return image
-
-
-def preprocessed_image_batch(images: Sequence[np.ndarray], model_params: ModelParams) -> Sequence[np.ndarray]:
-    image_batch = []
-    for image in images:
-        image = preprocessed_image(image, model_params)
-        image_batch.append(image)
-    return image_batch
+        return image
 
 
 class Padding:

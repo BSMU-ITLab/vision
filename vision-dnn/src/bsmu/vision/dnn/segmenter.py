@@ -9,7 +9,7 @@ import onnxruntime as ort
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.image import tile_splitter
-from bsmu.vision.dnn.inferencer import Inferencer, preprocessed_image_batch, padded_to_square_shape, padding_removed
+from bsmu.vision.dnn.inferencer import Inferencer, padded_to_square_shape, padding_removed
 
 if TYPE_CHECKING:
     from typing import Callable, List, Tuple, Sequence
@@ -50,7 +50,7 @@ def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.
 
 class Segmenter(Inferencer):
     def _segment_batch_without_postresize(self, images: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
-        input_image_batch = preprocessed_image_batch(images, self._model_params)
+        input_image_batch = self._model_params.preprocessed_input_batch(images)
 
         self._create_inference_session()
         model_inputs: List[ort.NodeArg] = self._inference_session.get_inputs()

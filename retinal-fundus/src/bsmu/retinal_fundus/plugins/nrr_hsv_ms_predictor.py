@@ -39,7 +39,7 @@ class NrrHsvMsPredictionParameter(ObjectParameter):
 
 
 class NrrHsvMsPredictionTableColumn(TableColumn):
-    TITLE = 'NRR HSV\nMS Prediction'
+    TITLE = 'MS Prediction\n(NRR HSV)'
     OBJECT_PARAMETER_TYPE = NrrHsvMsPredictionParameter
 
 

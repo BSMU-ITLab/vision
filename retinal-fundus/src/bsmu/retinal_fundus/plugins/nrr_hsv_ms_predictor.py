@@ -123,10 +123,10 @@ class RetinalFundusNrrHsvMsPredictor(QObject):
 
     def _predict_for_record(self, record: PatientRetinalFundusRecord):
         """
-        DiseaseStatus.NORM:      mean H <= 0.06 and mean S >= 0.69
-        DiseaseStatus.PATHOLOGY: mean H >  0.06 and mean S <  0.69
+        DiseaseStatus.NORM:      mean H <  0.07 and mean S >= 0.69
+        DiseaseStatus.PATHOLOGY: mean H >= 0.07 and mean S <  0.69
         In case of uncertainty:
-            if at least one ISNT-sector has mean S > 0.72:
+            if at least one ISNT-sector has mean S >= 0.7:
                 DiseaseStatus.NORM:
             else:
                 DiseaseStatus.PATHOLOGY
@@ -155,9 +155,9 @@ class RetinalFundusNrrHsvMsPredictor(QObject):
         h_mean = np.mean(nrr_region_image_h_channel, where=nrr_bool_mask_in_region)
         s_mean = np.mean(nrr_region_image_s_channel, where=nrr_bool_mask_in_region)
 
-        if h_mean <= 0.06 and s_mean >= 0.69:
+        if h_mean < 0.07 and s_mean >= 0.69:
             disease_status = DiseaseStatus.NORM
-        elif h_mean > 0.06 and s_mean < 0.69:
+        elif h_mean >= 0.07 and s_mean < 0.69:
             disease_status = DiseaseStatus.PATHOLOGY
         else:
             # Analyze every ISNT-sector
@@ -172,7 +172,7 @@ class RetinalFundusNrrHsvMsPredictor(QObject):
                 isnt_sector_mask = sector_mask(nrr_shape, nrr_center, (isnt_sector.start_angle, isnt_sector.end_angle))
                 nrr_sector_bool_mask = nrr_bool_mask_in_region & isnt_sector_mask
                 sector_s_mean = np.mean(nrr_region_image_s_channel, where=nrr_sector_bool_mask)
-                if sector_s_mean > 0.72:
+                if sector_s_mean >= 0.7:
                     disease_status = DiseaseStatus.NORM
                     break
 

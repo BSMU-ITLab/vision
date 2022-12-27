@@ -6,6 +6,7 @@ import cv2 as cv
 import numpy as np
 from PySide6.QtCore import Qt, QObject
 
+from bsmu.retinal_fundus.core.ms_prediction import MsPredictionParameter
 from bsmu.retinal_fundus.core.statistics import calculate_hsv_parameters
 from bsmu.retinal_fundus.plugins.disk_region_selector import RetinalFundusDiskRegionSelector, sector_mask
 from bsmu.retinal_fundus.plugins.nrr_mask_calculator import RetinalFundusNrrMaskCalculator, NrrBboxParameter
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.image.layered import ImageLayer
 
 
-class XgboostMsPredictionScoreParameter(ObjectParameter):
+class XgboostMsPredictionScoreParameter(MsPredictionParameter):
     NAME = 'XGBoost MS Prediction Score'
 
 

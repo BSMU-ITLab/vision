@@ -66,6 +66,10 @@ class ObjectRecord(QObject):
         for parameter in parameters:
             self.add_parameter(parameter)
 
+    @property
+    def parameters(self) -> list[ObjectParameter]:
+        return self._parameters
+
     def parameter_by_type(self, parameter_type: Type[ObjectParameter] | None) -> ObjectParameter | None:
         return self._parameter_by_type.get(parameter_type)
 

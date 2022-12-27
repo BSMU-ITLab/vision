@@ -98,6 +98,7 @@ class ImageModelParams(ModelParams):
             image = image[:, :, :3]
 
         if image.shape[:DEFAULT_CHANNELS_AXIS] != self.input_image_size:
+            image = image.astype(np.float_)
             image = cv.resize(image, self.input_image_size, interpolation=cv.INTER_AREA)
 
         if self.normalize:
@@ -106,10 +107,14 @@ class ImageModelParams(ModelParams):
         mean = None
         std = None
         if self.preprocessing_mode == 'image-net-torch':
+            if not self.normalize:
+                image = image / 255
             # Normalize each channel with respect to the ImageNet dataset
             mean = [0.485, 0.456, 0.406]
             std = [0.229, 0.224, 0.225]
         elif self.preprocessing_mode == 'image-net-tf':
+            if not self.normalize:
+                image = image / 255
             # Scale pixels between -1 and 1, sample-wise
             image *= 2
             image -= 1

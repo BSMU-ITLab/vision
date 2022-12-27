@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QObject
 
+from bsmu.retinal_fundus.core.ms_prediction import MsPredictionParameter
 from bsmu.retinal_fundus.plugins.table_visualizer import StyledItemDelegate
-from bsmu.vision.core.models.base import ObjectParameter
 from bsmu.vision.core.models.table import TableColumn, TableItemDataRole
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.dnn.inferencer import ImageModelParams as DnnModelParams
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.bbox import BBox
 
 
-class MsPredictionScoreParameter(ObjectParameter):
+class MsPredictionScoreParameter(MsPredictionParameter):
     NAME = 'MS Prediction Score'
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import statistics
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QObject
@@ -26,6 +27,19 @@ class MsSummaryParameter(ObjectParameter):
     NAME = 'MS Summary'
 
 
+@dataclass
+class MsSummaryParameterValue:
+    score: float
+    ms_count: int
+    norm_count: int
+
+    def __str__(self):
+        if self.score is None:
+            return ObjectParameter.UNKNOWN_VALUE_STR
+
+        return f'{self.score:.2f}\nN: {self.norm_count}   P: {self.ms_count}'
+
+
 class MsSummaryTableColumn(TableColumn):
     TITLE = 'MS\nSummary'
     OBJECT_PARAMETER_TYPE = MsSummaryParameter
@@ -41,12 +55,12 @@ class MsSummaryItemDelegate(StyledItemDelegate):
     def _paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
         item_parameter = self._item_parameter(index)
         disease_status = None
-        if item_parameter and item_parameter.value is not None:
+        if item_parameter and item_parameter.value and item_parameter.value.score is not None:
             pen_color = None
-            if item_parameter.value < self._norm_threshold:
+            if item_parameter.value.score < self._norm_threshold:
                 disease_status = DiseaseStatus.NORM
                 pen_color = QColor.fromHsv(120, 204, 179)
-            elif item_parameter.value > self._ms_threshold:
+            elif item_parameter.value.score > self._ms_threshold:
                 disease_status = DiseaseStatus.PATHOLOGY
                 pen_color = Qt.red
             else:
@@ -147,8 +161,12 @@ class RetinalFundusMsPredictionAggregator(QObject):
         else:
             mean_patient_ms_score = None
 
+        ms_count = sum(score > 0.75 for score in patient_ms_scores)
+        norm_count = len(patient_ms_scores) - ms_count
+
         for patient_record in record.patient.records:
-            ms_summary_parameter = MsSummaryParameter(mean_patient_ms_score)
+            ms_summary_parameter = MsSummaryParameter(
+                MsSummaryParameterValue(score=mean_patient_ms_score, ms_count=ms_count, norm_count=norm_count))
             ms_summary_parameter = patient_record.add_parameter_or_modify_value(ms_summary_parameter)
 
         patient_records_count = len(record.patient.records)

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import onnxruntime as ort
 
+from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.dnn.inferencer import Inferencer
 
 if TYPE_CHECKING:
@@ -33,8 +34,9 @@ class Predictor(Inferencer):
             prediction = float(prediction)
         return prediction
 
-    def predict_async(self, callback: Callable, image: np.ndarray):
-        self._call_async_with_callback(callback, self.predict, image)
+    def predict_async(self, image: np.ndarray, callback: Callable):
+        ThreadPool.call_async_with_callback(self.predict, image, callback=callback)
+        # self._call_async_with_callback(callback, self.predict, image)
 
 
 class MlPredictor(Inferencer):

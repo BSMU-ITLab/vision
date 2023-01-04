@@ -938,7 +938,8 @@ class RetinalFundusTableVisualizer(QObject):
 
         # Optic cup segmentation
         self._cup_segmenter.segment_largest_connected_component_and_return_mask_with_bbox_async(
-            partial(self._on_cup_segmented, record, image, disk_mask_pixels, disk_region_bbox), disk_region_image_pixels)
+            disk_region_image_pixels,
+            callback=partial(self._on_cup_segmented, record, image, disk_mask_pixels, disk_region_bbox))
 
     def _on_cup_segmented(
             self,
@@ -960,7 +961,8 @@ class RetinalFundusTableVisualizer(QObject):
 
     def _segment_vessels(self, record: PatientRetinalFundusRecord, image: FlatImage):
         self._vessels_segmenter.segment_on_splitted_into_tiles_async(
-            partial(self._on_vessels_segmented, record), image.array)
+            image.array,
+            callback=partial(self._on_vessels_segmented, record))
 
     def _on_vessels_segmented(
             self,
@@ -1008,7 +1010,8 @@ class RetinalFundusTableVisualizer(QObject):
 
         # Optic disk segmentation
         self._disk_segmenter.segment_largest_connected_component_and_return_mask_with_bbox_async(
-            partial(self._on_disk_segmented, record, image), image.array)
+            image.array,
+            callback=partial(self._on_disk_segmented, record, image))
 
     def raise_journal_sub_window(self):
         self._journal_sub_window.show_normal()

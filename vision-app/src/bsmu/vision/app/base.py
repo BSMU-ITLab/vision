@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, Signal, QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from bsmu.vision.app.plugin_manager import PluginManager
+from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.config.united import UnitedConfig
 from bsmu.vision.core.data_file import DataFileProvider
 from bsmu.vision.core.plugins.base import Plugin
@@ -34,6 +35,8 @@ class App(QObject, DataFileProvider):
 
         self._gui_enabled = self._config.value('enable-gui')
         self._qApp = QApplication(sys.argv) if self._gui_enabled else QCoreApplication(sys.argv)
+
+        ThreadPool.init_executor(self._config.value('max_thread_count'))
 
         if self._config.value('warn-with-traceback'):
             warnings.showwarning = warn_with_traceback

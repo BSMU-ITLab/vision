@@ -8,6 +8,7 @@ import numpy as np
 import onnxruntime as ort
 
 from bsmu.vision.core.bbox import BBox
+from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.image import tile_splitter
 from bsmu.vision.dnn.inferencer import Inferencer, padded_to_square_shape, padding_removed
 
@@ -125,16 +126,22 @@ class Segmenter(Inferencer):
 
     def segment_largest_connected_component_and_return_mask_with_bbox_async(
             self,
-            callback: Callable,
             image: np.ndarray,
             use_square_image: bool = True,
+            callback: Callable = None,
     ):
-        self._call_async_with_callback(
-            callback,
+        ThreadPool.call_async_with_callback(
             self.segment_largest_connected_component_and_return_mask_with_bbox,
             image,
             use_square_image,
+            callback=callback,
         )
+        # self._call_async_with_callback(
+        #     callback,
+        #     self.segment_largest_connected_component_and_return_mask_with_bbox,
+        #     image,
+        #     use_square_image,
+        # )
 
     def segment_on_splitted_into_tiles(
             self,
@@ -174,20 +181,28 @@ class Segmenter(Inferencer):
 
     def segment_on_splitted_into_tiles_async(
             self,
-            callback: Callable,
             image: np.ndarray,
             use_square_image: bool = True,
             tile_grid_shape: Sequence = (3, 3),
             border_size: int = 10,
+            callback: Callable = None,
     ):
-        self._call_async_with_callback(
-            callback,
+        ThreadPool.call_async_with_callback(
             self.segment_on_splitted_into_tiles,
             image,
             use_square_image,
             tile_grid_shape,
             border_size,
+            callback=callback,
         )
+        # self._call_async_with_callback(
+        #     callback,
+        #     self.segment_on_splitted_into_tiles,
+        #     image,
+        #     use_square_image,
+        #     tile_grid_shape,
+        #     border_size,
+        # )
 
 
 def largest_connected_component_soft_mask(soft_mask: np.ndarray) -> Tuple[np.ndarray, BBox]:

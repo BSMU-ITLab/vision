@@ -119,8 +119,8 @@ class RetinalFundusMsPredictor(QObject):
         disk_region_image = disk_region_bbox.pixels(record.image.pixels)
 
         self._ms_predictor.predict_async(
-            partial(self._on_ms_predicted, record),
-            disk_region_image)
+            disk_region_image,
+            partial(self._on_ms_predicted, record))
 
     def _on_record_disk_bbox_changed(self, record: PatientRetinalFundusRecord, disk_bbox: BBox):
         self._predict_for_record(record)

@@ -13,6 +13,7 @@ import onnxruntime as ort
 from PySide6.QtCore import QObject, Signal, QThreadPool, QTimer
 
 import bsmu.vision.core.converters.image as image_converter
+from bsmu.vision.dnn.config import OnnxConfig
 
 if TYPE_CHECKING:
     from typing import Callable, Tuple, Sequence
@@ -206,7 +207,7 @@ class Inferencer(QObject):
             self._inference_session_being_created = True
 
             self._inference_session = ort.InferenceSession(
-                str(self._model_params.path), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+                str(self._model_params.path), providers=OnnxConfig.providers)
 
             self._inference_session_being_created = False
 

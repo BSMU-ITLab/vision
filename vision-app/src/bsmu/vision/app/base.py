@@ -14,6 +14,7 @@ from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.config.united import UnitedConfig
 from bsmu.vision.core.data_file import DataFileProvider
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.dnn.config import OnnxConfig
 
 if TYPE_CHECKING:
     from typing import List
@@ -41,6 +42,8 @@ class App(QObject, DataFileProvider):
         if self._config.value('warn-with-traceback'):
             warnings.showwarning = warn_with_traceback
             warnings.simplefilter('always')
+
+        OnnxConfig.providers = self._config.value('onnx_providers')
 
         self._plugin_manager = PluginManager(self)
         self._plugin_manager.plugin_enabled.connect(self.plugin_enabled)

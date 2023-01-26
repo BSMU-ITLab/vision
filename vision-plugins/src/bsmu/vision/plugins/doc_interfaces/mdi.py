@@ -4,11 +4,15 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QResizeEvent
-from PySide6.QtWidgets import QMdiArea
+from PySide6.QtWidgets import QMdiArea, QMessageBox
 
 from bsmu.vision.core.plugins.base import Plugin
 
 if TYPE_CHECKING:
+    from typing import Type, Protocol
+
+    from PySide6.QtWidgets import QMdiSubWindow
+
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
 
@@ -48,6 +52,19 @@ class Mdi(QMdiArea):
 
     def __init__(self):
         super().__init__()
+
+    def active_sub_window_with_type(
+            self, window_type: Type[Protocol], show_message: bool = True) -> QMdiSubWindow | None:
+        active_sub_window = self.activeSubWindow()
+        if not isinstance(active_sub_window, window_type):
+            if show_message:
+                QMessageBox.warning(
+                    self,
+                    'Wrong Active Window Type',
+                    f'The active window must have {window_type.__name__} type.')
+            return None
+
+        return active_sub_window
 
     def resizeEvent(self, resize_event: QResizeEvent):
         super().resizeEvent(resize_event)

@@ -1,0 +1,8 @@
+layers:
+  masks:
+    # Next properties will be used, if there is no mask and we have to create one
+    palette:
+      row-by-name:
+        background: [ 0, 0, 0, 0, 0 ]
+        foreground: [ 1, 50, 170, 230, 255 ]
+    opacity: 0.5

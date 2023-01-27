@@ -76,6 +76,13 @@ class ImageViewerPathOverlayer(QObject):
 
         for new_layer_name, layer_props in self.layers_config_data.items():
             new_layer_image_path = layers_dir / new_layer_name / first_layer_image_name
+
+            layer_extension_prop = layer_props.get('extension')
+            if layer_extension_prop is not None:
+                if not layer_extension_prop.startswith('.'):
+                    layer_extension_prop = f'.{layer_extension_prop}'
+                new_layer_image_path = new_layer_image_path.with_suffix(layer_extension_prop)
+
             if not new_layer_image_path.exists():
                 continue
 

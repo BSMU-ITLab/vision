@@ -40,6 +40,8 @@ class ImageViewerOverlayerPlugin(Plugin):
         self._file_loading_manager_plugin = file_loading_manager_plugin
         self._file_loading_manager: FileLoadingManager | None = None
 
+        self._last_opened_file_dir = None
+
     def _enable(self):
         self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
 
@@ -57,10 +59,17 @@ class ImageViewerOverlayerPlugin(Plugin):
         if layered_image_viewer_sub_window is None:
             return
 
+        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
+        if self._last_opened_file_dir is None:
+            dialog_dir = layered_image_viewer.active_layer.path
+        else:
+            dialog_dir = self._last_opened_file_dir
+        dialog_dir_str = '' if dialog_dir is None else str(dialog_dir)
         file_name, selected_filter = QFileDialog.getOpenFileName(
-            parent=self._main_window, caption='Load Mask', filter='PNG (*.png)')
+            parent=self._main_window, caption='Load Mask', dir=dialog_dir_str, filter='PNG (*.png)')
         if not file_name:
             return
+        self._last_opened_file_dir = Path(file_name).parent
 
         layers_props = self.config.value('layers')
         layer_name = 'masks'
@@ -68,7 +77,6 @@ class ImageViewerOverlayerPlugin(Plugin):
         mask_palette = Palette.from_config(mask_props.get('palette'))
         mask = self._file_loading_manager.load_file(Path(file_name), palette=mask_palette)
 
-        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
         mask_layer = layered_image_viewer.add_layer_from_image(mask, layer_name)
 
         mask_opacity = mask_props.get('opacity')

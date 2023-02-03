@@ -18,7 +18,7 @@ class SimpleImageFileLoaderPlugin(ImageFileLoaderPlugin):
 
 
 class SimpleImageFileLoader(ImageFileLoader):
-    _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tiff')
+    _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif')
 
     def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
         print('Load Simple Image')

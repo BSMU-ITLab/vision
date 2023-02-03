@@ -20,7 +20,7 @@ class WholeSlideImageFileLoaderPlugin(ImageFileLoaderPlugin):
 
 
 class WholeSlideImageFileLoader(ImageFileLoader):
-    _FORMATS = ('tiff', 'svs')
+    _FORMATS = ('svs', 'tiff', 'tif')
 
     def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
         print('Load Whole-Slide Image')
@@ -61,8 +61,8 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         slide = slideio.open_slide(str(path), "SVS")
         scene = slide.get_scene(0)
         full_resolution_width = scene.rect[2]
-        region = scene.read_block(size=(round(full_resolution_width / 7.53), 0))
-        # region = scene.read_block(size=(round(full_resolution_width / 4), 0))
+        # region = scene.read_block(size=(round(full_resolution_width / 7.53), 0))
+        region = scene.read_block(size=(round(full_resolution_width / 8), 0))
 
         if palette is not None:
             region = region[..., 0]

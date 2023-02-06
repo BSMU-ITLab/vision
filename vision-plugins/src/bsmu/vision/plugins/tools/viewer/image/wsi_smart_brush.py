@@ -15,19 +15,15 @@ from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from typing import Sequence, Type
 
     from PySide6.QtCore import QObject
 
     from bsmu.vision.core.config.united import UnitedConfig
-    from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
+    from bsmu.vision.plugins.tools.viewer.base import ViewerTool
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
-
-
-class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
-    def __init__(self, main_window_plugin: MainWindowPlugin, mdi_plugin: MdiPlugin):
-        super().__init__(main_window_plugin, mdi_plugin, WsiSmartBrushImageViewerTool, 'Smart Brush (WSI)', Qt.CTRL + Qt.Key_B)
 
 
 class Mode(Enum):
@@ -45,13 +41,19 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         super().__init__(viewer, config)
 
         self.mode = Mode.SHOW
+        self._smart_mode_enabled = True
 
         self.radius = DEFAULT_RADIUS
+        self._max_radius_without_downscale = 100
+
+        self._number_of_clusters = 2
 
         self.paint_central_pixel_cluster = True
         self.paint_dark_cluster = False
 
         self.paint_connected_component = True
+
+        self.draw_on_mouse_move = True
 
         layers_props = self.config.value('layers')
         self.mask_palette = Palette.from_config(layers_props['mask'].get('palette'))
@@ -89,7 +91,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             return super().eventFilter(watched_obj, event)
 
     def update_mode(self, event: QEvent):
-        if event.buttons() == Qt.LeftButton:
+        if event.buttons() == Qt.LeftButton and (self.draw_on_mouse_move or event.type() != QEvent.MouseMove):
             if event.type() != QEvent.Wheel:  # This condition is used only to fix strange bug
                 # after a mouse click on the app title bar, try to change brush radius (using Ctrl + mouse wheel)
                 # event.buttons() shows, that LeftButton is pressed (but it is not pressed)
@@ -97,6 +99,8 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 self.mode = Mode.DRAW
         elif event.buttons() == Qt.RightButton:
             self.mode = Mode.ERASE
+        elif event.type() == QEvent.MouseButtonPress and event.buttons() == Qt.MiddleButton:
+            self._smart_mode_enabled = not self._smart_mode_enabled
         else:
             self.mode = Mode.SHOW
 
@@ -127,7 +131,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         # Downscale the image in brush region if radius is large.
         # Smaller analyzed region will improve performance of algorithms
         # (skimage.draw.ellipse, cv2.kmeans, skimage.measure.label) at the expense of accuracy.
-        downscale_factor = 1 / math.sqrt(self.radius)
+        downscale_factor = min(1., 1 / math.sqrt(self.radius) * math.sqrt(self._max_radius_without_downscale))
         downscaled_brush_shape_f = \
             (self._brush_bbox.height * downscale_factor, self._brush_bbox.width * downscale_factor)
         downscaled_brush_shape = np.rint(downscaled_brush_shape_f).astype(int) + 1
@@ -150,20 +154,24 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         downscaled_tool_mask_in_brush_bbox = \
             np.full(shape=downscaled_brush_shape, fill_value=self.tool_background_class)
 
-        if self.mode == Mode.ERASE:
-            downscaled_tool_mask_in_brush_bbox[rr, cc] = self.tool_eraser_class
-            tool_mask_in_brush_bbox, temp_tool_eraser_class = self.resize_indexed_binary_image(
+        if not self._smart_mode_enabled or self.mode == Mode.ERASE:
+            tool_class, mask_class = (self.tool_eraser_class, self.mask_background_class) \
+                if self.mode == Mode.ERASE else (self.tool_foreground_class, self.mask_foreground_class)
+
+            downscaled_tool_mask_in_brush_bbox[rr, cc] = tool_class
+            tool_mask_in_brush_bbox, temp_tool_class = self.resize_indexed_binary_image(
                 downscaled_tool_mask_in_brush_bbox,
                 self._brush_bbox.size,
                 self.tool_background_class,
-                self.tool_eraser_class)
-            erased_pixels = tool_mask_in_brush_bbox == temp_tool_eraser_class
+                tool_class)
+            modified_pixels = tool_mask_in_brush_bbox == temp_tool_class
 
-            self.tool_mask.bboxed_pixels(self._brush_bbox)[erased_pixels] = self.tool_eraser_class
-            self.mask.bboxed_pixels(self._brush_bbox)[erased_pixels] = self.mask_background_class
-
+            self.tool_mask.bboxed_pixels(self._brush_bbox)[modified_pixels] = tool_class
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
-            self.mask.emit_pixels_modified(self._brush_bbox)
+
+            if self.mode in [Mode.ERASE, Mode.DRAW]:
+                self.mask.bboxed_pixels(self._brush_bbox)[modified_pixels] = mask_class
+                self.mask.emit_pixels_modified(self._brush_bbox)
 
             return
 
@@ -171,16 +179,16 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         downscaled_image_in_brush_bbox = cv2.resize(
             image_in_brush_bbox, tuple(reversed(downscaled_brush_shape)), interpolation=cv2.INTER_AREA)
 
+        downscaled_image_in_brush_bbox = self._preprocess_downscaled_image_in_brush_bbox(downscaled_image_in_brush_bbox)
         samples = downscaled_image_in_brush_bbox[rr, cc]
         if len(samples.shape) == 2:  # if there is an axis with channels (multichannel image)
             samples = samples[:, 0]  # use only the first channel
         samples = samples.astype(np.float32)
-        number_of_clusters = 2
-        if number_of_clusters > samples.size:
+        if self._number_of_clusters > samples.size:
             return
 
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-        ret, label, centers = cv2.kmeans(samples, number_of_clusters, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+        ret, label, centers = cv2.kmeans(samples, self._number_of_clusters, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
         label = label.ravel()  # 2D array (one column) to 1D array without copy
         centers = centers.ravel()
 
@@ -201,13 +209,20 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         tool_mask_circle_pixels[label == painted_cluster_label] = self.tool_foreground_class
         downscaled_tool_mask_in_brush_bbox[rr, cc] = tool_mask_circle_pixels
 
-        if self.paint_central_pixel_cluster and self.paint_connected_component:
-            labeled_tool_mask_in_brush_bbox = skimage.measure.label(
-                downscaled_tool_mask_in_brush_bbox, background=self.tool_background_class)
-            label_under_mouse = labeled_tool_mask_in_brush_bbox[downscaled_brush_center[0], downscaled_brush_center[1]]
-            downscaled_tool_mask_in_brush_bbox[
-                (downscaled_tool_mask_in_brush_bbox == self.tool_foreground_class) &
-                (labeled_tool_mask_in_brush_bbox != label_under_mouse)] = self.tool_unconnected_component_class
+        if self.paint_connected_component:
+            if 0 <= downscaled_brush_center[0] < downscaled_tool_mask_in_brush_bbox.shape[0] and \
+                    0 <= downscaled_brush_center[1] < downscaled_tool_mask_in_brush_bbox.shape[1]:
+
+                labeled_tool_mask_in_brush_bbox = skimage.measure.label(
+                    downscaled_tool_mask_in_brush_bbox, background=self.tool_background_class)
+                label_under_mouse = labeled_tool_mask_in_brush_bbox[
+                    downscaled_brush_center[0], downscaled_brush_center[1]]
+                downscaled_tool_mask_in_brush_bbox[
+                    (downscaled_tool_mask_in_brush_bbox == self.tool_foreground_class) &
+                    (labeled_tool_mask_in_brush_bbox != label_under_mouse)] = self.tool_unconnected_component_class
+            else:
+                downscaled_tool_mask_in_brush_bbox[downscaled_tool_mask_in_brush_bbox == self.tool_foreground_class] \
+                    = self.tool_unconnected_component_class
 
         tool_mask_in_brush_bbox = cv2.resize(
             downscaled_tool_mask_in_brush_bbox,
@@ -236,6 +251,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         self.tool_mask.emit_pixels_modified(self._brush_bbox)
         return
 
+    def _preprocess_downscaled_image_in_brush_bbox(self, image: np.ndarray):
+        return image
+
     @staticmethod
     def resize_indexed_binary_image(
             image: np.ndarray, size: Sequence[int], background_index, foreground_index) -> tuple[np.ndarray, int]:
@@ -261,3 +279,21 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
         resized_image = cv2.resize(image, size, interpolation=cv2.INTER_LINEAR_EXACT)
         return resized_image, temp_foreground_index
+
+
+class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
+    def __init__(
+            self,
+            main_window_plugin: MainWindowPlugin,
+            mdi_plugin: MdiPlugin,
+            tool_cls: Type[ViewerTool] = WsiSmartBrushImageViewerTool,
+            action_name: str = 'Smart Brush (WSI)',
+            action_shortcut: Qt.Key = Qt.CTRL | Qt.Key_B,
+    ):
+        super().__init__(
+            main_window_plugin,
+            mdi_plugin,
+            tool_cls,
+            action_name,
+            action_shortcut,
+        )

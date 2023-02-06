@@ -162,8 +162,7 @@ class _ViewSmoothZoom(QObject):
 
         self.view = view
 
-        self.zoom_in_factor = 0.25
-        self.zoom_out_factor = -self.zoom_in_factor
+        self._zoom_factor = 1
 
     def eventFilter(self, watched_obj, event):
         if event.type() == QEvent.Wheel:
@@ -173,7 +172,8 @@ class _ViewSmoothZoom(QObject):
             return super().eventFilter(watched_obj, event)
 
     def on_wheel_scrolled(self, event):
-        zoom_factor = self.zoom_in_factor if event.angleDelta().y() > 0 else self.zoom_out_factor
+        angle_in_degrees = event.angleDelta().y() / 8
+        zoom_factor = angle_in_degrees / 60 * self._zoom_factor
         zoom_factor = 1 + zoom_factor / (SMOOTH_ZOOM_DURATION / SMOOTH_ZOOM_UPDATE_INTERVAL)
 
         zoom = _Zoom(event.position(), zoom_factor)

@@ -23,12 +23,12 @@ class UnitedConfig:
         self._last_united_base_class = None
         self._last_united_base_class_index = -1
 
-    def value(self, key: str) -> Any:
+    def value(self, key: str, default: Any = None) -> Any:
         result = self._data.get(key)
         while result is None and self._last_united_base_class != self._last_base_cls_to_unite:
             self._unite_with_next_base_class()
             result = self._data.get(key)
-        return result
+        return default if result is None else result
 
     @property
     def base_united_classes(self) -> List[Type[DataFileProvider]]:

@@ -12,7 +12,8 @@ from PySide6.QtCore import QEvent, Qt
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool
+from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool, \
+    LayeredImageViewerToolSettings
 
 if TYPE_CHECKING:
     from typing import Sequence, Type
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
 
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
-    from bsmu.vision.plugins.tools.viewer.base import ViewerTool
+    from bsmu.vision.plugins.tools.viewer.base import ViewerTool, ViewerToolSettings
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
@@ -38,28 +39,96 @@ DEFAULT_MAX_RADIUS = 2200
 DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE = 100
 
 
+class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
+    def __init__(
+            self,
+            layers_props: dict,
+            radius: float,
+            min_radius: float,
+            max_radius: float,
+            max_radius_without_downscale: float,
+            number_of_clusters: int,
+            paint_central_pixel_cluster: bool,
+            paint_dark_cluster: bool,
+            paint_connected_component: bool,
+            draw_on_mouse_move: bool,
+    ):
+        super().__init__(layers_props)
+
+        self._radius = radius
+        self._min_radius = min_radius
+        self._max_radius = max_radius
+        self._max_radius_without_downscale = max_radius_without_downscale
+        self._number_of_clusters = number_of_clusters
+        self._paint_central_pixel_cluster = paint_central_pixel_cluster
+        self._paint_dark_cluster = paint_dark_cluster
+        self._paint_connected_component = paint_connected_component
+        self._draw_on_mouse_move = draw_on_mouse_move
+
+    @property
+    def radius(self) -> float:
+        return self._radius
+
+    @radius.setter
+    def radius(self, value: float):
+        self._radius = value
+
+    @property
+    def min_radius(self) -> float:
+        return self._min_radius
+
+    @property
+    def max_radius(self) -> float:
+        return self._max_radius
+
+    @property
+    def max_radius_without_downscale(self) -> float:
+        return self._max_radius_without_downscale
+
+    @property
+    def number_of_clusters(self) -> int:
+        return self._number_of_clusters
+
+    @property
+    def paint_central_pixel_cluster(self) -> bool:
+        return self._paint_central_pixel_cluster
+
+    @property
+    def paint_dark_cluster(self) -> bool:
+        return self._paint_dark_cluster
+
+    @property
+    def paint_connected_component(self) -> bool:
+        return self._paint_connected_component
+
+    @property
+    def draw_on_mouse_move(self) -> bool:
+        return self._draw_on_mouse_move
+
+    @classmethod
+    def from_config(cls, config: UnitedConfig) -> WsiSmartBrushImageViewerToolSettings:
+        return cls(
+            cls.layers_props_from_config(config),
+            config.value('radius', DEFAULT_RADIUS),
+            config.value('min_radius', DEFAULT_MIN_RADIUS),
+            config.value('max_radius', DEFAULT_MAX_RADIUS),
+            config.value('max_radius_without_downscale', DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE),
+            config.value('number_of_clusters', 2),
+            config.value('paint_central_pixel_cluster', True),
+            config.value('paint_dark_cluster', False),
+            config.value('paint_connected_component', True),
+            config.value('draw_on_mouse_move', True),
+        )
+
+
 class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
-    def __init__(self, viewer: LayeredImageViewer, config: UnitedConfig):
-        super().__init__(viewer, config)
+    def __init__(self, viewer: LayeredImageViewer, settings: WsiSmartBrushImageViewerToolSettings):
+        super().__init__(viewer, settings)
 
         self._mode = Mode.SHOW
         self._smart_mode_enabled = True
 
-        self._radius = self.config.value('radius', DEFAULT_RADIUS)
-        self._min_radius = self.config.value('min_radius', DEFAULT_MIN_RADIUS)
-        self._max_radius = self.config.value('max_radius', DEFAULT_MAX_RADIUS)
-        self._max_radius_without_downscale = \
-            self.config.value('max_radius_without_downscale', DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE)
-
-        self._number_of_clusters = self.config.value('number_of_clusters', 2)
-
-        self._paint_central_pixel_cluster = self.config.value('paint_central_pixel_cluster', True)
-        self._paint_dark_cluster = self.config.value('paint_dark_cluster', False)
-        self._paint_connected_component = self.config.value('paint_connected_component', True)
-
-        self._draw_on_mouse_move = self.config.value('draw_on_mouse_move', True)
-
-        layers_props = self.config.value('layers')
+        layers_props = self.settings.layers_props
         self.mask_palette = Palette.from_config(layers_props['mask'].get('palette'))
         self.mask_background_class = self.mask_palette.row_index_by_name('background')
         self.mask_foreground_class = self.mask_palette.row_index_by_name('foreground')
@@ -87,15 +156,15 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         elif event.type() == QEvent.Wheel and event.modifiers() == Qt.ControlModifier:
             angle_delta_y = event.angleDelta().y()
             zoom_factor = 1 + np.sign(angle_delta_y) * 0.2 * abs(angle_delta_y) / 110
-            self._radius *= zoom_factor
-            self._radius = min(max(self._min_radius, self._radius), self._max_radius)
+            self.settings.radius = \
+                min(max(self.settings.min_radius, self.settings.radius * zoom_factor), self.settings.max_radius)
             self.draw_brush_event(event)
             return True
         else:
             return super().eventFilter(watched_obj, event)
 
     def update_mode(self, event: QEvent):
-        if event.buttons() == Qt.LeftButton and (self._draw_on_mouse_move or event.type() != QEvent.MouseMove):
+        if event.buttons() == Qt.LeftButton and (self.settings.draw_on_mouse_move or event.type() != QEvent.MouseMove):
             if event.type() != QEvent.Wheel:  # This condition is used only to fix strange bug
                 # after a mouse click on the app title bar, try to change brush radius (using Ctrl + mouse wheel)
                 # event.buttons() shows, that LeftButton is pressed (but it is not pressed)
@@ -123,7 +192,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
         row_spatial_radius, col_spatial_radius = \
-            self.tool_mask.spatial_size_to_indexed(np.array([self._radius, self._radius]))
+            self.tool_mask.spatial_size_to_indexed(np.array([self.settings.radius, self.settings.radius]))
         not_clipped_brush_bbox = BBox(
             int(round(col_f - col_spatial_radius)), int(round(col_f + col_spatial_radius)) + 1,
             int(round(row_f - row_spatial_radius)), int(round(row_f + row_spatial_radius)) + 1)
@@ -135,7 +204,8 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         # Downscale the image in brush region if radius is large.
         # Smaller analyzed region will improve performance of algorithms
         # (skimage.draw.ellipse, cv2.kmeans, skimage.measure.label) at the expense of accuracy.
-        downscale_factor = min(1., 1 / math.sqrt(self._radius) * math.sqrt(self._max_radius_without_downscale))
+        downscale_factor = \
+            min(1., 1 / math.sqrt(self.settings.radius) * math.sqrt(self.settings.max_radius_without_downscale))
         downscaled_brush_shape_f = \
             (self._brush_bbox.height * downscale_factor, self._brush_bbox.width * downscale_factor)
         downscaled_brush_shape = np.rint(downscaled_brush_shape_f).astype(int) + 1
@@ -188,15 +258,16 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         if len(samples.shape) == 2:  # if there is an axis with channels (multichannel image)
             samples = samples[:, 0]  # use only the first channel
         samples = samples.astype(np.float32)
-        if self._number_of_clusters > samples.size:
+        if self.settings.number_of_clusters > samples.size:
             return
 
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-        ret, label, centers = cv2.kmeans(samples, self._number_of_clusters, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
+        ret, label, centers = cv2.kmeans(
+            samples, self.settings.number_of_clusters, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
         label = label.ravel()  # 2D array (one column) to 1D array without copy
         centers = centers.ravel()
 
-        if self._paint_central_pixel_cluster:
+        if self.settings.paint_central_pixel_cluster:
             center_pixel_indexes = np.where((rr == downscaled_brush_center[0]) & (cc == downscaled_brush_center[1]))[0]
             if center_pixel_indexes.size != 1:  # there are situations, when the center pixel is out of image
                 return
@@ -205,7 +276,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         else:
             # Label of light cluster
             painted_cluster_label = 0 if centers[0] > centers[1] else 1
-            if self._paint_dark_cluster:
+            if self.settings.paint_dark_cluster:
                 # Swapping 1 with 0 and 0 with 1
                 painted_cluster_label = 1 - painted_cluster_label
 
@@ -213,7 +284,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         tool_mask_circle_pixels[label == painted_cluster_label] = self.tool_foreground_class
         downscaled_tool_mask_in_brush_bbox[rr, cc] = tool_mask_circle_pixels
 
-        if self._paint_connected_component:
+        if self.settings.paint_connected_component:
             if 0 <= downscaled_brush_center[0] < downscaled_tool_mask_in_brush_bbox.shape[0] and \
                     0 <= downscaled_brush_center[1] < downscaled_tool_mask_in_brush_bbox.shape[1]:
 
@@ -291,6 +362,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
             tool_cls: Type[ViewerTool] = WsiSmartBrushImageViewerTool,
+            tool_settings_cls: Type[ViewerToolSettings] = WsiSmartBrushImageViewerToolSettings,
             action_name: str = 'Smart Brush (WSI)',
             action_shortcut: Qt.Key = Qt.CTRL | Qt.Key_B,
     ):
@@ -298,6 +370,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             main_window_plugin,
             mdi_plugin,
             tool_cls,
+            tool_settings_cls,
             action_name,
             action_shortcut,
         )

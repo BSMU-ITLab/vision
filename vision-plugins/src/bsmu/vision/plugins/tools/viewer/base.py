@@ -38,6 +38,7 @@ class ViewerToolPlugin(Plugin):
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
             tool_cls: Type[ViewerTool],
+            tool_settings_cls: Type[ViewerToolSettings],
             action_name: str = '',
             action_shortcut: Qt.Key = None,
     ):
@@ -50,6 +51,7 @@ class ViewerToolPlugin(Plugin):
         self._mdi: Mdi | None = None
 
         self._tool_cls = tool_cls
+        self._tool_settings_cls = tool_settings_cls
         self._action_name = action_name
         self._action_shortcut = action_shortcut
 
@@ -62,7 +64,8 @@ class ViewerToolPlugin(Plugin):
         self._main_window = self._main_window_plugin.main_window
         self._mdi = self._mdi_plugin.mdi
 
-        self._mdi_viewer_tool = MdiViewerTool(self._mdi, self._tool_cls, self.config)
+        tool_settings = self._tool_settings_cls.from_config(self.config)
+        self._mdi_viewer_tool = MdiViewerTool(self._mdi, self._tool_cls, tool_settings)
 
         self._main_window.add_menu_action(
             ToolsMenu, self._action_name, self._mdi_viewer_tool.activate, self._action_shortcut)
@@ -74,46 +77,75 @@ class ViewerToolPlugin(Plugin):
 
 
 class MdiViewerTool(QObject):
-    def __init__(self, mdi: Mdi, tool_cls: Type[ViewerTool], config):
+    def __init__(self, mdi: Mdi, tool_cls: Type[ViewerTool], tool_settings: ViewerToolSettings):
         super().__init__()
 
         self.mdi = mdi
         self.tool_csl = tool_cls
-        self.config = config
+        self._tool_settings = tool_settings
 
-        self.sub_windows_viewer_tools = {}  # DataViewerSubWindow: ViewerTool
+        self._viewer_tool_by_sub_window = {}  # DataViewerSubWindow: ViewerTool
 
     def activate(self):
         for sub_window in self.mdi.subWindowList():
-            viewer_tool = self._sub_window_viwer_tool(sub_window)
+            viewer_tool = self._sub_window_viewer_tool(sub_window)
             if viewer_tool is not None:
                 viewer_tool.activate()
 
-    def _sub_window_viwer_tool(self, sub_window: DataViewerSubWindow):
+    def _sub_window_viewer_tool(self, sub_window: DataViewerSubWindow):
         if not isinstance(sub_window, LayeredImageViewerSubWindow):
             return None
 
-        viewer_tool = self.sub_windows_viewer_tools.get(sub_window)
+        viewer_tool = self._viewer_tool_by_sub_window.get(sub_window)
         if viewer_tool is None:
-            viewer_tool = self.tool_csl(sub_window.viewer, self.config)
-            self.sub_windows_viewer_tools[sub_window] = viewer_tool
+            viewer_tool = self.tool_csl(sub_window.viewer, self._tool_settings)
+            self._viewer_tool_by_sub_window[sub_window] = viewer_tool
         return viewer_tool
 
 
+class ViewerToolSettings(QObject):
+    @classmethod
+    def from_config(cls, config: UnitedConfig) -> ViewerToolSettings:
+        return cls()
+
+
 class ViewerTool(QObject):
-    def __init__(self, viewer: DataViewer, config: UnitedConfig):
+    def __init__(self, viewer: DataViewer, settings: ViewerToolSettings):
         super().__init__()
 
         self.viewer = viewer
-        self.config = config
+        self._settings = settings
+
+    @property
+    def settings(self) -> ViewerToolSettings:
+        return self._settings
 
     def activate(self):
         self.viewer.viewport.installEventFilter(self)
 
 
+class LayeredImageViewerToolSettings(ViewerToolSettings):
+    def __init__(self, layers_props: dict):
+        super().__init__()
+
+        self._layers_props = layers_props
+
+    @property
+    def layers_props(self) -> dict:
+        return self._layers_props
+
+    @staticmethod
+    def layers_props_from_config(config: UnitedConfig) -> dict:
+        return config.value('layers')
+
+    @classmethod
+    def from_config(cls, config: UnitedConfig) -> LayeredImageViewerToolSettings:
+        return cls(cls.layers_props_from_config(config))
+
+
 class LayeredImageViewerTool(ViewerTool):
-    def __init__(self, viewer: LayeredImageViewer, config: UnitedConfig):
-        super().__init__(viewer, config)
+    def __init__(self, viewer: LayeredImageViewer, settings: LayeredImageViewerToolSettings):
+        super().__init__(viewer, settings)
 
         self.image_layer_view = None
         self.mask_layer = None
@@ -125,8 +157,6 @@ class LayeredImageViewerTool(ViewerTool):
 
         self.mask_palette = None
         self.tool_mask_palette = None
-
-        self.layers_properties = None
 
     @property
     def image(self) -> FlatImage:
@@ -140,10 +170,14 @@ class LayeredImageViewerTool(ViewerTool):
     def tool_mask(self) -> FlatImage:
         return self.viewer.layer_view_by_model(self.tool_mask_layer).flat_image
 
-    def create_nonexistent_layer_with_zeros_mask(self, layers_properties, layer_key: str, name_property_key: str,
-                                                 image: Image, palette: Palette) -> _ImageItemLayer:
-        layer_properties = layers_properties[layer_key]
-        layer_name = layer_properties[name_property_key]
+    @property
+    def layers_props(self) -> dict:
+        return self.settings.layers_props
+
+    def create_nonexistent_layer_with_zeros_mask(
+            self, layer_key: str, name_property_key: str, image: Image, palette: Palette) -> _ImageItemLayer:
+        layer_props = self.layers_props[layer_key]
+        layer_name = layer_props[name_property_key]
         layer = self.viewer.layer_by_name(layer_name)
 
         if layer is None:
@@ -151,7 +185,7 @@ class LayeredImageViewerTool(ViewerTool):
             layer_image = image.zeros_mask(palette=palette)
             layer = self.viewer.add_layer_from_image(layer_image, layer_name)
 
-        layer_opacity = layer_properties.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
+        layer_opacity = layer_props.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
         self.viewer.layer_view_by_model(layer).opacity = layer_opacity
 
         return layer
@@ -159,21 +193,19 @@ class LayeredImageViewerTool(ViewerTool):
     def activate(self):
         super().activate()
 
-        self.layers_properties = self.config.value('layers')
-
-        image_layer_properties = self.layers_properties['image']
-        if image_layer_properties == 'active_layer':
+        image_layer_props = self.layers_props['image']
+        if image_layer_props == 'active_layer':
             self.image_layer_view = self.viewer.active_layer_view
         else:
-            image_layer_name = image_layer_properties.get(LAYER_NAME_PROPERTY_KEY)
+            image_layer_name = image_layer_props.get(LAYER_NAME_PROPERTY_KEY)
             if image_layer_name is not None:
                 self.image_layer_view = self.viewer.layer_view_by_name(image_layer_name)
             else:
-                image_layer_number = image_layer_properties.get('number')
+                image_layer_number = image_layer_props.get('number')
                 if image_layer_number is not None:
                     self.image_layer_view = self.viewer.layer_views[image_layer_number]
                 else:
-                    assert False, f'Unknown image layer properties: {image_layer_properties}'
+                    assert False, f'Unknown image layer properties: {image_layer_props}'
 
         self.image_layer_view.image_layer.image_updated.connect(self._on_layer_image_updated)
         self.image_layer_view.image_view_updated.connect(self._on_layer_image_updated)
@@ -184,13 +216,11 @@ class LayeredImageViewerTool(ViewerTool):
 
     def _on_layer_image_updated(self):
         self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            self.layers_properties, 'mask', LAYER_NAME_PROPERTY_KEY,
-            self.image_layer_view.image, self.mask_palette)
+            'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.mask_palette)
         self.mask_layer.image_updated.connect(self._update_masks)
 
         self.tool_mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            self.layers_properties, 'tool_mask', LAYER_NAME_PROPERTY_KEY,
-            self.image_layer_view.image, self.tool_mask_palette)
+            'tool_mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.tool_mask_palette)
 
         self._update_masks()
 

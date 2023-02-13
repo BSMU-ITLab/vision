@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import Qt, QObject
+from PySide6.QtWidgets import QWidget, QDockWidget
 
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.palette import Palette
@@ -13,7 +14,7 @@ from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
 
 if TYPE_CHECKING:
     import numpy as np
-    from PySide6.QtCore import Qt, QPoint, QPointF
+    from PySide6.QtCore import QPoint, QPointF
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.core.image.base import Image
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
@@ -39,6 +40,7 @@ class ViewerToolPlugin(Plugin):
             mdi_plugin: MdiPlugin,
             tool_cls: Type[ViewerTool],
             tool_settings_cls: Type[ViewerToolSettings],
+            tool_settings_widget_cls: Type[ViewerToolSettingsWidget],
             action_name: str = '',
             action_shortcut: Qt.Key = None,
     ):
@@ -52,6 +54,7 @@ class ViewerToolPlugin(Plugin):
 
         self._tool_cls = tool_cls
         self._tool_settings_cls = tool_settings_cls
+        self._tool_settings_widget_cls = tool_settings_widget_cls
         self._action_name = action_name
         self._action_shortcut = action_shortcut
 
@@ -65,7 +68,8 @@ class ViewerToolPlugin(Plugin):
         self._mdi = self._mdi_plugin.mdi
 
         tool_settings = self._tool_settings_cls.from_config(self.config)
-        self._mdi_viewer_tool = MdiViewerTool(self._mdi, self._tool_cls, tool_settings)
+        self._mdi_viewer_tool = MdiViewerTool(
+            self._main_window, self._mdi, self._tool_cls, tool_settings, self._tool_settings_widget_cls)
 
         self._main_window.add_menu_action(
             ToolsMenu, self._action_name, self._mdi_viewer_tool.activate, self._action_shortcut)
@@ -77,17 +81,33 @@ class ViewerToolPlugin(Plugin):
 
 
 class MdiViewerTool(QObject):
-    def __init__(self, mdi: Mdi, tool_cls: Type[ViewerTool], tool_settings: ViewerToolSettings):
+    def __init__(
+            self,
+            main_window: MainWindow,
+            mdi: Mdi,
+            tool_cls: Type[ViewerTool],
+            tool_settings: ViewerToolSettings,
+            tool_settings_widget_cls: Type[ViewerToolSettingsWidget]
+    ):
         super().__init__()
 
-        self.mdi = mdi
-        self.tool_csl = tool_cls
+        self._main_window = main_window
+        self._mdi = mdi
+        self._tool_csl = tool_cls
         self._tool_settings = tool_settings
+        self._tool_settings_widget_cls = tool_settings_widget_cls
+        self._tool_settings_widget = None
 
         self._viewer_tool_by_sub_window = {}  # DataViewerSubWindow: ViewerTool
 
     def activate(self):
-        for sub_window in self.mdi.subWindowList():
+        if self._tool_settings_widget is None:
+            self._tool_settings_widget = self._tool_settings_widget_cls(self._tool_settings)
+            tool_settings_dock_widget = QDockWidget('Tool Settings', self._main_window)
+            tool_settings_dock_widget.setWidget(self._tool_settings_widget)
+            self._main_window.addDockWidget(Qt.LeftDockWidgetArea, tool_settings_dock_widget)
+
+        for sub_window in self._mdi.subWindowList():
             viewer_tool = self._sub_window_viewer_tool(sub_window)
             if viewer_tool is not None:
                 viewer_tool.activate()
@@ -98,7 +118,7 @@ class MdiViewerTool(QObject):
 
         viewer_tool = self._viewer_tool_by_sub_window.get(sub_window)
         if viewer_tool is None:
-            viewer_tool = self.tool_csl(sub_window.viewer, self._tool_settings)
+            viewer_tool = self._tool_csl(sub_window.viewer, self._tool_settings)
             self._viewer_tool_by_sub_window[sub_window] = viewer_tool
         return viewer_tool
 
@@ -107,6 +127,17 @@ class ViewerToolSettings(QObject):
     @classmethod
     def from_config(cls, config: UnitedConfig) -> ViewerToolSettings:
         return cls()
+
+
+class ViewerToolSettingsWidget(QWidget):
+    def __init__(self, tool_settings: ViewerToolSettings, parent: QWidget = None):
+        super().__init__(parent)
+
+        self._tool_settings = tool_settings
+
+    @property
+    def tool_settings(self) -> ViewerToolSettings:
+        return self._tool_settings
 
 
 class ViewerTool(QObject):
@@ -130,9 +161,20 @@ class LayeredImageViewerToolSettings(ViewerToolSettings):
 
         self._layers_props = layers_props
 
+        self._mask_palette = Palette.from_config(self._layers_props['mask'].get('palette'))
+        self._tool_mask_palette = Palette.from_config(self._layers_props['tool_mask'].get('palette'))
+
     @property
     def layers_props(self) -> dict:
         return self._layers_props
+
+    @property
+    def mask_palette(self) -> Palette:
+        return self._mask_palette
+
+    @property
+    def tool_mask_palette(self) -> Palette:
+        return self._tool_mask_palette
 
     @staticmethod
     def layers_props_from_config(config: UnitedConfig) -> dict:
@@ -154,9 +196,6 @@ class LayeredImageViewerTool(ViewerTool):
         # self.image = None
         # self.mask = None
         # self.tool_mask = None
-
-        self.mask_palette = None
-        self.tool_mask_palette = None
 
     @property
     def image(self) -> FlatImage:
@@ -216,17 +255,17 @@ class LayeredImageViewerTool(ViewerTool):
 
     def _on_layer_image_updated(self):
         self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.mask_palette)
+            'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.mask_palette)
         self.mask_layer.image_updated.connect(self._update_masks)
 
         self.tool_mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            'tool_mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.tool_mask_palette)
+            'tool_mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.tool_mask_palette)
 
         self._update_masks()
 
     def _update_masks(self):
         if self.mask_layer.image is None:
-            self.mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self.mask_palette)
+            self.mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self.mask_layer.palette)
             self.viewer.layer_view_by_model(self.mask_layer).slice_number = self.image_layer_view.slice_number
 
         self.tool_mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self.tool_mask_layer.palette)

@@ -8,17 +8,18 @@ import cv2
 import numpy as np
 import skimage.draw
 import skimage.measure
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import Qt, Signal, QEvent
+from PySide6.QtWidgets import QFormLayout, QSpinBox
 
 from bsmu.vision.core.bbox import BBox
-from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool, \
-    LayeredImageViewerToolSettings
+    LayeredImageViewerToolSettings, ViewerToolSettingsWidget
 
 if TYPE_CHECKING:
     from typing import Sequence, Type
 
     from PySide6.QtCore import QObject
+    from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
@@ -40,6 +41,8 @@ DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE = 100
 
 
 class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
+    mask_foreground_class_changed = Signal(int)
+
     def __init__(
             self,
             layers_props: dict,
@@ -64,6 +67,14 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._paint_dark_cluster = paint_dark_cluster
         self._paint_connected_component = paint_connected_component
         self._draw_on_mouse_move = draw_on_mouse_move
+
+        self._mask_background_class = self._mask_palette.row_index_by_name('background')
+        self._mask_foreground_class = self._mask_palette.row_index_by_name('foreground')
+
+        self._tool_background_class = self._tool_mask_palette.row_index_by_name('background')
+        self._tool_foreground_class = self._tool_mask_palette.row_index_by_name('foreground')
+        self._tool_eraser_class = self._tool_mask_palette.row_index_by_name('eraser')
+        self._tool_unconnected_component_class = self._tool_mask_palette.row_index_by_name('unconnected_component')
 
     @property
     def radius(self) -> float:
@@ -105,6 +116,36 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
     def draw_on_mouse_move(self) -> bool:
         return self._draw_on_mouse_move
 
+    @property
+    def mask_background_class(self) -> int:
+        return self._mask_background_class
+
+    @property
+    def mask_foreground_class(self) -> int:
+        return self._mask_foreground_class
+
+    @mask_foreground_class.setter
+    def mask_foreground_class(self, value: int):
+        if self._mask_foreground_class != value:
+            self._mask_foreground_class = value
+            self.mask_foreground_class_changed.emit(self._mask_foreground_class)
+
+    @property
+    def tool_background_class(self) -> int:
+        return self._tool_background_class
+
+    @property
+    def tool_foreground_class(self) -> int:
+        return self._tool_foreground_class
+
+    @property
+    def tool_eraser_class(self) -> int:
+        return self._tool_eraser_class
+
+    @property
+    def tool_unconnected_component_class(self) -> int:
+        return self._tool_unconnected_component_class
+
     @classmethod
     def from_config(cls, config: UnitedConfig) -> WsiSmartBrushImageViewerToolSettings:
         return cls(
@@ -121,23 +162,33 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         )
 
 
+class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
+    def __init__(self, tool_settings: WsiSmartBrushImageViewerToolSettings, parent: QWidget = None):
+        super().__init__(tool_settings, parent)
+
+        layout = QFormLayout()
+
+        self._mask_foreground_class_spin_box = QSpinBox()
+        self._mask_foreground_class_spin_box.setValue(tool_settings.mask_foreground_class)
+        self._mask_foreground_class_spin_box.valueChanged.connect(self._on_mask_foreground_class_spin_box_value_changed)
+        tool_settings.mask_foreground_class_changed.connect(self._on_tool_settings_mask_foreground_class_changed)
+        layout.addRow('&Mask Foreground:', self._mask_foreground_class_spin_box)
+
+        self.setLayout(layout)
+
+    def _on_mask_foreground_class_spin_box_value_changed(self, value: int):
+        self.tool_settings.mask_foreground_class = value
+
+    def _on_tool_settings_mask_foreground_class_changed(self, value: int):
+        self._mask_foreground_class_spin_box.setValue(value)
+
+
 class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
     def __init__(self, viewer: LayeredImageViewer, settings: WsiSmartBrushImageViewerToolSettings):
         super().__init__(viewer, settings)
 
         self._mode = Mode.SHOW
         self._smart_mode_enabled = True
-
-        layers_props = self.settings.layers_props
-        self.mask_palette = Palette.from_config(layers_props['mask'].get('palette'))
-        self.mask_background_class = self.mask_palette.row_index_by_name('background')
-        self.mask_foreground_class = self.mask_palette.row_index_by_name('foreground')
-
-        self.tool_mask_palette = Palette.from_config(layers_props['tool_mask'].get('palette'))
-        self.tool_background_class = self.tool_mask_palette.row_index_by_name('background')
-        self.tool_foreground_class = self.tool_mask_palette.row_index_by_name('foreground')
-        self.tool_eraser_class = self.tool_mask_palette.row_index_by_name('eraser')
-        self.tool_unconnected_component_class = self.tool_mask_palette.row_index_by_name('unconnected_component')
 
         self._brush_bbox = None
 
@@ -188,7 +239,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
     def draw_brush(self, row_f: float, col_f: float):
         # Erase old tool mask
         if self._brush_bbox is not None:
-            self.tool_mask.bboxed_pixels(self._brush_bbox).fill(self.tool_background_class)
+            self.tool_mask.bboxed_pixels(self._brush_bbox).fill(self.settings.tool_background_class)
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
         row_spatial_radius, col_spatial_radius = \
@@ -226,17 +277,18 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             shape=downscaled_brush_shape)  # try with downscaled_brush_shape_f
 
         downscaled_tool_mask_in_brush_bbox = \
-            np.full(shape=downscaled_brush_shape, fill_value=self.tool_background_class)
+            np.full(shape=downscaled_brush_shape, fill_value=self.settings.tool_background_class)
 
         if not self._smart_mode_enabled or self._mode == Mode.ERASE:
-            tool_class, mask_class = (self.tool_eraser_class, self.mask_background_class) \
-                if self._mode == Mode.ERASE else (self.tool_foreground_class, self.mask_foreground_class)
+            tool_class, mask_class = (self.settings.tool_eraser_class, self.settings.mask_background_class) \
+                if self._mode == Mode.ERASE \
+                else (self.settings.tool_foreground_class, self.settings.mask_foreground_class)
 
             downscaled_tool_mask_in_brush_bbox[rr, cc] = tool_class
             tool_mask_in_brush_bbox, temp_tool_class = self.resize_indexed_binary_image(
                 downscaled_tool_mask_in_brush_bbox,
                 self._brush_bbox.size,
-                self.tool_background_class,
+                self.settings.tool_background_class,
                 tool_class)
             modified_pixels = tool_mask_in_brush_bbox == temp_tool_class
 
@@ -281,7 +333,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 painted_cluster_label = 1 - painted_cluster_label
 
         tool_mask_circle_pixels = downscaled_tool_mask_in_brush_bbox[rr, cc]
-        tool_mask_circle_pixels[label == painted_cluster_label] = self.tool_foreground_class
+        tool_mask_circle_pixels[label == painted_cluster_label] = self.settings.tool_foreground_class
         downscaled_tool_mask_in_brush_bbox[rr, cc] = tool_mask_circle_pixels
 
         if self.settings.paint_connected_component:
@@ -289,15 +341,17 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                     0 <= downscaled_brush_center[1] < downscaled_tool_mask_in_brush_bbox.shape[1]:
 
                 labeled_tool_mask_in_brush_bbox = skimage.measure.label(
-                    downscaled_tool_mask_in_brush_bbox, background=self.tool_background_class)
+                    downscaled_tool_mask_in_brush_bbox, background=self.settings.tool_background_class)
                 label_under_mouse = labeled_tool_mask_in_brush_bbox[
                     downscaled_brush_center[0], downscaled_brush_center[1]]
                 downscaled_tool_mask_in_brush_bbox[
-                    (downscaled_tool_mask_in_brush_bbox == self.tool_foreground_class) &
-                    (labeled_tool_mask_in_brush_bbox != label_under_mouse)] = self.tool_unconnected_component_class
+                    (downscaled_tool_mask_in_brush_bbox == self.settings.tool_foreground_class) &
+                    (labeled_tool_mask_in_brush_bbox != label_under_mouse)] = \
+                    self.settings.tool_unconnected_component_class
             else:
-                downscaled_tool_mask_in_brush_bbox[downscaled_tool_mask_in_brush_bbox == self.tool_foreground_class] \
-                    = self.tool_unconnected_component_class
+                downscaled_tool_mask_in_brush_bbox[
+                    downscaled_tool_mask_in_brush_bbox == self.settings.tool_foreground_class] = \
+                    self.settings.tool_unconnected_component_class
 
         tool_mask_in_brush_bbox = cv2.resize(
             downscaled_tool_mask_in_brush_bbox,
@@ -309,17 +363,18 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         if self._mode == Mode.DRAW:
             # We can use cv2.INTER_LINEAR_EXACT interpolation for draw mode
             # For that we have to remove all values from tool mask, except background and foreground
-            downscaled_tool_mask_in_brush_bbox[downscaled_tool_mask_in_brush_bbox != self.tool_foreground_class] = \
-                self.tool_background_class
+            downscaled_tool_mask_in_brush_bbox[
+                downscaled_tool_mask_in_brush_bbox != self.settings.tool_foreground_class] = \
+                self.settings.tool_background_class
             tool_mask_in_brush_bbox, temp_tool_foreground_class = self.resize_indexed_binary_image(
                 downscaled_tool_mask_in_brush_bbox,
                 self._brush_bbox.size,
-                self.tool_background_class,
-                self.tool_foreground_class)
+                self.settings.tool_background_class,
+                self.settings.tool_foreground_class)
             drawn_pixels = tool_mask_in_brush_bbox == temp_tool_foreground_class
 
             mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
-            mask_in_brush_bbox[drawn_pixels] = self.mask_foreground_class
+            mask_in_brush_bbox[drawn_pixels] = self.settings.mask_foreground_class
 
             self.mask.emit_pixels_modified(self._brush_bbox)
 
@@ -363,6 +418,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             mdi_plugin: MdiPlugin,
             tool_cls: Type[ViewerTool] = WsiSmartBrushImageViewerTool,
             tool_settings_cls: Type[ViewerToolSettings] = WsiSmartBrushImageViewerToolSettings,
+            tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = WsiSmartBrushImageViewerToolSettingsWidget,
             action_name: str = 'Smart Brush (WSI)',
             action_shortcut: Qt.Key = Qt.CTRL | Qt.Key_B,
     ):
@@ -371,6 +427,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             mdi_plugin,
             tool_cls,
             tool_settings_cls,
+            tool_settings_widget_cls,
             action_name,
             action_shortcut,
         )

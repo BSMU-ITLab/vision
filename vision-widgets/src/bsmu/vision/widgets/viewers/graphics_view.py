@@ -1,25 +1,48 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QRect, QRectF, QPointF
 from PySide6.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics
 from PySide6.QtWidgets import QGraphicsView
 
+from bsmu.vision.core.settings import Settings
+
+if TYPE_CHECKING:
+    from PySide6.QtGui import QPaintEvent, QResizeEvent
+    from PySide6.QtWidgets import QGraphicsScene
+
 
 SMOOTH_ZOOM_DURATION = 100
 SMOOTH_ZOOM_UPDATE_INTERVAL = 10
 
 
+class GraphicsViewSettings(Settings):
+    def __init__(self, zoomable: bool = True, zoom_settings: ZoomSettings = None):
+        super().__init__()
+
+        self._zoomable = zoomable
+        self._zoom_settings = zoom_settings
+
+    @property
+    def zoomable(self) -> bool:
+        return self._zoomable
+
+    @property
+    def zoom_settings(self) -> ZoomSettings:
+        return self._zoom_settings
+
+
 class GraphicsView(QGraphicsView):
-    def __init__(self, scene: QGraphicsScene, zoomable: bool = True):
+    def __init__(self, scene: QGraphicsScene, settings: GraphicsViewSettings):
         super().__init__()
 
         self.setScene(scene)
 
-        self._zoomable = zoomable
-        if self._zoomable:
+        self._settings = settings
+        if self._settings.zoomable:
             self.enable_zooming()
 
         self._cur_scale = self._calculate_scale()
@@ -49,7 +72,7 @@ class GraphicsView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.NoAnchor)
         self.setResizeAnchor(QGraphicsView.NoAnchor)
 
-        view_smooth_zoom = _ViewSmoothZoom(self, self)
+        view_smooth_zoom = _ViewSmoothZoom(self, self._settings.zoom_settings, self)
         view_smooth_zoom.zoom_finished.connect(self._on_zoom_finished)
         self.viewport().installEventFilter(view_smooth_zoom)
 
@@ -154,15 +177,34 @@ class GraphicsView(QGraphicsView):
         self._update_viewport_anchors()
 
 
+class ZoomSettings(Settings):
+    zoom_factor_changed = Signal(float)
+
+    def __init__(self, zoom_factor: float = 1):
+        super().__init__()
+
+        self._zoom_factor = zoom_factor
+
+    @property
+    def zoom_factor(self) -> float:
+        return self._zoom_factor
+
+    @zoom_factor.setter
+    def zoom_factor(self, value: float):
+        if self._zoom_factor != value:
+            self._zoom_factor = value
+            self.zoom_factor_changed.emit(self._zoom_factor)
+
+
 class _ViewSmoothZoom(QObject):
     zoom_finished = Signal()
 
-    def __init__(self, view, parent: QObject = None):
+    def __init__(self, view, settings: ZoomSettings, parent: QObject = None):
         super().__init__(parent)
 
         self.view = view
 
-        self._zoom_factor = 1
+        self._settings = settings
 
     def eventFilter(self, watched_obj, event):
         if event.type() == QEvent.Wheel:
@@ -173,7 +215,7 @@ class _ViewSmoothZoom(QObject):
 
     def on_wheel_scrolled(self, event):
         angle_in_degrees = event.angleDelta().y() / 8
-        zoom_factor = angle_in_degrees / 60 * self._zoom_factor
+        zoom_factor = angle_in_degrees / 60 * self._settings.zoom_factor
         zoom_factor = 1 + zoom_factor / (SMOOTH_ZOOM_DURATION / SMOOTH_ZOOM_UPDATE_INTERVAL)
 
         zoom = _Zoom(event.position(), zoom_factor)

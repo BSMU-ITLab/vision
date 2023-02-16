@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow, MainMenu, MenuBar, FileMenu, ViewMenu, \
-    ToolsMenu, WindowsMenu, HelpMenu
+from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow, MainMenu, MenuBar, FileMenu, ToolsMenu, \
+    ViewMenu, WindowsMenu, SettingsMenu, HelpMenu
 
 if TYPE_CHECKING:
     from typing import Tuple, Type
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 class BiocellMenuBar(MenuBar):
     def __init__(
             self,
-            menu_order: Tuple[MainMenu] = (FileMenu, ViewMenu, ToolsMenu, WindowsMenu, HelpMenu)
+            menu_order: Tuple[MainMenu] = (FileMenu, ToolsMenu, ViewMenu, WindowsMenu, SettingsMenu, HelpMenu)
     ):
         super().__init__(menu_order)
 

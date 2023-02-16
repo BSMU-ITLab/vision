@@ -27,10 +27,6 @@ class FileMenu(MainMenu):
     name = 'File'
 
 
-class ViewMenu(MainMenu):
-    name = 'View'
-
-
 class ToolsMenu(MainMenu):
     name = 'Tools'
 
@@ -39,8 +35,16 @@ class AlgorithmsMenu(MainMenu):
     name = 'Algorithms'
 
 
+class ViewMenu(MainMenu):
+    name = 'View'
+
+
 class WindowsMenu(MainMenu):
     name = 'Windows'
+
+
+class SettingsMenu(MainMenu):
+    name = 'Settings'
 
 
 class HelpMenu(MainMenu):
@@ -48,8 +52,11 @@ class HelpMenu(MainMenu):
 
 
 class MenuBar(QMenuBar):
-    def __init__(self,
-                 menu_order: Tuple[MainMenu] = (FileMenu, ViewMenu, ToolsMenu, AlgorithmsMenu, WindowsMenu, HelpMenu)):
+    def __init__(
+            self,
+            menu_order: Tuple[MainMenu] = (
+                    FileMenu, ToolsMenu, AlgorithmsMenu, ViewMenu, WindowsMenu, SettingsMenu, HelpMenu)
+    ):
         super().__init__()
 
         self._menu_order = menu_order

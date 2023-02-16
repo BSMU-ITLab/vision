@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
-from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.data import Data
+from bsmu.vision.core.plugins.base import Plugin
 
 if TYPE_CHECKING:
+    from bsmu.vision.core.plugins.processor.registry import ProcessorRegistry
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
-    from bsmu.vision.plugins.visualizers.registry import DataVisualizerRegistryPlugin, DataVisualizerRegistry
+    from bsmu.vision.plugins.visualizers.registry import DataVisualizerRegistryPlugin
 
 
 class DataVisualizationManagerPlugin(Plugin):
@@ -25,7 +26,7 @@ class DataVisualizationManagerPlugin(Plugin):
         super().__init__()
 
         self._data_visualizer_registry_plugin = data_visualizer_registry_plugin
-        self._data_visualizer_registry: DataVisualizerRegistry | None = None
+        self._data_visualizer_registry: ProcessorRegistry | None = None
 
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
@@ -49,7 +50,7 @@ class DataVisualizationManagerPlugin(Plugin):
 class DataVisualizationManager(QObject):
     data_visualized = Signal(Data, list)  # (Data, List[DataViewerSubWindow])
 
-    def __init__(self, data_visualizer_registry: DataVisualizerRegistry, mdi: Mdi):
+    def __init__(self, data_visualizer_registry: ProcessorRegistry, mdi: Mdi):
         super().__init__()
 
         self.data_visualizer_registry = data_visualizer_registry
@@ -60,8 +61,9 @@ class DataVisualizationManager(QObject):
 
     def visualize_data(self, data: Data):
         print('Visualize data:', type(data))
-        visualizer_cls = self.data_visualizer_registry.processor_cls(type(data))
-        if visualizer_cls is not None:
-            visualizer = visualizer_cls(self.mdi)
+        visualizer_cls_with_settings = self.data_visualizer_registry.processor_cls_with_settings(type(data))
+        if visualizer_cls_with_settings is not None:
+            visualizer = visualizer_cls_with_settings.processor_cls(
+                self.mdi, visualizer_cls_with_settings.processor_settings)
             data_viewer_sub_windows = visualizer.visualize_data(data)
             self.data_visualized.emit(data, data_viewer_sub_windows)

@@ -12,8 +12,9 @@ import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.core.image.base import Image, FlatImage
 from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
 from bsmu.vision.core.models.base import positive_list_insert_index
+from bsmu.vision.core.settings import Settings
 from bsmu.vision.widgets.viewers.base import DataViewer
-from bsmu.vision.widgets.viewers.graphics_view import GraphicsView
+from bsmu.vision.widgets.viewers.graphics_view import GraphicsView, ZoomSettings, GraphicsViewSettings
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget, QStyleOptionGraphicsItem
 
     from bsmu.vision.core.bbox import BBox
+    from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.core.palette import Palette
 
 
@@ -416,6 +418,26 @@ class _LayeredImageGraphicsObject(QGraphicsObject):
         self.update()
 
 
+class ImageViewerSettings(Settings):
+    def __init__(self, graphics_view_settings: GraphicsViewSettings):
+        super().__init__()
+
+        self._graphics_view_settings = graphics_view_settings
+
+    @property
+    def graphics_view_settings(self) -> GraphicsViewSettings:
+        return self._graphics_view_settings
+
+    @classmethod
+    def from_config(cls, config: UnitedConfig) -> ImageViewerSettings:
+        return cls(
+            GraphicsViewSettings(
+                zoomable=config.value('zoomable', True),
+                zoom_settings=ZoomSettings(config.value('zoom_factor', 1))
+            )
+        )
+
+
 class LayeredImageViewer(DataViewer):
     layer_view_adding = Signal(ImageLayerView, int)
     layer_view_added = Signal(ImageLayerView, int)
@@ -424,9 +446,11 @@ class LayeredImageViewer(DataViewer):
 
     data_name_changed = Signal(str)
 
-    def __init__(self, data: LayeredImage = None, zoomable: bool = True):
+    def __init__(self, data: LayeredImage = None, settings: ImageViewerSettings = None):
         super().__init__()  # do not pass |data| as parameter, cause we need at first create _LayeredImageGraphicsObject
         # Thus, |data| is assigned later, when _LayeredImageGraphicsObject will be created
+
+        self._settings = settings
 
         self.layered_image_graphics_object = _LayeredImageGraphicsObject()
         self.layered_image_graphics_object.active_layer_view_changed.connect(
@@ -443,7 +467,7 @@ class LayeredImageViewer(DataViewer):
         self.data = data
 
         self.graphics_scene = QGraphicsScene()
-        self.graphics_view = GraphicsView(self.graphics_scene, zoomable)
+        self.graphics_view = GraphicsView(self.graphics_scene, self._settings.graphics_view_settings)
 
         self.graphics_scene.addItem(self.layered_image_graphics_object)
 

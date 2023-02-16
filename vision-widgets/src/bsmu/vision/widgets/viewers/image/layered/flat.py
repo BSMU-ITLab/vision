@@ -7,6 +7,7 @@ from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, I
 if TYPE_CHECKING:
     from bsmu.vision.core.image.base import FlatImage
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
+    from bsmu.vision.widgets.viewers.image.layered.base import ImageViewerSettings
 
 
 class FlatImageLayerView(ImageLayerView):
@@ -27,8 +28,8 @@ class FlatImageLayerView(ImageLayerView):
 
 
 class LayeredFlatImageViewer(LayeredImageViewer):
-    def __init__(self, data: LayeredImage = None, zoomable: bool = True):
-        super().__init__(data, zoomable)
+    def __init__(self, data: LayeredImage = None, settings: ImageViewerSettings = None):
+        super().__init__(data, settings)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> FlatImageLayerView:
         layer_view = FlatImageLayerView(image_layer, image_layer.visibility.visible, image_layer.visibility.opacity)

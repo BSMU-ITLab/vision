@@ -13,6 +13,7 @@ from bsmu.vision.widgets.viewers.image.layered.flat import FlatImageLayerView
 if TYPE_CHECKING:
     from bsmu.vision.core.image.base import Image
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
+    from bsmu.vision.widgets.viewers.image.layered.base import ImageViewerSettings
 
 
 class VolumeSliceImageLayerView(ImageLayerView):
@@ -89,7 +90,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
             plane_axis: PlaneAxis,
             slice_number: int | None = None,
             data: LayeredImage = None,
-            zoomable: bool = True
+            settings: ImageViewerSettings = None,
     ):
         self.plane_axis = plane_axis
 
@@ -99,7 +100,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
 
         self.slice_number = slice_number
 
-        super().__init__(data, zoomable)
+        super().__init__(data, settings)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> VolumeSliceImageLayerView:
         if isinstance(image_layer.image, VolumeImage):

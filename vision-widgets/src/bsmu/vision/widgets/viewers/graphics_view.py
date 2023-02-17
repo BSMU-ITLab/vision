@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QGraphicsView
 from bsmu.vision.core.settings import Settings
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import QPaintEvent, QResizeEvent
+    from PySide6.QtGui import QPaintEvent, QResizeEvent, QMouseEvent
     from PySide6.QtWidgets import QGraphicsScene
 
 
@@ -44,6 +44,7 @@ class GraphicsView(QGraphicsView):
         self._settings = settings
         if self._settings.zoomable:
             self.enable_zooming()
+        self._enable_panning()
 
         self._cur_scale = self._calculate_scale()
 
@@ -75,6 +76,14 @@ class GraphicsView(QGraphicsView):
         view_smooth_zoom = _ViewSmoothZoom(self, self._settings.zoom_settings, self)
         view_smooth_zoom.zoom_finished.connect(self._on_zoom_finished)
         self.viewport().installEventFilter(view_smooth_zoom)
+
+    def _enable_panning(self):
+        # We can use |setDragMode| method, but that will not allow to add some inertia after drag
+        # (like during drag and scroll on mobile phones)
+        # self.setDragMode(QGraphicsView.ScrollHandDrag)
+
+        view_pan = _ViewPan(self, self)
+        view_pan.activate()
 
     def set_visualized_scene_rect(self, rect: QRectF):
         self.setSceneRect(rect)
@@ -247,3 +256,38 @@ class _ZoomTimeLine(QTimeLine):
         super().__init__(duration, parent)
 
         self.finished.connect(self.deleteLater)
+
+
+class _ViewPan(QObject):
+    def __init__(self, view: QGraphicsView, parent: QObject = None):
+        super().__init__(parent)
+
+        self._view = view
+
+        self._old_pos = None
+
+    def activate(self):
+        self._view.setTransformationAnchor(QGraphicsView.NoAnchor)
+        self._view.viewport().installEventFilter(self)
+
+    def eventFilter(self, watched_obj, event):
+        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            self._view.setCursor(Qt.ClosedHandCursor)
+            self._old_pos = self.event_pos(event)
+            return True
+        elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
+            self._old_pos = None
+            self._view.unsetCursor()
+            return False
+        elif event.type() == QEvent.MouseMove and event.buttons() == Qt.LeftButton and self._old_pos is not None:
+            new_pos = self.event_pos(event)
+            delta = self._view.mapToScene(new_pos.toPoint()) - self._view.mapToScene(self._old_pos.toPoint())
+            self._view.translate(delta.x(), delta.y())
+            self._old_pos = new_pos
+            return True
+        else:
+            return super().eventFilter(watched_obj, event)
+
+    @staticmethod
+    def event_pos(event: QMouseEvent):
+        return event.position()

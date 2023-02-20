@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import QMainWindow, QMenuBar, QMenu
 from sortedcontainers import SortedDict
 
@@ -12,8 +12,6 @@ from bsmu.vision.widgets.images import icons_rc  # noqa: F401
 
 if TYPE_CHECKING:
     from typing import Tuple, Type
-
-    from PySide6.QtGui import QAction
 
 
 class MainMenu(QMenu):
@@ -86,11 +84,22 @@ class MenuBar(QMenuBar):
             menu = self.add_menu(menu_type)
         return menu
 
-    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method=None, shortcut=None) -> QAction:
-        if shortcut is None:
-            return self.menu(menu_type).addAction(action_name, method)
-        else:
-            return self.menu(menu_type).addAction(action_name, method, shortcut)
+    def add_menu_action(
+            self,
+            menu_type: Type[MainMenu],
+            action_name,
+            method=None,
+            shortcut=None,
+            checkable: bool = False
+    ) -> QAction:
+        menu = self.menu(menu_type)
+        action = QAction(action_name, menu)
+        action.setCheckable(checkable)
+        if shortcut is not None:
+            action.setShortcut(shortcut)
+        action.triggered.connect(method)
+        menu.addAction(action)
+        return action
 
     def _menu_order_index(self, menu_type: Type[MainMenu]) -> int:
         return self._menus_order_indexes[menu_type]
@@ -107,8 +116,15 @@ class MainWindow(QMainWindow):
         self._menu_bar = MenuBar() if menu_bar is None else menu_bar
         self.setMenuBar(self._menu_bar)
 
-    def add_menu_action(self, menu_type: Type[MainMenu], action_name, method=None, shortcut=None) -> QAction:
-        return self._menu_bar.add_menu_action(menu_type, action_name, method, shortcut)
+    def add_menu_action(
+            self,
+            menu_type: Type[MainMenu],
+            action_name,
+            method=None,
+            shortcut=None,
+            checkable: bool = False
+    ) -> QAction:
+        return self._menu_bar.add_menu_action(menu_type, action_name, method, shortcut, checkable)
 
     def menu(self, menu_type: Type[MainMenu], add_nonexistent: bool = True) -> MainMenu | None:
         return self._menu_bar.menu(menu_type, add_nonexistent)

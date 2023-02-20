@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.image.base import Image
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
-    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayer
     from bsmu.vision.widgets.viewers.base import DataViewer
     from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
     from typing import Type
@@ -72,12 +72,15 @@ class ViewerToolPlugin(Plugin):
             self._main_window, self._mdi, self._tool_cls, tool_settings, self._tool_settings_widget_cls)
 
         self._main_window.add_menu_action(
-            ToolsMenu, self._action_name, self._mdi_viewer_tool.activate, self._action_shortcut)
+            ToolsMenu, self._action_name, self._tool_action_triggered, self._action_shortcut, checkable=True)
 
     def _disable(self):
         self._mdi_viewer_tool = None
 
         raise NotImplemented()
+
+    def _tool_action_triggered(self, checked: bool):
+        self._mdi_viewer_tool.activate() if checked else self._mdi_viewer_tool.deactivate()
 
 
 class MdiViewerTool(QObject):
@@ -97,20 +100,30 @@ class MdiViewerTool(QObject):
         self._tool_settings = tool_settings
         self._tool_settings_widget_cls = tool_settings_widget_cls
         self._tool_settings_widget = None
+        self._tool_settings_dock_widget = None
 
         self._viewer_tool_by_sub_window = {}  # DataViewerSubWindow: ViewerTool
 
     def activate(self):
         if self._tool_settings_widget is None:
             self._tool_settings_widget = self._tool_settings_widget_cls(self._tool_settings)
-            tool_settings_dock_widget = QDockWidget('Tool Settings', self._main_window)
-            tool_settings_dock_widget.setWidget(self._tool_settings_widget)
-            self._main_window.addDockWidget(Qt.LeftDockWidgetArea, tool_settings_dock_widget)
+            self._tool_settings_dock_widget = QDockWidget('Tool Settings', self._main_window)
+            self._tool_settings_dock_widget.setWidget(self._tool_settings_widget)
+            self._main_window.addDockWidget(Qt.LeftDockWidgetArea, self._tool_settings_dock_widget)
 
         for sub_window in self._mdi.subWindowList():
             viewer_tool = self._sub_window_viewer_tool(sub_window)
             if viewer_tool is not None:
                 viewer_tool.activate()
+
+    def deactivate(self):
+        for viewer_tool in self._viewer_tool_by_sub_window.values():
+            viewer_tool.deactivate()
+        self._viewer_tool_by_sub_window.clear()
+
+        self._main_window.removeDockWidget(self._tool_settings_dock_widget)
+        self._tool_settings_dock_widget = None
+        self._tool_settings_widget = None
 
     def _sub_window_viewer_tool(self, sub_window: DataViewerSubWindow):
         if not isinstance(sub_window, LayeredImageViewerSubWindow):
@@ -153,6 +166,9 @@ class ViewerTool(QObject):
 
     def activate(self):
         self.viewer.viewport.installEventFilter(self)
+
+    def deactivate(self):
+        self.viewer.viewport.removeEventFilter(self)
 
 
 class LayeredImageViewerToolSettings(ViewerToolSettings):
@@ -214,7 +230,7 @@ class LayeredImageViewerTool(ViewerTool):
         return self.settings.layers_props
 
     def create_nonexistent_layer_with_zeros_mask(
-            self, layer_key: str, name_property_key: str, image: Image, palette: Palette) -> _ImageItemLayer:
+            self, layer_key: str, name_property_key: str, image: Image, palette: Palette) -> ImageLayer:
         layer_props = self.layers_props[layer_key]
         layer_name = layer_props[name_property_key]
         layer = self.viewer.layer_by_name(layer_name)
@@ -253,6 +269,14 @@ class LayeredImageViewerTool(ViewerTool):
 
         self.viewer.print_layer_views()
 
+    def deactivate(self):
+        super().deactivate()
+
+        self.image_layer_view.image_layer.image_updated.disconnect(self._on_layer_image_updated)
+        self.image_layer_view.image_view_updated.disconnect(self._on_layer_image_updated)
+
+        self._remove_tool_mask_layer()
+
     def _on_layer_image_updated(self):
         self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
             'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.mask_palette)
@@ -262,6 +286,9 @@ class LayeredImageViewerTool(ViewerTool):
             'tool_mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.tool_mask_palette)
 
         self._update_masks()
+
+    def _remove_tool_mask_layer(self):
+        self.viewer.remove_layer(self.tool_mask_layer)
 
     def _update_masks(self):
         if self.mask_layer.image is None:

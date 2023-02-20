@@ -136,6 +136,13 @@ class LayeredImage(Data):
             layer.image.emit_pixels_modified()
         return layer
 
+    def remove_layer(self, layer: ImageLayer):
+        layer_index = self._layers.index(layer)
+        self.layer_removing.emit(layer, layer_index)
+        self._layers.remove(layer)
+        del self._layer_by_name[layer.name]
+        self.layer_removed.emit(layer, layer_index)
+
     def print_layers(self):
         for index, layer in enumerate(self.layers):
             print(f'Layer {index}: {layer.name}')

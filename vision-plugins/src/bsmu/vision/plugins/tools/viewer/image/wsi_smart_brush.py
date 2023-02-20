@@ -9,6 +9,7 @@ import numpy as np
 import skimage.draw
 import skimage.measure
 from PySide6.QtCore import Qt, Signal, QEvent
+from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import QFormLayout, QSpinBox
 
 from bsmu.vision.core.bbox import BBox
@@ -18,7 +19,7 @@ from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImage
 if TYPE_CHECKING:
     from typing import Sequence, Type
 
-    from PySide6.QtCore import QObject
+    from PySide6.QtCore import QObject, QPoint
     from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.core.config.united import UnitedConfig
@@ -197,6 +198,14 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
         self.viewer.viewport.setMouseTracking(True)
 
+        mouse_pos_in_viewport = self.viewer.viewport.mapFromGlobal(QCursor.pos())
+        self._draw_brush_in_pos(mouse_pos_in_viewport)
+
+    def deactivate(self):
+        super().deactivate()
+
+        self.viewer.viewport.setMouseTracking(False)
+
     def eventFilter(self, watched_obj: QObject, event: QEvent):
         if event.type() == QEvent.MouseButtonPress or event.type() == QEvent.MouseButtonRelease:
             self.draw_brush_event(event)
@@ -233,7 +242,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         #     return
 
         self.update_mode(event)
-        image_pixel_indexes = self.pos_f_to_image_pixel_indexes(event.position(), self.tool_mask)
+        self._draw_brush_in_pos(event.position().toPoint())
+
+    def _draw_brush_in_pos(self, pos: QPoint):
+        image_pixel_indexes = self.pos_to_image_pixel_indexes(pos, self.tool_mask)
         self.draw_brush(*image_pixel_indexes)
 
     def draw_brush(self, row_f: float, col_f: float):

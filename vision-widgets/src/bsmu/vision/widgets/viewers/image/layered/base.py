@@ -156,7 +156,7 @@ class ImageLayerView(QObject):
 
     def _update_displayed_qimage_cache(self):
         if self.image_view.is_indexed:
-            if self._modified_cache_bboxes:
+            if self._modified_cache_bboxes and self._displayed_rgba_pixels is not None:
                 for changed_bbox in self._modified_cache_bboxes:
                     changed_bbox.pixels(self._displayed_rgba_pixels)[...] = \
                         self.image_view.colored_premultiplied_array_in_bbox(changed_bbox)
@@ -504,10 +504,13 @@ class LayeredImageViewer(DataViewer):
     def add_layer(self, layer: ImageLayer):
         self.data.add_layer(layer)
 
-    def add_layer_from_image(self, image: Image, name: str = ''):
+    def add_layer_from_image(self, image: Image, name: str = '') -> ImageLayer:
         layer = ImageLayer(image, name)
         self.add_layer(layer)
         return layer
+
+    def remove_layer(self, layer: ImageLayer):
+        self.data.remove_layer(layer)
 
     def add_graphics_item(self, item: QGraphicsItem):
         self.graphics_scene.addItem(item)
@@ -520,6 +523,7 @@ class LayeredImageViewer(DataViewer):
             return
 
         self.data.layer_added.disconnect(self._add_layer_view_from_model)
+        self.data.layer_removed.disconnect(self._remove_layer_view_by_model)
 
         for layer in self.layers:
             self._remove_layer_view_by_model(layer)
@@ -529,6 +533,7 @@ class LayeredImageViewer(DataViewer):
             return
 
         self.data.layer_added.connect(self._add_layer_view_from_model)
+        self.data.layer_removed.connect(self._remove_layer_view_by_model)
 
         for layer in self.layers:
             self._add_layer_view_from_model(layer)

@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QObject
+from PySide6.QtGui import QCursor, QPixmap
 from PySide6.QtWidgets import QWidget, QDockWidget
 
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.plugins.tools.images import icons_rc  # noqa: F401
 from bsmu.vision.plugins.windows.main import ToolsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
@@ -137,6 +139,19 @@ class MdiViewerTool(QObject):
 
 
 class ViewerToolSettings(QObject):
+    def __init__(self):
+        super().__init__()
+
+        self._cursor_file_name = ':/icons/brush.svg'  # TODO: Take this from config and pass as parameter
+        self._cursor = None
+
+    @property
+    def cursor(self) -> QCursor:
+        if self._cursor is None:
+            cursor_icon = QPixmap(self._cursor_file_name, format=b'svg')
+            self._cursor = QCursor(cursor_icon, hotX=0, hotY=0)
+        return self._cursor
+
     @classmethod
     def from_config(cls, config: UnitedConfig) -> ViewerToolSettings:
         return cls()
@@ -165,10 +180,12 @@ class ViewerTool(QObject):
         return self._settings
 
     def activate(self):
+        self.viewer.viewport.setCursor(self._settings.cursor)
         self.viewer.viewport.installEventFilter(self)
 
     def deactivate(self):
         self.viewer.viewport.removeEventFilter(self)
+        self.viewer.viewport.unsetCursor()
 
 
 class LayeredImageViewerToolSettings(ViewerToolSettings):
@@ -270,12 +287,12 @@ class LayeredImageViewerTool(ViewerTool):
         self.viewer.print_layer_views()
 
     def deactivate(self):
-        super().deactivate()
-
         self.image_layer_view.image_layer.image_updated.disconnect(self._on_layer_image_updated)
         self.image_layer_view.image_view_updated.disconnect(self._on_layer_image_updated)
 
         self._remove_tool_mask_layer()
+
+        super().deactivate()
 
     def _on_layer_image_updated(self):
         self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(

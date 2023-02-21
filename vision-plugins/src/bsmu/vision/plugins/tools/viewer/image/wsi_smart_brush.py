@@ -202,9 +202,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         self._draw_brush_in_pos(mouse_pos_in_viewport)
 
     def deactivate(self):
-        super().deactivate()
-
         self.viewer.viewport.setMouseTracking(False)
+
+        super().deactivate()
 
     def eventFilter(self, watched_obj: QObject, event: QEvent):
         if event.type() == QEvent.MouseButtonPress or event.type() == QEvent.MouseButtonRelease:

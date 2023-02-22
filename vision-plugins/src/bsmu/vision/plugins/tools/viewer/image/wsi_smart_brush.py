@@ -213,7 +213,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         elif event.type() == QEvent.MouseMove:
             self.draw_brush_event(event)
             return False
-        elif event.type() == QEvent.Wheel and event.modifiers() == Qt.ControlModifier:
+        elif event.type() == QEvent.Wheel:
             angle_delta_y = event.angleDelta().y()
             zoom_factor = 1 + np.sign(angle_delta_y) * 0.2 * abs(angle_delta_y) / 110
             self.settings.radius = \

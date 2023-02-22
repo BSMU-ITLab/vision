@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, QObject
-from PySide6.QtGui import QCursor, QPixmap
+from PySide6.QtCore import Qt, QObject, QEvent
+from PySide6.QtGui import QCursor, QPixmap, QAction
 from PySide6.QtWidgets import QWidget, QDockWidget
 
 from bsmu.vision.core.image.base import FlatImage
@@ -62,6 +62,9 @@ class ViewerToolPlugin(Plugin):
 
         self._mdi_viewer_tool: MdiViewerTool | None = None
 
+        self._tool_action: QAction | None = None
+        self._tool_temporary_deactivated: bool = False
+
     def _enable(self):
         if not self._action_name:
             return
@@ -73,16 +76,40 @@ class ViewerToolPlugin(Plugin):
         self._mdi_viewer_tool = MdiViewerTool(
             self._main_window, self._mdi, self._tool_cls, tool_settings, self._tool_settings_widget_cls)
 
-        self._main_window.add_menu_action(
+        self._tool_action = self._main_window.add_menu_action(
             ToolsMenu, self._action_name, self._tool_action_triggered, self._action_shortcut, checkable=True)
 
+        self._main_window.add_menu_action(ToolsMenu, 'Uncheck Tool', self._deactivate_active_tool, Qt.Key_Escape)
+
+        self._main_window.installEventFilter(self)
+
     def _disable(self):
+        self._main_window.removeEventFilter(self)
+
         self._mdi_viewer_tool = None
+        self._tool_action = None
 
         raise NotImplemented()
 
     def _tool_action_triggered(self, checked: bool):
         self._mdi_viewer_tool.activate() if checked else self._mdi_viewer_tool.deactivate()
+
+    def _deactivate_active_tool(self):
+        if self._tool_action.isChecked():
+            self._tool_action.activate(QAction.Trigger)
+
+    def eventFilter(self, watched_obj: QObject, event: QEvent):
+        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_1 and not event.isAutoRepeat():
+            if self._tool_action.isChecked():
+                self._tool_action.activate(QAction.Trigger)
+                self._tool_temporary_deactivated = True
+                return True
+        elif event.type() == QEvent.KeyRelease and event.key() == Qt.Key_1 and not event.isAutoRepeat():
+            if self._tool_temporary_deactivated and not self._tool_action.isChecked():
+                self._tool_action.activate(QAction.Trigger)
+                self._tool_temporary_deactivated = False
+                return True
+        return super().eventFilter(watched_obj, event)
 
 
 class MdiViewerTool(QObject):

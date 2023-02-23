@@ -42,6 +42,8 @@ DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE = 100
 
 
 class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
+    radius_changed = Signal(float)
+    smart_mode_enabled_changed = Signal(bool)
     mask_foreground_class_changed = Signal(int)
 
     def __init__(
@@ -50,7 +52,9 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             radius: float,
             min_radius: float,
             max_radius: float,
+            radius_zoom_factor: float,
             max_radius_without_downscale: float,
+            smart_mode_enabled: bool,
             number_of_clusters: int,
             paint_central_pixel_cluster: bool,
             paint_dark_cluster: bool,
@@ -62,7 +66,9 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._radius = radius
         self._min_radius = min_radius
         self._max_radius = max_radius
+        self._radius_zoom_factor = radius_zoom_factor
         self._max_radius_without_downscale = max_radius_without_downscale
+        self._smart_mode_enabled = smart_mode_enabled
         self._number_of_clusters = number_of_clusters
         self._paint_central_pixel_cluster = paint_central_pixel_cluster
         self._paint_dark_cluster = paint_dark_cluster
@@ -83,7 +89,9 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
 
     @radius.setter
     def radius(self, value: float):
-        self._radius = value
+        if self._radius != value:
+            self._radius = value
+            self.radius_changed.emit(self._radius)
 
     @property
     def min_radius(self) -> float:
@@ -94,8 +102,22 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         return self._max_radius
 
     @property
+    def radius_zoom_factor(self) -> float:
+        return self._radius_zoom_factor
+
+    @property
     def max_radius_without_downscale(self) -> float:
         return self._max_radius_without_downscale
+
+    @property
+    def smart_mode_enabled(self) -> bool:
+        return self._smart_mode_enabled
+
+    @smart_mode_enabled.setter
+    def smart_mode_enabled(self, value: bool):
+        if self._smart_mode_enabled != value:
+            self._smart_mode_enabled = value
+            self.smart_mode_enabled_changed.emit(self._smart_mode_enabled)
 
     @property
     def number_of_clusters(self) -> int:
@@ -154,7 +176,9 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             config.value('radius', DEFAULT_RADIUS),
             config.value('min_radius', DEFAULT_MIN_RADIUS),
             config.value('max_radius', DEFAULT_MAX_RADIUS),
+            config.value('radius_zoom_factor', 1),
             config.value('max_radius_without_downscale', DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE),
+            config.value('smart_mode_enabled', True),
             config.value('number_of_clusters', 2),
             config.value('paint_central_pixel_cluster', True),
             config.value('paint_dark_cluster', False),
@@ -189,7 +213,6 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         super().__init__(viewer, settings)
 
         self._mode = Mode.SHOW
-        self._smart_mode_enabled = True
 
         self._brush_bbox = None
 
@@ -214,8 +237,8 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.draw_brush_event(event)
             return False
         elif event.type() == QEvent.Wheel:
-            angle_delta_y = event.angleDelta().y()
-            zoom_factor = 1 + np.sign(angle_delta_y) * 0.2 * abs(angle_delta_y) / 110
+            angle_in_degrees = event.angleDelta().y() / 8
+            zoom_factor = 1 + angle_in_degrees / 65 * self.settings.radius_zoom_factor
             self.settings.radius = \
                 min(max(self.settings.min_radius, self.settings.radius * zoom_factor), self.settings.max_radius)
             self.draw_brush_event(event)
@@ -233,7 +256,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         elif event.buttons() == Qt.RightButton:
             self._mode = Mode.ERASE
         elif event.type() == QEvent.MouseButtonPress and event.buttons() == Qt.MiddleButton:
-            self._smart_mode_enabled = not self._smart_mode_enabled
+            self.settings.smart_mode_enabled = not self.settings.smart_mode_enabled
         else:
             self._mode = Mode.SHOW
 
@@ -291,7 +314,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         downscaled_tool_mask_in_brush_bbox = \
             np.full(shape=downscaled_brush_shape, fill_value=self.settings.tool_background_class)
 
-        if not self._smart_mode_enabled or self._mode == Mode.ERASE:
+        if not self.settings.smart_mode_enabled or self._mode == Mode.ERASE:
             tool_class, mask_class = (self.settings.tool_eraser_class, self.settings.mask_background_class) \
                 if self._mode == Mode.ERASE \
                 else (self.settings.tool_foreground_class, self.settings.mask_foreground_class)
@@ -432,7 +455,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             tool_settings_cls: Type[ViewerToolSettings] = WsiSmartBrushImageViewerToolSettings,
             tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = WsiSmartBrushImageViewerToolSettingsWidget,
             action_name: str = 'Smart Brush (WSI)',
-            action_shortcut: Qt.Key = Qt.CTRL | Qt.Key_B,
+            action_shortcut: Qt.Key = Qt.Key_2,
     ):
         super().__init__(
             main_window_plugin,

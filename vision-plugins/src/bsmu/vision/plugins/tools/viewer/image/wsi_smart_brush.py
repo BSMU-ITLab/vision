@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -290,8 +289,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         # Downscale the image in brush region if radius is large.
         # Smaller analyzed region will improve performance of algorithms
         # (skimage.draw.ellipse, cv2.kmeans, skimage.measure.label) at the expense of accuracy.
-        downscale_factor = \
-            min(1., 1 / math.sqrt(self.settings.radius) * math.sqrt(self.settings.max_radius_without_downscale))
+        downscale_factor = min(1, self.settings.max_radius_without_downscale / self.settings.radius)
         downscaled_brush_shape_f = \
             (self._brush_bbox.height * downscale_factor, self._brush_bbox.width * downscale_factor)
         downscaled_brush_shape = np.rint(downscaled_brush_shape_f).astype(int) + 1

@@ -14,6 +14,8 @@ class Palette:
         self._array = array
         self._premultiplied_array_cache = None
 
+        self._argb_quadruplets_cache = None
+
         self._row_index_by_name = row_index_by_name
 
     @classmethod
@@ -131,6 +133,20 @@ class Palette:
 
             self._premultiplied_array_cache[:, 3] = self._array[:, 3]
         return self._premultiplied_array_cache
+
+    @property
+    def argb_quadruplets(self) -> list[int]:
+        """
+        :return: a list of ARGB quadruplets on the format #AARRGGBB, equivalent to an unsigned int.
+        It can be used e.g., for QImage.setColorTable(colors: Sequence[int])
+        see: https://doc.qt.io/qt-6/qimage.html#setColorTable
+        """
+        if self._argb_quadruplets_cache is None:
+            # PySide6.QtGui.qRgba(*rgba) can be used, to get ARGB quadruplet, but int.from_bytes works faster
+            # and need no import of PySide6.QtGui module.
+            self._argb_quadruplets_cache = \
+                [int.from_bytes([rgba[3], rgba[0], rgba[1], rgba[2]], byteorder='big') for rgba in self._array]
+        return self._argb_quadruplets_cache
 
     def row_index_by_name(self, name: str) -> int:
         return self._row_index_by_name.get(name)

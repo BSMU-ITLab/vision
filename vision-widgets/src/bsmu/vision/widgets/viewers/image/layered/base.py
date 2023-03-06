@@ -76,8 +76,8 @@ class ImageLayerView(QObject):
         # Store numpy array, because QImage uses it's data without copying,
         # and QImage will crash if it's data buffer will be deleted.
         # Moreover, it is used to update only |self._modified_cache_bboxes|.
-        self._displayed_rgba_pixels = None
-        # Bounding boxes of modified regions, which we have to update in the |self._displayed_rgba_pixels|.
+        self._displayed_pixels = None
+        # Bounding boxes of modified regions, which we have to update in the |self._displayed_pixels|.
         self._modified_cache_bboxes = []
 
         self._view_min_spacing = None
@@ -156,26 +156,29 @@ class ImageLayerView(QObject):
 
     def _update_displayed_qimage_cache(self):
         if self.image_view.is_indexed:
-            if self._modified_cache_bboxes and self._displayed_rgba_pixels is not None:
-                for changed_bbox in self._modified_cache_bboxes:
-                    changed_bbox.pixels(self._displayed_rgba_pixels)[...] = \
-                        self.image_view.colored_premultiplied_array_in_bbox(changed_bbox)
-            else:
-                self._displayed_rgba_pixels = self.image_view.colored_premultiplied_array
+            self._displayed_pixels = self.image_view.pixels
+            displayed_qimage_format = QImage.Format_Indexed8
         else:
-            # self._displayed_rgba_pixels = image_converter.converted_to_normalized_uint8(self.image.array)
-            # self._displayed_rgba_pixels = image_converter.converted_to_rgba(self._displayed_rgba_pixels)
+            # self._displayed_pixels = image_converter.converted_to_normalized_uint8(self.image.array)
+            # self._displayed_pixels = image_converter.converted_to_rgba(self._displayed_pixels)
 
-            self._displayed_rgba_pixels = image_converter.converted_to_rgba(self.image_view.array)
+            # Conversion to RGBA will consume additional memory,
+            # but the QPainter can draw QImage.Format_RGBA8888_Premultiplied faster
+            # (when multiple layers is drawn with semi-transparency), unlike QImage.Format_RGB888.
+            # See: https://doc.qt.io/qt-6/qimage.html#Format-enum
+            self._displayed_pixels = image_converter.converted_to_rgba(self.image_view.array)
 
-        if not self._displayed_rgba_pixels.flags['C_CONTIGUOUS']:
-            self._displayed_rgba_pixels = np.ascontiguousarray(self._displayed_rgba_pixels)
+            displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied \
+                if self._displayed_pixels.itemsize == 1 \
+                else QImage.Format_RGBA64_Premultiplied
 
-        displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied \
-            if self._displayed_rgba_pixels.itemsize == 1 \
-            else QImage.Format_RGBA64_Premultiplied
-        self._displayed_qimage_cache = image_converter.numpy_rgba_image_to_qimage(
-            self._displayed_rgba_pixels, displayed_qimage_format)
+        if not self._displayed_pixels.flags['C_CONTIGUOUS']:
+            self._displayed_pixels = np.ascontiguousarray(self._displayed_pixels)
+
+        self._displayed_qimage_cache = image_converter.numpy_array_to_qimage(
+            self._displayed_pixels, displayed_qimage_format)
+        if self.image_view.is_indexed:
+            self._displayed_qimage_cache.setColorTable(self.image_view.palette.argb_quadruplets)
 
         # Scale image to take into account spatial attributes (spacings)
         width_spacing = self.image_view.spatial.spacing[1]

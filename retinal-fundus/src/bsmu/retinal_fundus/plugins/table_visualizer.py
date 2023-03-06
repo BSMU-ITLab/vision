@@ -430,7 +430,7 @@ class PatientRetinalFundusJournalTableModel(RecordTableModel):
 
         qimage_format = QImage.Format_RGBA8888_Premultiplied if preview_rgba_pixels.itemsize == 1 \
             else QImage.Format_RGBA64_Premultiplied
-        preview_qimage = image_converter.numpy_rgba_image_to_qimage(preview_rgba_pixels, qimage_format)
+        preview_qimage = image_converter.numpy_array_to_qimage(preview_rgba_pixels, qimage_format)
 
         self._preview_qimage_by_record[record] = preview_qimage
 

@@ -23,16 +23,18 @@ def converted_to_rgba(image):
     return image
 
 
-# Do not delete |numpy_image| or it's data, because QImage uses it without copying,
-# and QImage will crash if it's data buffer will be deleted
-def numpy_rgba_image_to_qimage(numpy_image, image_format: QImage.Format = QImage.Format_RGBA8888_Premultiplied):
-    # print('STRIDES', numpy_image.strides[0])
-    # print(numpy_image.flags)
-    assert numpy_image.flags['C_CONTIGUOUS'], 'Numpy array have to be C-contiguous'
-    height, width, channel = numpy_image.shape
-    bytes_per_line = width * channel * numpy_image.itemsize
-    return QImage(numpy_image.data, width, height, bytes_per_line, image_format)
+def numpy_array_to_qimage(numpy_array: np.ndarray, image_format: QImage.Format = QImage.Format_RGBA8888_Premultiplied):
+    """
+    Do not delete |numpy_array| or it's data, because QImage uses it without copying,
+    and QImage will crash if it's data buffer will be deleted
+    """
+    assert numpy_array.flags['C_CONTIGUOUS'], 'Numpy array have to be C-contiguous'
+    height, width, *channel_count = numpy_array.shape
+    # If shape has no channels use 1 as channel count
+    channel_count = (channel_count and channel_count[0]) or 1
+    bytes_per_line = width * channel_count * numpy_array.itemsize
+    return QImage(numpy_array.data, width, height, bytes_per_line, image_format)
 
 
 def numpy_bgra_image_to_qimage(numpy_image):
-    return numpy_rgba_image_to_qimage(numpy_image).rgbSwapped()
+    return numpy_array_to_qimage(numpy_image).rgbSwapped()

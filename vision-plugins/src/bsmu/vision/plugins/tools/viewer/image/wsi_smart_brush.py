@@ -9,9 +9,10 @@ import skimage.draw
 import skimage.measure
 from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QCursor
-from PySide6.QtWidgets import QFormLayout, QSpinBox
+from PySide6.QtWidgets import QComboBox, QFormLayout, QSpinBox
 
 from bsmu.vision.core.bbox import BBox
+from bsmu.vision.core.image.base import MASK_MAX
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool, \
     LayeredImageViewerToolSettings, ViewerToolSettingsWidget
 
@@ -192,7 +193,11 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
 
         layout = QFormLayout()
 
+        # self._mask_layer_combo_box = QComboBox()
+        # layout.addRow('&Mask Layer:', self._mask_layer_combo_box)
+
         self._mask_foreground_class_spin_box = QSpinBox()
+        self._mask_foreground_class_spin_box.setMaximum(MASK_MAX)
         self._mask_foreground_class_spin_box.setValue(tool_settings.mask_foreground_class)
         self._mask_foreground_class_spin_box.valueChanged.connect(self._on_mask_foreground_class_spin_box_value_changed)
         tool_settings.mask_foreground_class_changed.connect(self._on_tool_settings_mask_foreground_class_changed)

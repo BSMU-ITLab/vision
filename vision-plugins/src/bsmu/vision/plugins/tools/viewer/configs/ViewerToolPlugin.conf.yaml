@@ -3,20 +3,28 @@ layers:
 #    name: images
 #    number: 0
   mask:
+    # If the active layer is indexed, then it's used as mask layer
+    use_active_indexed_layer: true
+    # Use the first found indexed layer as mask layer
+    use_first_indexed_layer: true
     name: masks
     # Next properties will be used, if there is no mask and we have to create one
     palette:
       row-by-name:
-        background: [0, 0, 0, 0, 0]
-        foreground: [1, 50, 170, 230, 255]
+        background: [ 0, 0, 0, 0, 0 ]
+        foreground: [ 1, 50, 170, 230, 255 ]
+        gleason_2: [ 2, 170, 230, 50, 255 ]
+        gleason_3: [ 3, 255, 255, 0, 255 ]
+        gleason_4: [ 4, 255, 165, 0, 255 ]
+        gleason_5: [ 5, 255, 0, 0, 255 ]
     opacity: 0.5
   tool_mask:
     name: tool-mask
     # Next properties will be used, if we have to create new tool mask
     palette:
       row-by-name:
-        background: [0, 0, 0, 0, 0]
-        foreground: [1, 130, 210, 50, 255]
-        eraser: [2, 210, 60, 40, 255]
-        unconnected_component: [3, 210, 130, 50, 255]
+        background: [ 0, 0, 0, 0, 0 ]
+        foreground: [ 1, 130, 210, 50, 255 ]
+        eraser: [ 2, 210, 60, 40, 255 ]
+        unconnected_component: [ 3, 210, 130, 50, 255 ]
     opacity: 0.5

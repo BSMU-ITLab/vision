@@ -322,8 +322,21 @@ class LayeredImageViewerTool(ViewerTool):
         super().deactivate()
 
     def _on_layer_image_updated(self):
-        self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-            'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.mask_palette)
+        self.mask_layer = None
+
+        mask_layer_props = self.layers_props['mask']
+        if mask_layer_props.get('use_active_indexed_layer', True):
+            active_layer = self.viewer.active_layer_view.image_layer
+            if active_layer.is_indexed:
+                self.mask_layer = active_layer
+        if self.mask_layer is None and mask_layer_props.get('use_first_indexed_layer', True):
+            for layer in self.viewer.layers:
+                if layer.is_indexed:
+                    self.mask_layer = layer
+                    break
+        if self.mask_layer is None:
+            self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
+                'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.mask_palette)
         self.mask_layer.image_updated.connect(self._update_masks)
 
         self.tool_mask_layer = self.create_nonexistent_layer_with_zeros_mask(

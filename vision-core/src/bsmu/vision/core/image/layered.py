@@ -79,6 +79,10 @@ class ImageLayer(QObject):
             self._image.shape_changed.connect(self.image_shape_changed)
 
     @property
+    def is_indexed(self) -> bool:
+        return self._image.is_indexed
+
+    @property
     def visibility(self) -> Visibility:
         return self._visibility
 

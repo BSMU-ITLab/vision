@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 
 MASK_TYPE = np.uint8
+MASK_MAX = np.iinfo(MASK_TYPE).max
 
 
 class SpatialAttrs:

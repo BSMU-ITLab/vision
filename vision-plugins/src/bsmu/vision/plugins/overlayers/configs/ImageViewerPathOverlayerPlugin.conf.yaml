@@ -1,18 +1,25 @@
 layers:
   masks:
+    extension: png
     palette:
-      rgb-color: [0, 255, 0]
+#      rgb-color: [0, 255, 0]
+#      rgb-color: [0, 0, 255]
       # Set "foreground-value" to create a binary palette, else a soft palette will be used
 #      foreground-value: 1
 
       # Custom palette can be used instead of the "rgb-color" property
-#      - [0, 0, 0, 0, 0]
-#      - [1, 0, 255, 0, 255]
-#      - [255, 255, 0, 0, 255]
+      - [0, 0, 0, 0, 0]
+      - [1, 0, 255, 0, 100]
+      - [2, 0, 255, 0, 200]
+      - [3, 255, 255, 0, 255]
+      - [4, 255, 165, 0, 255]
+      - [5, 255, 0, 0, 255]
+      - [255, 0, 0, 255, 255]
 
     opacity: 0.5
 
   predictions:
+    extension: png
     palette:
       rgb-color: [255, 0, 0]
 #      foreground-value: 1
@@ -22,3 +29,11 @@ layers:
 #      - [2, 255, 0, 255, 255]
 
     opacity: 0.4
+
+  masks-glass-box:
+    extension: png
+    palette:
+      - [0, 0, 0, 0, 0]
+      - [1, 238, 147, 224, 255]
+
+    opacity: 1

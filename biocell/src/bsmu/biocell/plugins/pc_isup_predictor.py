@@ -19,7 +19,7 @@ from bsmu.vision.core.models.base import ObjectParameter
 from bsmu.vision.core.models.table import TableColumn, TableItemDataRole
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.dnn.inferencer import ModelParams as DnnModelParams
+from bsmu.vision.dnn.inferencer import ImageModelParams as DnnModelParams
 from bsmu.vision.dnn.predictor import Predictor as DnnPredictor
 
 if TYPE_CHECKING:
@@ -204,7 +204,7 @@ class BiocellPcIsupPredictor(QObject):
     def predict(self, data: Data):
         # self._test_openslide(data.slide)
         # self._test_slideio(data)
-        return
+        # return
 
 
         print('predict', type(data))
@@ -237,7 +237,7 @@ class BiocellPcIsupPredictor(QObject):
         ensemble_glisson = 0
 
         for i, pc_predictor in enumerate(self._pc_predictors):
-            # pc_predictor.predict_async(partial(self._on_pc_predicted, pc_predictor), img)
+            # pc_predictor.predict_async(img, partial(self._on_pc_predicted, pc_predictor))
 
             pc_prediction = pc_predictor.predict(img)
             pc_prediction = self.sigmoid_array(pc_prediction)

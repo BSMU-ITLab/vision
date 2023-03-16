@@ -13,7 +13,7 @@ from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.visibility import Visibility
-from bsmu.vision.dnn.inferencer import ModelParams as DnnModelParams
+from bsmu.vision.dnn.inferencer import ImageModelParams as DnnModelParams
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter
 
 if TYPE_CHECKING:

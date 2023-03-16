@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from bsmu.biocell.plugins.images import icons_rc  # noqa: F401
 from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow, MainMenu, MenuBar, FileMenu, ToolsMenu, \
-    ViewMenu, WindowsMenu, SettingsMenu, HelpMenu
+    AlgorithmsMenu, ViewMenu, WindowsMenu, SettingsMenu, HelpMenu
 
 if TYPE_CHECKING:
     from typing import Tuple, Type
@@ -12,14 +13,15 @@ if TYPE_CHECKING:
 class BiocellMenuBar(MenuBar):
     def __init__(
             self,
-            menu_order: Tuple[MainMenu] = (FileMenu, ToolsMenu, ViewMenu, WindowsMenu, SettingsMenu, HelpMenu)
+            menu_order: Tuple[MainMenu] = (
+                    FileMenu, ToolsMenu, AlgorithmsMenu, ViewMenu, WindowsMenu, SettingsMenu, HelpMenu)
     ):
         super().__init__(menu_order)
 
 
 class BiocellMainWindow(MainWindow):
-    def __init__(self, title: str = '', menu_bar: MenuBar = None):
-        super().__init__(title, BiocellMenuBar() if menu_bar is None else menu_bar)
+    def __init__(self, title: str = '', icon_file_name: str = '', menu_bar: MenuBar = None):
+        super().__init__(title, icon_file_name, BiocellMenuBar() if menu_bar is None else menu_bar)
 
 
 class BiocellMainWindowPlugin(MainWindowPlugin):

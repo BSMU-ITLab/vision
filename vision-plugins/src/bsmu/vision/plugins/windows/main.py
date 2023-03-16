@@ -106,12 +106,16 @@ class MenuBar(QMenuBar):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, title: str = '', menu_bar: MenuBar = None):
+    def __init__(self, title: str = '', icon_file_name: str = '', menu_bar: MenuBar = None):
         super().__init__()
 
         self.resize(1200, 800)
         self.move(100, 100)
+
         self.setWindowTitle(title)
+
+        icon = QIcon(icon_file_name)
+        self.setWindowIcon(icon)
 
         self._menu_bar = MenuBar() if menu_bar is None else menu_bar
         self.setMenuBar(self._menu_bar)
@@ -142,15 +146,11 @@ class MainWindowPlugin(Plugin):
         return self._main_window
 
     def _enable(self):
-        self._main_window = self._main_window_cls()
+        title = self.config.value('title', 'Vision')
+        icon_file_name = self.config.value('icon_file_name', ':/icons/vision.svg')
+
+        self._main_window = self._main_window_cls(title, icon_file_name)
         self._main_window.setAttribute(Qt.WA_DeleteOnClose)
-
-        title_config = self.config.value('title')
-        if title_config is not None:
-            self._main_window.setWindowTitle(title_config)
-
-        icon = QIcon(':/icons/vision.svg')
-        self._main_window.setWindowIcon(icon)
 
         self._main_window.show()
 

@@ -1,0 +1,11 @@
+<!--
+To generate a *.py file use the next command in the terminal:
+..\vision\biocell\src\bsmu\biocell\plugins\images> pyside6-rcc icons.qrc -o icons_rc.py
+-->
+
+<!DOCTYPE RCC>
+<RCC version="1.0">
+<qresource>
+    <file>icons/biocell.svg</file>
+</qresource>
+</RCC>

@@ -22,8 +22,9 @@ if __name__ == '__main__':
         app_version=bsmu.biocell.app.__version__,
         app_description='Application to detect prostate cancer on images of prostate tissue biopsies.',
         app_base=None,
+        icon_path_relative_to_file_dir=Path('src/bsmu/biocell/app/images/icons/biocell.ico'),
 
-        add_packages=['bsmu.biocell.app', 'bsmu.biocell.plugins'],
+        add_packages=['bsmu.biocell.app', 'bsmu.biocell.plugins', 'scipy.optimize', 'scipy.integrate'],
         add_packages_with_data=[bsmu.biocell.app, bsmu.biocell.plugins],
     )
     app_builder.build()

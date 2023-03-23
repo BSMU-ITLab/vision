@@ -1,75 +1,35 @@
 from __future__ import annotations
 
-import importlib
-import inspect
-import pkgutil
+import ast
+import subprocess
 from pathlib import Path
 from types import ModuleType
 from typing import List
 
 from cx_Freeze import setup, Executable
 
+import bsmu.vision.app
 import bsmu.vision.plugins
 from bsmu.vision.core.data_file import DataFileProvider
 
 
-# see: https://packaging.python.org/guides/creating-and-discovering-plugins/#using-namespace-packages
-def iter_namespace_package_modules(namespace_package: ModuleType):
-    # Specifying the second argument (prefix) to iter_modules makes the
-    # returned name an absolute name instead of a relative one. This allows
-    # import_module to work without having to do additional modification to
-    # the name.
-    return pkgutil.iter_modules(namespace_package.__path__, namespace_package.__name__ + ".")
-
-
-def find_modules_of_package_recursively(package: ModuleType, indent: int = 0):
-    indent_str = indent * '\t'
-    print(f'{indent_str}package:', package)
-    for finder, name, ispkg in iter_namespace_package_modules(package):
-        # print('Try to import:', name)  # Use this print to find current package or module with errors during import
-        module_or_package = importlib.import_module(name)
-        if ispkg:
-            yield from find_modules_of_package_recursively(module_or_package, indent + 1)
-        else:
-            indent_str = (indent + 1) * '\t'
-            print(f'{indent_str}module:', module_or_package)
-            yield module_or_package
-
-
-def find_modules_of_packages_recursively(packages: List[ModuleType], indent: int = 0):
-    for package in packages:
-        yield from find_modules_of_package_recursively(package, indent)
-
-
-def generate_list_of_data_file_tuples(packages_with_data: List[ModuleType]):
+def generate_list_of_data_file_tuples_in_subprocess(packages_with_data: List[ModuleType]) -> list[tuple[str, str]]:
     """
-    :param packages_with_data: packages to search DataFileProvider classes
-    :return: e.g. list of such tuples:
-    ('full-path/vision-app/bsmu/vision/app/App.conf.yaml', 'data/bsmu.vision.app/configs/App.conf.yaml')
-    full signature is:
-    [('full path to the data file or dir', 'relative path to the data file or dir in the build folder'), ...]
+    Get |list_of_data_file_tuples| using subprocess to fix strange crash during build.exe step.
+    The crash happens, when onnxruntime was previously imported.
+    (Everything worked well with onnxruntime-gpu 1.10.0, but with onnxruntime-gpu 1.14.1 crash happens.)
+    Subprocess allows to separate importlib.import_module calls and build.exe stage. So no crash happens.
     """
-    # Use dictionary to remove duplicate values
-    destination_data_path_by_absolute = {}
-    for module in find_modules_of_packages_recursively(packages_with_data):
-        class_name_value_pairs = inspect.getmembers(module, inspect.isclass)
-        for cls_name, cls in class_name_value_pairs:
-            # Skip classes, which were imported
-            if cls.__module__ != module.__name__:
-                continue
-
-            if not issubclass(cls, DataFileProvider):
-                continue
-
-            for absolute_data_dir, frozen_rel_data_dir in cls.frozen_rel_data_dir_by_absolute().items():
-                destination_data_path_by_absolute[absolute_data_dir] = frozen_rel_data_dir
-
-    # Convert |destination_data_path_by_absolute| dict to list of tuples
-    data_file_absolute_path_and_destination_tuples = \
-        [(str(absolute_data_path), str(frozen_rel_data_path))
-         for absolute_data_path, frozen_rel_data_path in destination_data_path_by_absolute.items()]
-
-    return data_file_absolute_path_and_destination_tuples
+    package_names = [package.__name__ for package in packages_with_data]
+    kwargs = {'package_names': package_names}
+    out = subprocess.check_output(
+        ['python', Path(__file__).parent / 'builder_helper.py', str(kwargs)])
+    out = out.decode('utf-8')
+    # Filter out empty strings after split
+    last_printed_output_str = list(filter(None, out.split('\n')))[-1]
+    last_printed_output_dict = ast.literal_eval(last_printed_output_str)
+    list_of_data_file_tuples = last_printed_output_dict['list_of_data_file_tuples']
+    return list_of_data_file_tuples
 
 
 class AppBuilder:
@@ -77,16 +37,19 @@ class AppBuilder:
     _DIST_DIR_NAME = 'dist'
 
     _BASE_BUILD_EXE_PACKAGES = [
-        'scipy.fftpack', 'scipy.ndimage',
-        'skimage.io', 'skimage.util', 'skimage.color',
+        'imageio',
         'numpy.core',
         'ruamel.yaml',
+        'scipy.fftpack', 'scipy.ndimage',
+        'skimage.color', 'skimage.io', 'skimage.util',
+        # To fix an error in a frozen build: unsupported operand type(s) for | operator.
+        # See the same issue in the PyInstaller: https://github.com/pyinstaller/pyinstaller/issues/7249
+        'PySide6.support.deprecated',
         'bsmu.vision.app',
         'bsmu.vision.core',
         'bsmu.vision.dnn',
         'bsmu.vision.plugins',
         'bsmu.vision.widgets',
-        'imageio',
     ]
 
     def __init__(
@@ -174,9 +137,9 @@ class AppBuilder:
     def _generate_default_build_exe_options(
             self,
             packages: List[str],
-            packages_with_data: List[ModuleType]
+            packages_with_data: List[ModuleType],
     ) -> dict:
-        list_of_data_file_tuples = generate_list_of_data_file_tuples(packages_with_data)
+        list_of_data_file_tuples = generate_list_of_data_file_tuples_in_subprocess(packages_with_data)
         frozen_rel_data_paths = [data_file_tuple[1] for data_file_tuple in list_of_data_file_tuples]
         data_modules_to_exclude = []
         for frozen_rel_data_path in frozen_rel_data_paths:

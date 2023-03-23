@@ -38,7 +38,7 @@ class MdiImageViewerLayerControllerPlugin(Plugin):
         self._layer_controller = MdiImageViewerLayerController(self._mdi)
 
         menu_action = self._main_window.add_menu_action(
-            ViewMenu, 'Active Layer View', self._layer_controller.toggle_active_layer_view, Qt.CTRL + Qt.Key_I)
+            ViewMenu, 'Active Layer View', self._layer_controller.toggle_active_layer_view, Qt.CTRL | Qt.Key_I)
         # menu_action.setCheckable(True)
         menu_action.setWhatsThis('Show active layer and hide other layers / Restore')
 

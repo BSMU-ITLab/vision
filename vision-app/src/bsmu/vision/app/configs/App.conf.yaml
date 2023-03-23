@@ -20,7 +20,7 @@ enable-gui: true
 
 max_thread_count: 1
 
-warn-with-traceback: true
+warn-with-traceback: false
 
 onnx_providers:
   - CUDAExecutionProvider

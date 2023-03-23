@@ -14,7 +14,6 @@ import skimage.util
 from bsmu.vision.core.image import tile_splitter
 from ctypes import CDLL
 
-from bsmu.retinal_fundus.plugins.table_visualizer import StyledItemDelegate
 from bsmu.vision.core.models.base import ObjectParameter
 from bsmu.vision.core.models.table import TableColumn, TableItemDataRole
 from bsmu.vision.core.image.base import FlatImage
@@ -27,10 +26,7 @@ if TYPE_CHECKING:
     from PySide6.QtGui import QPainter
     from PySide6.QtWidgets import QStyleOptionViewItem
 
-    from bsmu.retinal_fundus.plugins.table_visualizer import RetinalFundusTableVisualizerPlugin, \
-        RetinalFundusTableVisualizer, PatientRetinalFundusRecord
     from bsmu.vision.core.bbox import BBox
-
     from bsmu.vision.core.data import Data
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager

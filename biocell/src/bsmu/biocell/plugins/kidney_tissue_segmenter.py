@@ -130,7 +130,7 @@ class BiocellKidneyTissueSegmenter(QObject):
         stain_2_normalized_uint8 = normalized_uint8(stain_2)
 
         tissue_mask = np.zeros_like(stain_0_normalized_uint8)
-        tissue_mask[np.where((stain_0_normalized_uint8 > 1) | (stain_2_normalized_uint8 > 1))] = 1
+        tissue_mask[np.where((stain_0_normalized_uint8 > 1) | (stain_2_normalized_uint8 > 7))] = 1
         tissue_palette = Palette.default_binary(rgb_color=[131, 151, 98])
         layered_image_viewer.data.add_layer_or_modify_pixels(
             TISSUE_MASK_LAYER_NAME, tissue_mask, FlatImage, tissue_palette)

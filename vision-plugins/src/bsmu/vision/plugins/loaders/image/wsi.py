@@ -4,11 +4,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import skimage.io
+import slideio
 
 from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.plugins.loaders.image.base import ImageFileLoaderPlugin, ImageFileLoader
 from pathlib import Path
 from bsmu.vision.core.data import Data
+from bsmu.vision.core.path import is_ascii_path
 
 # if TYPE_CHECKING:
 #     from pathlib import Path
@@ -20,7 +22,21 @@ class WholeSlideImageFileLoaderPlugin(ImageFileLoaderPlugin):
 
 
 class WholeSlideImageFileLoader(ImageFileLoader):
-    _FORMATS = ('svs', 'tiff', 'tif')
+    _FORMATS = ('svs', 'afi', 'scn', 'czi', 'zvi', 'ndpi', 'tiff', 'tif')
+
+    def __init__(self):
+        super().__init__()
+
+        self._slideio_driver_by_file_extension = {
+            '.svs': 'SVS',
+            '.afi': 'AFI',
+            '.scn': 'SCN',
+            '.czi': 'CZI',
+            '.zvi': 'ZVI',
+            '.ndpi': 'NDPI',
+            '.tiff': 'GDAL',
+            '.tif': 'GDAL',
+        }
 
     def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
         print('Load Whole-Slide Image')
@@ -56,9 +72,13 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         # data = Data(path)
         # return data
 
+        if not is_ascii_path(path):
+            print('Current version of SlideIO library cannot open file if non-ASCII characters present in path name')
+            return None
 
-        import slideio
-        slide = slideio.open_slide(str(path), "SVS")
+        file_extension = path.suffix
+        slideio_driver = self._slideio_driver_by_file_extension[file_extension]
+        slide = slideio.open_slide(str(path), slideio_driver)
         scene = slide.get_scene(0)
         full_resolution_width = scene.rect[2]
         # region = scene.read_block(size=(round(full_resolution_width / 7.53), 0))

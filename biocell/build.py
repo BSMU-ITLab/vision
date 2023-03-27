@@ -18,7 +18,7 @@ if __name__ == '__main__':
         file_dir=Path(__file__).parent,
         script_path_relative_to_file_dir=Path('src/bsmu/biocell/app/__main__.py'),
 
-        app_name='Biocell',
+        app_name=bsmu.biocell.app.__title__,
         app_version=bsmu.biocell.app.__version__,
         app_description='Application to detect prostate cancer on images of prostate tissue biopsies.',
         app_base=None,

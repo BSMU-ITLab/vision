@@ -18,7 +18,7 @@ if __name__ == '__main__':
         file_dir=Path(__file__).parent,
         script_path_relative_to_file_dir=Path('src/bsmu/bone_age/app/__main__.py'),
 
-        app_name='Bone Age Analyzer',
+        app_name=bsmu.bone_age.app.__title__,
         app_version=bsmu.bone_age.app.__version__,
         app_description='Application to predict bone age on hand X-ray images.',
         # app_base=None,

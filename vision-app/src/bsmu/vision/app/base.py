@@ -13,6 +13,7 @@ from bsmu.vision.app.plugin_manager import PluginManager
 from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.config.united import UnitedConfig
 from bsmu.vision.core.data_file import DataFileProvider
+from bsmu.vision.core.freeze import is_app_frozen
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.dnn.config import OnnxConfig
 
@@ -24,10 +25,13 @@ class App(QObject, DataFileProvider):
     plugin_enabled = Signal(Plugin)
     plugin_disabled = Signal(Plugin)
 
-    def __init__(self):
+    def __init__(self, name: str, version: str):
         super().__init__()
 
-        print(f'App started. Prefix: {sys.prefix}')
+        print(f'{name} {version}')
+        if not is_app_frozen():
+            print(f'Prefix: {sys.prefix}')
+        print(f'Executable: {sys.executable}')
 
         # Set to users preferred locale to output correct decimal point (comma or point):
         locale.setlocale(locale.LC_NUMERIC, '')
@@ -36,6 +40,8 @@ class App(QObject, DataFileProvider):
 
         self._gui_enabled = self._config.value('enable-gui')
         self._qApp = QApplication(sys.argv) if self._gui_enabled else QCoreApplication(sys.argv)
+        self._qApp.setApplicationName(name)
+        self._qApp.setApplicationVersion(version)
 
         ThreadPool.init_executor(self._config.value('max_thread_count'))
 

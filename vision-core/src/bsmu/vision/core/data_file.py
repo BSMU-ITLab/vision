@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from bsmu.vision.core.freeze import is_app_frozen
+
 
 class DataFileProvider:
     _BASE_DATA_DIRS = ('configs',)
@@ -47,11 +49,9 @@ class DataFileProvider:
 
     @classmethod
     def data_path(cls, *rel_path_parts) -> Path:
-        if getattr(sys, 'frozen', False):
-            # The application is frozen into *.exe
+        if is_app_frozen():
             return cls.frozen_absolute_data_path(*rel_path_parts)
         else:
-            # The application is not frozen
             return cls.absolute_data_path(*rel_path_parts)
 
     @classmethod

@@ -1,3 +1,4 @@
+from bsmu.bone_age.app import __title__, __version__
 from bsmu.vision.app.base import App
 
 
@@ -6,9 +7,7 @@ class BoneAgeApp(App):
 
 
 def run_app():
-    print('Run, Bone Age! Run!')
-
-    app = BoneAgeApp()
+    app = BoneAgeApp(__title__, __version__)
     app.run()
 
 

@@ -1,3 +1,4 @@
+from bsmu.biocell.app import __title__, __version__
 from bsmu.vision.app.base import App
 
 
@@ -6,9 +7,7 @@ class BiocellApp(App):
 
 
 def run_app():
-    print('Run, Biocell! Run!')
-
-    app = BiocellApp()
+    app = BiocellApp(__title__, __version__)
     app.run()
 
 

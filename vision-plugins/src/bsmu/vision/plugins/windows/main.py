@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QCoreApplication
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import QMainWindow, QMenuBar, QMenu
 from sortedcontainers import SortedDict
@@ -146,7 +146,8 @@ class MainWindowPlugin(Plugin):
         return self._main_window
 
     def _enable(self):
-        title = self.config.value('title', 'Vision')
+        app = QCoreApplication.instance()
+        title = self.config.value('title', f'{app.applicationName()} {app.applicationVersion()}')
         icon_file_name = self.config.value('icon_file_name', ':/icons/vision.svg')
 
         self._main_window = self._main_window_cls(title, icon_file_name)

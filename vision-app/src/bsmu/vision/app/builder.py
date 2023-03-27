@@ -59,7 +59,7 @@ class AppBuilder:
             build_dir: Path | None = None,
             dist_dir: Path | None = None,
 
-            app_name: str = 'Vision',
+            app_name: str = bsmu.vision.app.__title__,
             app_version: str = '1.0.0',
             app_description: str = 'Base application for image visualization and processing '
                                    'that is easily extensible with plugins.',

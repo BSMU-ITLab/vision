@@ -1,3 +1,4 @@
+from bsmu.retinal_fundus.app import __title__, __version__
 from bsmu.vision.app.base import App
 
 
@@ -6,9 +7,7 @@ class RetinalFundusApp(App):
 
 
 def run_app():
-    print('Run, Retinal Fundus! Run!')
-
-    app = RetinalFundusApp()
+    app = RetinalFundusApp(__title__, __version__)
     app.run()
 
 

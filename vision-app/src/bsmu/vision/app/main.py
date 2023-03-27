@@ -1,10 +1,9 @@
+from bsmu.vision.app import __title__, __version__
 from bsmu.vision.app.base import App
 
 
 def run_app():
-    print('Run, Vision! Run!')
-
-    app = App()
+    app = App(__title__, __version__)
     app.run()
 
 

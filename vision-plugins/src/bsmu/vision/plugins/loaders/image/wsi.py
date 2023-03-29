@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -39,7 +40,7 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         }
 
     def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
-        print('Load Whole-Slide Image')
+        logging.info('Load Whole-Slide Image')
 
         # multi_image_level = 1
         # pixels = skimage.io.MultiImage(
@@ -73,7 +74,8 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         # return data
 
         if not is_ascii_path(path):
-            print('Current version of SlideIO library cannot open file if non-ASCII characters present in path name')
+            logging.error(
+                'Current version of SlideIO library cannot open file if non-ASCII characters present in path name')
             return None
 
         file_extension = path.suffix

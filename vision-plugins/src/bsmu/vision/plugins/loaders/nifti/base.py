@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import logging
+from typing import TYPE_CHECKING
+
 import nibabel as nib
 import numpy as np
 
 from bsmu.vision.core.image.base import VolumeImage, SpatialAttrs
 from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class NiftiFileLoaderPlugin(FileLoaderPlugin):
@@ -16,7 +22,7 @@ class NiftiFileLoader(FileLoader):
     _FORMATS = ('nii.gz',)
 
     def _load_file(self, path: Path, palette=None, **kwargs) -> VolumeImage:
-        print('Load NIfTI DICOM')
+        logging.info('Load NIfTI DICOM')
 
         nifti_image = nib.load(str(path))
 
@@ -26,10 +32,10 @@ class NiftiFileLoader(FileLoader):
         # https://nipy.org/nibabel/dicom/dicom_orientation.html
         direction = nifti_image.affine[:3, :3] / spacing
 
-        print('affine\n', nifti_image.affine)
-        print('origin', origin)
-        print('spacing', spacing)
-        print('direction\n', direction)
+        logging.info(f'Affine:\n{nifti_image.affine}\n'
+                     f'Origin: {origin}\n'
+                     f'Spacing: {spacing}\n'
+                     f'Direction:\n{direction}')
         spatial = SpatialAttrs(origin=origin, spacing=spacing, direction=direction)
 
         return VolumeImage(np.asanyarray(nifti_image.dataobj), palette=palette, path=path, spatial=spatial)  # nifti_image.get_fdata()

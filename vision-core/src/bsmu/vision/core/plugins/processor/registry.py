@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
@@ -55,7 +56,7 @@ class ProcessorRegistry:
     def register_processor_cls(self, processor_cls_with_settings: ProcessorClsWithSettings):
         for processed_key in processor_cls_with_settings.processor_cls.processed_keys:
             if processed_key in self._registry:
-                print(f'Warning: the <{processed_key}> key already has processors: {self._registry[processed_key]}')
+                logging.warning(f'The <{processed_key}> key already has processors: {self._registry[processed_key]}')
             self._registry[processed_key].append(processor_cls_with_settings)
 
     def unregister_processor_cls(self, processor_cls_with_settings: ProcessorClsWithSettings):

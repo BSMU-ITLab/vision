@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
@@ -27,10 +28,10 @@ class Plugin(QObject, DataFileProvider):
 
         self._dependency_plugin_by_key: dict = {}
 
-        self._print_action('inited')
+        self._log_action('inited')
 
     def __del__(self):
-        self._print_action('deleted')
+        self._log_action('deleted')
 
     @classmethod
     @property
@@ -50,7 +51,7 @@ class Plugin(QObject, DataFileProvider):
         self._enable()
         if enable_gui:
             self._enable_gui()
-        self._print_action('enabled')
+        self._log_action('enabled')
         self.enabled.emit(self)
 
     def _enable(self):
@@ -60,7 +61,7 @@ class Plugin(QObject, DataFileProvider):
         pass
 
     def disable(self):
-        self._print_action('disabling')
+        self._log_action('disabling')
         self.disabling.emit(self)
         self._disable()
         self.disabled.emit(self)
@@ -80,5 +81,5 @@ class Plugin(QObject, DataFileProvider):
         return f'{cls.__module__}.{cls.__qualname__}'
 
     @classmethod
-    def _print_action(cls, action_str: str):
-        print(f'Plugin {action_str}:\t{cls.name()}')
+    def _log_action(cls, action_str: str):
+        logging.info(f'Plugin {action_str}:\t{cls.name()}')

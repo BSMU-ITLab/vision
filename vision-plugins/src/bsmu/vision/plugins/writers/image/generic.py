@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -117,6 +118,6 @@ class GenericImageFileWriter(FileWriter):
     _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tif', 'tiff')
 
     def _write_to_file(self, data: Image, path: Path, **kwargs):
-        print('Write Generic Image')
+        logging.info('Write Generic Image')
 
         skimage.io.imsave(str(path), data.pixels, check_contrast=False)

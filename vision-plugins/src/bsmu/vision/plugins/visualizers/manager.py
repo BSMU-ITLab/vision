@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
@@ -60,7 +61,7 @@ class DataVisualizationManager(QObject):
         return self.data_visualizer_registry.contains(type(data))
 
     def visualize_data(self, data: Data):
-        print('Visualize data:', type(data))
+        logging.info(f'Visualize data: {type(data)}')
         visualizer_cls_with_settings = self.data_visualizer_registry.processor_cls_with_settings(type(data))
         if visualizer_cls_with_settings is not None:
             visualizer = visualizer_cls_with_settings.processor_cls(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from bsmu.vision.core.constants import PlaneAxis
@@ -27,7 +28,7 @@ class LayeredImageVisualizer(DataVisualizer):
     _DATA_TYPES = (LayeredImage, )
 
     def _visualize_data(self, data: LayeredImage):
-        print('visualize layered image')
+        logging.info('Visualize layered image')
 
         viewer_sub_windows = []
         if data.layers[0].image.n_dims == VolumeImage.n_dims:

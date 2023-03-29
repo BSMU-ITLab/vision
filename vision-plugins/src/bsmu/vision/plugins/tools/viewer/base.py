@@ -311,8 +311,6 @@ class LayeredImageViewerTool(ViewerTool):
 
         self._on_layer_image_updated()
 
-        self.viewer.print_layer_views()
-
     def deactivate(self):
         self.image_layer_view.image_layer.image_updated.disconnect(self._on_layer_image_updated)
         self.image_layer_view.image_view_updated.disconnect(self._on_layer_image_updated)

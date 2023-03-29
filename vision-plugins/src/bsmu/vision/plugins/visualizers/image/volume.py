@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from bsmu.vision.core.constants import PlaneAxis
 from bsmu.vision.core.image.base import VolumeImage
 from bsmu.vision.core.image.layered import LayeredImage
@@ -17,7 +19,7 @@ class VolumeImageVisualizer(DataVisualizer):
     _DATA_TYPES = (VolumeImage, )
 
     def _visualize_data(self, data: VolumeImage):
-        print('visualize volume image')
+        logging.info('Visualize volume image')
 
         layered_image = LayeredImage()
         layered_image.add_layer_from_image(data, name=data.dir_name)

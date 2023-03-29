@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 from typing import Type, Optional
 
 from PySide6.QtCore import QObject, Signal
 
-from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.data import Data
+from bsmu.vision.core.plugins.base import Plugin
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
+    from bsmu.vision.plugins.loaders.base import FileLoader
     from bsmu.vision.plugins.loaders.registry import FileLoaderRegistryPlugin
 
 
@@ -47,7 +51,7 @@ class FileLoadingManager(QObject):
         return self._loader_cls(path) is not None
 
     def load_file(self, path: Path, **kwargs) -> Optional[Data]:
-        print('File loader: load_file')
+        logging.info(f'Load file: {path}')
         if path.exists():
             format_loader_cls = self._loader_cls(path)
             if format_loader_cls is None:

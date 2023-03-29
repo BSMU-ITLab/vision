@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -106,7 +107,7 @@ class FileDropper(QObject):
         event.setAccepted(bool(self.dragged_loadable_file_paths))
 
     def on_drop(self, event):
-        print('drop', self.dragged_loadable_file_paths)
+        logging.info(f'Drop: {self.dragged_loadable_file_paths}')
         for file_path in self.dragged_loadable_file_paths:
             data = self.file_loading_manager.load_file(file_path)
             data = self.post_load_conversion_manager.convert_data(data)

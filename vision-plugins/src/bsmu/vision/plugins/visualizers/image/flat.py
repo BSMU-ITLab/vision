@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
+
+from bsmu.vision.core.image.base import FlatImage
+from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.plugins.visualizers.image.base import ImageVisualizerPlugin, ImageVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
-from bsmu.vision.core.image.base import FlatImage
-from bsmu.vision.core.image.layered import LayeredImage
 
 
 class FlatImageVisualizerPlugin(ImageVisualizerPlugin):
@@ -16,7 +18,7 @@ class FlatImageVisualizer(ImageVisualizer):
     _DATA_TYPES = (FlatImage, )
 
     def _visualize_data(self, data: FlatImage):
-        print('visualize flat image')
+        logging.info('Visualize flat image')
 
         layered_image = LayeredImage()
         layered_image.add_layer_from_image(data, name=data.dir_name)

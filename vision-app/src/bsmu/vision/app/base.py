@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import argparse
 import locale
+import logging
 import sys
 import traceback
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal, QCoreApplication
@@ -26,12 +29,21 @@ class App(QObject, DataFileProvider):
     plugin_disabled = Signal(Plugin)
 
     def __init__(self, name: str, version: str):
+        name_version = f'{name} {version}'
+
+        arg_parser = argparse.ArgumentParser(prog=name_version)
+        arg_parser.add_argument('-l', '--log-level', default=logging.getLevelName(logging.INFO))
+        self._args = arg_parser.parse_args()
+
+        self._init_logging()
+
+        # Call the base method after the logging initialization
         super().__init__()
 
-        print(f'{name} {version}')
+        logging.info(name_version)
         if not is_app_frozen():
-            print(f'Prefix: {sys.prefix}')
-        print(f'Executable: {sys.executable}')
+            logging.info(f'Prefix: {sys.prefix}')
+        logging.info(f'Executable: {sys.executable}')
 
         # Set to users preferred locale to output correct decimal point (comma or point):
         locale.setlocale(locale.LC_NUMERIC, '')
@@ -68,6 +80,29 @@ class App(QObject, DataFileProvider):
 
     def run(self):
         sys.exit(self._qApp.exec())
+
+    def _init_logging(self):
+        log_level_str = self._args.log_level
+        log_level = getattr(logging, log_level_str.upper(), None)
+        if not isinstance(log_level, int):
+            raise ValueError(f'Invalid log level: {log_level_str}')
+        log_format = '\t\t\t\t\t%(asctime)s %(levelname)s\t\t%(filename)s %(lineno)d\t\t%(funcName)s\n' \
+                     '%(message)s'
+        if is_app_frozen():
+            log_path = Path('logs')
+            try:
+                log_path.mkdir(exist_ok=True)
+            except:
+                # Create log files without common directory
+                # if the application has no rights to create the directory
+                log_path = Path('.')
+            logging.basicConfig(
+                filename=log_path / f'log-{log_level_str.lower()}.log',
+                format=log_format,
+                level=log_level,
+                encoding='utf-8')
+        else:
+            logging.basicConfig(format=log_format, level=log_level, stream=sys.stdout)
 
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):

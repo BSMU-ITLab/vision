@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal, QCoreApplication
 from PySide6.QtWidgets import QApplication
 
+from bsmu.vision.app.logger import ColoredFormatter, RotatingFileHandlerWithSeparator, SimpleFormatter
 from bsmu.vision.app.plugin_manager import PluginManager
 from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.config.united import UnitedConfig
@@ -86,8 +87,6 @@ class App(QObject, DataFileProvider):
         log_level = getattr(logging, log_level_str.upper(), None)
         if not isinstance(log_level, int):
             raise ValueError(f'Invalid log level: {log_level_str}')
-        log_format = '\t\t\t\t\t%(asctime)s %(levelname)s\t\t%(filename)s %(lineno)d\t\t%(funcName)s\n' \
-                     '%(message)s'
         if is_app_frozen():
             log_path = Path('logs')
             try:
@@ -96,13 +95,17 @@ class App(QObject, DataFileProvider):
                 # Create log files without common directory
                 # if the application has no rights to create the directory
                 log_path = Path('.')
-            logging.basicConfig(
+            handler = RotatingFileHandlerWithSeparator(
                 filename=log_path / f'log-{log_level_str.lower()}.log',
-                format=log_format,
-                level=log_level,
+                maxBytes=2_097_152,  # 2 MB
+                backupCount=1,
                 encoding='utf-8')
+            formatter = SimpleFormatter()
         else:
-            logging.basicConfig(format=log_format, level=log_level, stream=sys.stdout)
+            handler = logging.StreamHandler(stream=sys.stdout)
+            formatter = ColoredFormatter()
+        handler.setFormatter(formatter)
+        logging.basicConfig(level=log_level, handlers=[handler])
 
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -15,16 +14,22 @@ from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.visibility import Visibility
 from bsmu.vision.dnn.inferencer import ImageModelParams as DnnModelParams
 from bsmu.vision.dnn.segmenter import Segmenter as DnnSegmenter
+from bsmu.vision.plugins.windows.main import AlgorithmsMenu
+from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewerHolder
 
 if TYPE_CHECKING:
     from bsmu.vision.core.data import Data
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
 
 
 class BiocellPcGleasonSegmenterPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
+        'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
+        'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
         'file_loading_manager_plugin':
             'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
         'data_visualization_manager_plugin':
@@ -36,10 +41,18 @@ class BiocellPcGleasonSegmenterPlugin(Plugin):
 
     def __init__(
             self,
+            main_window_plugin: MainWindowPlugin,
+            mdi_plugin: MdiPlugin,
             file_loading_manager_plugin: FileLoadingManagerPlugin,
             data_visualization_manager_plugin: DataVisualizationManagerPlugin,
     ):
         super().__init__()
+
+        self._main_window_plugin = main_window_plugin
+        self._main_window: MainWindow | None = None
+
+        self._mdi_plugin = mdi_plugin
+        self._mdi: Mdi | None = None
 
         self._file_loading_manager_plugin = file_loading_manager_plugin
         self._file_loading_manager: FileLoadingManager | None = None
@@ -47,53 +60,89 @@ class BiocellPcGleasonSegmenterPlugin(Plugin):
         self._data_visualization_manager_plugin = data_visualization_manager_plugin
         self._data_visualization_manager: DataVisualizationManager
 
-        self._pc_gleason_segmenter: BiocellPcGleasonSegmenter | None = None
+        self._pc_gleason_3_segmenter: BiocellPcGleasonSegmenter | None = None
+        self._pc_gleason_4_segmenter: BiocellPcGleasonSegmenter | None = None
 
     @property
     def pc_gleason_segmenter(self) -> BiocellPcGleasonSegmenter | None:
-        return self._pc_gleason_segmenter
+        return self._pc_gleason_3_segmenter
 
     def _enable(self):
         self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
 
-        model_params = DnnModelParams.from_config(
+        model_params_gleason_3 = DnnModelParams.from_config(
             self.config.value('gleason-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
+        model_params_gleason_4 = DnnModelParams.from_config(
+            self.config.value('gleason-4-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
 
-        self._pc_gleason_segmenter = BiocellPcGleasonSegmenter(
-            self._data_visualization_manager, model_params)
+        self._pc_gleason_3_segmenter = BiocellPcGleasonSegmenter(
+            self._data_visualization_manager, model_params_gleason_3, Palette.default_binary(rgb_color=[255, 255, 0]))
+        self._pc_gleason_4_segmenter = BiocellPcGleasonSegmenter(
+            self._data_visualization_manager, model_params_gleason_4, Palette.default_binary(rgb_color=[255, 165, 0]))
 
-        # self._file_loading_manager.file_loaded.connect(self._pc_gleason_segmenter.segment)
-        self._data_visualization_manager.data_visualized.connect(self._pc_gleason_segmenter.on_data_visualized)
+        # self._data_visualization_manager.data_visualized.connect(self._pc_gleason_3_segmenter.on_data_visualized)
+
+    def _enable_gui(self):
+        self._main_window = self._main_window_plugin.main_window
+        self._mdi = self._mdi_plugin.mdi
+
+        self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Gleason >= 3', self._segment_gleason_3_and_above)
+        self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Gleason >= 4', self._segment_gleason_4_and_above)
 
     def _disable(self):
-        self._pc_gleason_segmenter = None
+        self._pc_gleason_3_segmenter = None
+        self._pc_gleason_4_segmenter = None
 
         self._file_loading_manager = None
         self._data_visualization_manager = None
 
         raise NotImplementedError
 
+    def _segment_gleason_3_and_above(self):
+        layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
+        if layered_image_viewer_sub_window is None:
+            return
+
+        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
+        self._pc_gleason_3_segmenter.segment(layered_image_viewer.data, 'gleason >= 3')
+
+    def _segment_gleason_4_and_above(self):
+        layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
+        if layered_image_viewer_sub_window is None:
+            return
+
+        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
+        self._pc_gleason_4_segmenter.segment(layered_image_viewer.data, 'gleason >= 4')
+
 
 class BiocellPcGleasonSegmenter(QObject):
-    def __init__(self, data_visualization_manager: DataVisualizationManager, model_params: DnnModelParams):
+    def __init__(
+            self, data_visualization_manager: DataVisualizationManager,
+            model_params: DnnModelParams,
+            mask_palette: Palette,
+    ):
         super().__init__()
 
         self._data_visualization_manager = data_visualization_manager
         self._model_params = model_params
+        self._mask_palette = mask_palette
 
         self._segmenter = DnnSegmenter(self._model_params)
 
-    def segment(self, data: Data):
-        print('segment', type(data))
+    def segment(self, layered_image: LayeredImage, mask_layer_name: str):
+        print('segment', type(layered_image))
 
-        if not isinstance(data, FlatImage):
-            return
-
-        image = data.pixels
+        image = layered_image.layers[0].image.pixels
         print('image:', image.shape, image.dtype, image.min(), image.max())
 
         mask = self._segment_image(image)
+        layered_image.add_layer_or_modify_pixels(
+            mask_layer_name,
+            mask,
+            FlatImage,
+            self._mask_palette,
+            Visibility(True, 0.5))
 
     def on_data_visualized(self, data: Data, data_viewer_sub_windows: list[DataViewerSubWindow]):
         if not isinstance(data, LayeredImage) or (len(data.layers) > 1 and data.layers[1].name == 'mask'):

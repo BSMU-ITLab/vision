@@ -5,7 +5,7 @@ plugins:
 #  - bsmu.biocell.plugins.pc_isup_predictor.BiocellPcIsupPredictorPlugin
   - bsmu.biocell.plugins.pc_gleason_segmenter.BiocellPcGleasonSegmenterPlugin
   - bsmu.biocell.plugins.hed_wsi_smart_brush.HedSmartBrushImageViewerToolPlugin
-  - bsmu.biocell.plugins.kidney_tissue_segmenter.BiocellKidneyTissueSegmenterPlugin
+#  - bsmu.biocell.plugins.kidney_tissue_segmenter.BiocellKidneyTissueSegmenterPlugin
 
   - bsmu.vision.plugins.overlayers.image.base.ImageViewerOverlayerPlugin
 

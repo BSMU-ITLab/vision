@@ -27,3 +27,13 @@ gleason-segmenter-model:
   channels-axis: 0
   normalize: false
   preload: false
+
+
+gleason-4-segmenter-model:
+  name: 'ourdata-segformer_mit-b0-panda+empty4.onnx'  # Trained on Gleason >= 4
+  preprocessing-mode: 'image-net-torch'
+  channels-order: 'rgb'
+  input-size: [3, 256, 256]
+  channels-axis: 0
+  normalize: false
+  preload: false

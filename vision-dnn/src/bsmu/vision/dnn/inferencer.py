@@ -129,7 +129,7 @@ class ImageModelParams(ModelParams):
         if self.channels_order == 'bgr':
             image = image[..., ::-1]
 
-        image = image.swapaxes(self.channels_axis, DEFAULT_CHANNELS_AXIS)
+        image = np.moveaxis(image, DEFAULT_CHANNELS_AXIS, self.channels_axis)
 
         return image
 

@@ -73,16 +73,17 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         # data = Data(path)
         # return data
 
-        if not is_ascii_path(path):
-            logging.error(
-                'Current version of SlideIO library cannot open file if non-ASCII characters present in path name')
-            return None
+        # if not is_ascii_path(path):
+        #     logging.error(
+        #         'Current version of SlideIO library cannot open file if non-ASCII characters present in path name')
+        #     return None
 
         file_extension = path.suffix
         slideio_driver = self._slideio_driver_by_file_extension[file_extension]
         slide = slideio.open_slide(str(path), slideio_driver)
         scene = slide.get_scene(0)
         full_resolution_width = scene.rect[2]
+        print('full_resolution_width', full_resolution_width)
         # region = scene.read_block(size=(round(full_resolution_width / 7.53), 0))
         region = scene.read_block(size=(round(full_resolution_width / 8), 0))
 

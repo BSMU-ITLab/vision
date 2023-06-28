@@ -155,6 +155,7 @@ class AppBuilder:
             'excludes': excludes,
             'includes': ['numpy', 'scipy.sparse.csgraph._validation'],
             'include_files': list_of_data_file_tuples,
+            # 'include_msvcr': True,
         }
 
     def _generate_default_install_exe_options(self) -> dict:

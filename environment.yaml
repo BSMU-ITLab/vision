@@ -58,7 +58,7 @@ dependencies:
       - scipy==1.10.1
       - shiboken6==6.4.3
       - six==1.16.0
-      - slideio==2.0.5
+      - slideio==2.0.7
       - sortedcontainers==2.4.0
       - sympy==1.11.1
       - tifffile==2023.3.21

@@ -147,27 +147,18 @@ class BiocellPcGleasonSegmenter(QObject):
                 # skimage.io.imsave(r'D:\Temp\gleason-segmentation-tests\tile.png', tile)
 
                 # self._data_visualization_manager.visualize_data(FlatImage(tile, path=Path(f'{row}-{col}')))
-                layered_tile = LayeredImage(path=Path(f'row: {row} - col: {col}'))
-                layered_tile.add_layer_from_image(FlatImage(tile))
 
                 tile = tile.astype(np.float32)
-                tile = (255 - tile) / 255
+                # tile = (255 - tile) / 255
+                # tile = tile / 255
 
                 tile_mask = self._segmenter.segment(tile)
-                tile_mask = tile_mask.transpose(1, 0)  # It's a temp fix of incorrect neural network result
-                # skimage.io.imsave(
-                #     r'D:\Temp\gleason-segmentation-tests\tile_mask.png', ((tile_mask > 0.5) * 255).astype(np.uint8))
-
-                layered_tile.add_layer_from_image(
-                    FlatImage((tile_mask > 0.5).astype(np.uint8), Palette.default_binary(rgb_color=[0, 255, 0])),
-                    'mask')
-                # self._data_visualization_manager.visualize_data(layered_tile)
 
                 # tiled_mask[row, col] = tile_mask > 0.5
 
                 tile_y = row * tile_size
                 tile_x = col * tile_size
-                tiled_mask[tile_y:(tile_y + tile_size), tile_x:(tile_x + tile_size)] = tile_mask > 0.5
+                tiled_mask[tile_y:(tile_y + tile_size), tile_x:(tile_x + tile_size)] = tile_mask > 0 #% 0.5
 
         # padded_mask = tiled_mask.transpose((0, 2, 1, 3)).reshape(padded_image.shape[:-1])
         padded_mask = tiled_mask

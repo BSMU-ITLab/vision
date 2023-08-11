@@ -22,7 +22,6 @@ if __name__ == '__main__':
         app_version=bsmu.retinal_fundus.app.__version__,
         app_description='Application to analyze disk, cup, vessels parameters '
                         'and to detect multiple sclerosis features on retinal fundus images.',
-        # app_base=None,
 
         add_packages=['bsmu.retinal_fundus.app', 'bsmu.retinal_fundus.plugins'],
         add_packages_with_data=[bsmu.retinal_fundus.app, bsmu.retinal_fundus.plugins],

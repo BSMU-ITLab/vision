@@ -23,6 +23,5 @@ if __name__ == '__main__':
         file_dir=Path(__file__).parent,
 
         app_version=app.__version__,
-        app_base=None,
     )
     app_builder.build()

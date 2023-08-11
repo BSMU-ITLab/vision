@@ -63,8 +63,6 @@ class AppBuilder:
             app_version: str = '1.0.0',
             app_description: str = 'Base application for image visualization and processing '
                                    'that is easily extensible with plugins.',
-            app_base: str | None = 'Win32GUI',  # Use None for a console application
-            # (or to display GUI and console windows)
             icon_path_relative_to_file_dir: Path | None = None,
 
             add_packages: List[str] | None = None,
@@ -78,16 +76,13 @@ class AppBuilder:
         self._file_dir = file_dir
         self._script_path_relative_to_file_dir = script_path_relative_to_file_dir
         self._build_name = f'{app_name.replace(" ", "")}-{app_version}'
-        console_suffix = '-c' if app_base is None else ''
-        self._build_name_with_console_suffix = self._build_name + console_suffix
-        self._build_dir = self._file_dir / self._BUILD_DIR_NAME / self._build_name_with_console_suffix \
+        self._build_dir = self._file_dir / self._BUILD_DIR_NAME / self._build_name \
             if build_dir is None else build_dir
         self._dist_dir = self._file_dir / self._DIST_DIR_NAME if dist_dir is None else dist_dir
 
         self._app_name = app_name
         self._app_version = app_version
-        self._app_description = app_description
-        self._app_base = app_base
+        self._app_description = f'{self._app_name} - {app_description}'
         if icon_path_relative_to_file_dir is None:
             self._icon_path = Path(__file__).parent / 'images/icons/vision.ico'
         else:
@@ -115,6 +110,29 @@ class AppBuilder:
             if bdist_msi_options is None else bdist_msi_options
 
     def build(self):
+        script = self._file_dir / self._script_path_relative_to_file_dir
+        target_name = self._build_name
+        shortcut_name = self._app_name
+        shortcut_dir = 'DesktopFolder'
+        icon = self._icon_path
+
+        gui_exe = Executable(
+            script,
+            base='Win32GUI',
+            target_name=target_name,
+            shortcut_name=shortcut_name,
+            shortcut_dir=shortcut_dir,
+            icon=icon,
+        )
+        cmd_exe = Executable(
+            script,
+            base=None,
+            target_name=target_name + '-c',
+            shortcut_name=shortcut_name,
+            shortcut_dir=shortcut_dir,
+            icon=icon,
+        )
+
         setup(
             name=self._app_name,
             version=self._app_version,
@@ -124,14 +142,7 @@ class AppBuilder:
                 'install_exe': self._install_exe_options,
                 'bdist_msi': self._bdist_msi_options,
             },
-            executables=[Executable(
-                self._file_dir / self._script_path_relative_to_file_dir,
-                base=self._app_base,
-                target_name=self._build_name_with_console_suffix,
-                shortcut_name=self._app_name,
-                shortcut_dir='DesktopFolder',
-                icon=self._icon_path,
-            )]
+            executables=[gui_exe, cmd_exe],
         )
 
     def _generate_default_build_exe_options(

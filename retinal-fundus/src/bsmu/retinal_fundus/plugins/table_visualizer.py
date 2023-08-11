@@ -38,10 +38,11 @@ if TYPE_CHECKING:
     from bsmu.vision.core.models.base import ObjectParameter
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
+    from bsmu.vision.plugins.viewers.image.settings import ImageViewerSettingsPlugin
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
     from bsmu.vision.plugins.post_load_converters.manager import PostLoadConversionManagerPlugin, \
         PostLoadConversionManager
-    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayerView
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayerView, ImageViewerSettings
 
 
 class RetinalFundusTableVisualizerPlugin(Plugin):
@@ -51,6 +52,7 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         'post_load_conversion_manager_plugin':
             'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+        'image_viewer_settings_plugin': 'bsmu.vision.plugins.viewers.image.settings.ImageViewerSettingsPlugin',
     }
 
     _DNN_MODELS_DIR_NAME = 'dnn-models'
@@ -62,6 +64,7 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             data_visualization_manager_plugin: DataVisualizationManagerPlugin,
             post_load_conversion_manager_plugin: PostLoadConversionManagerPlugin,
             mdi_plugin: MdiPlugin,
+            image_viewer_settings_plugin: ImageViewerSettingsPlugin,
     ):
         super().__init__()
 
@@ -77,6 +80,9 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
 
+        self._image_viewer_settings_plugin = image_viewer_settings_plugin
+        self._image_viewer_settings: ImageViewerSettings | None = None
+
         self._table_visualizer: RetinalFundusTableVisualizer | None = None
 
     @property
@@ -88,6 +94,7 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
         self._post_load_conversion_manager = self._post_load_conversion_manager_plugin.post_load_conversion_manager
         self._mdi = self._mdi_plugin.mdi
+        self._image_viewer_settings = self._image_viewer_settings_plugin.settings
 
         disk_segmenter_model_params = DnnModelParams.from_config(
             self.config.value('disk-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
@@ -99,7 +106,7 @@ class RetinalFundusTableVisualizerPlugin(Plugin):
             self.config.value('vessels-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
 
         self._table_visualizer = RetinalFundusTableVisualizer(
-            self._data_visualization_manager, self._mdi,
+            self._data_visualization_manager, self._mdi, self._image_viewer_settings,
             disk_segmenter_model_params, cup_segmenter_model_params, vessels_segmenter_model_params)
 
         self._post_load_conversion_manager.data_converted.connect(self._table_visualizer.visualize_retinal_fundus_data)
@@ -677,7 +684,12 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         PatientRetinalFundusRecord.VESSELS_MASK_LAYER_NAME: Visibility(True, 0.5),
     }
 
-    def __init__(self, data: PatientRetinalFundusJournal = None, parent: QWidget = None):
+    def __init__(
+            self,
+            image_viewer_settings: ImageViewerSettings,
+            data: PatientRetinalFundusJournal = None,
+            parent: QWidget = None
+    ):
         self._journal_viewer = PatientRetinalFundusJournalViewer(data)
         self._journal_viewer.record_selected.connect(self._on_journal_record_selected)
 
@@ -689,7 +701,7 @@ class PatientRetinalFundusIllustratedJournalViewer(DataViewer):
         self._journal_with_detailed_info_splitter.addWidget(self._journal_viewer)
         self._journal_with_detailed_info_splitter.addWidget(self._detailed_info_viewer)
 
-        self._layered_image_viewer = LayeredFlatImageViewer()
+        self._layered_image_viewer = LayeredFlatImageViewer(settings=image_viewer_settings)
         self._layer_visibility_by_name = {}
         self._layered_image_viewer.layer_view_removing.connect(self._save_layer_visibility)
         self._layered_image_viewer.layer_view_added.connect(self._restore_layer_visibility)
@@ -798,6 +810,7 @@ class RetinalFundusTableVisualizer(QObject):
             self,
             visualization_manager: DataVisualizationManager,  #% Temp
             mdi: Mdi,
+            image_viewer_settings: ImageViewerSettings,
             disk_segmenter_model_params: DnnModelParams,
             cup_segmenter_model_params: DnnModelParams,
             vessels_segmenter_model_params: DnnModelParams,
@@ -806,6 +819,7 @@ class RetinalFundusTableVisualizer(QObject):
 
         self._visualization_manager = visualization_manager
         self._mdi = mdi
+        self._image_viewer_settings = image_viewer_settings
 
         self._disk_segmenter = DnnSegmenter(disk_segmenter_model_params)
         self._cup_segmenter = DnnSegmenter(cup_segmenter_model_params)
@@ -829,7 +843,8 @@ class RetinalFundusTableVisualizer(QObject):
             path=Path('Void-2.png'))))
         """
 
-        self._illustrated_journal_viewer = PatientRetinalFundusIllustratedJournalViewer(self._journal)
+        self._illustrated_journal_viewer = PatientRetinalFundusIllustratedJournalViewer(
+            self._image_viewer_settings, self._journal)
         self.journal_viewer.resize_columns_to_contents()
 
         self._journal_sub_window = IllustratedJournalSubWindow(self._illustrated_journal_viewer)

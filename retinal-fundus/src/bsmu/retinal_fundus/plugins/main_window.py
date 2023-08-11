@@ -27,8 +27,8 @@ class RetinalFundusMenuBar(MenuBar):
 
 
 class RetinalFundusMainWindow(MainWindow):
-    def __init__(self, title: str = '', menu_bar: MenuBar = None):
-        super().__init__(title, RetinalFundusMenuBar() if menu_bar is None else menu_bar)
+    def __init__(self, title: str = '', icon_file_name: str = '', menu_bar: MenuBar = None):
+        super().__init__(title, icon_file_name, RetinalFundusMenuBar() if menu_bar is None else menu_bar)
 
 
 class RetinalFundusMainWindowPlugin(MainWindowPlugin):

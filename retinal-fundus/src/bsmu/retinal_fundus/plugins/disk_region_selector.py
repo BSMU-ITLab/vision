@@ -25,9 +25,10 @@ if TYPE_CHECKING:
 
     from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.image.layered import ImageLayer
-    from bsmu.vision.widgets.viewers.image.layered.flat import ImageLayerView
+    from bsmu.vision.widgets.viewers.image.layered.flat import ImageLayerView, ImageViewerSettings
     from bsmu.retinal_fundus.plugins.table_visualizer import RetinalFundusTableVisualizerPlugin, \
         RetinalFundusTableVisualizer
+    from bsmu.vision.plugins.viewers.image.settings import ImageViewerSettingsPlugin
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
 
@@ -36,12 +37,14 @@ class RetinalFundusDiskRegionSelectorPlugin(Plugin):
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'retinal_fundus_table_visualizer_plugin':
             'bsmu.retinal_fundus.plugins.table_visualizer.RetinalFundusTableVisualizerPlugin',
+        'image_viewer_settings_plugin': 'bsmu.vision.plugins.viewers.image.settings.ImageViewerSettingsPlugin',
     }
 
     def __init__(
             self,
             main_window_plugin: MainWindowPlugin,
             retinal_fundus_table_visualizer_plugin: RetinalFundusTableVisualizerPlugin,
+            image_viewer_settings_plugin: ImageViewerSettingsPlugin,
     ):
         super().__init__()
 
@@ -50,6 +53,9 @@ class RetinalFundusDiskRegionSelectorPlugin(Plugin):
 
         self._table_visualizer_plugin = retinal_fundus_table_visualizer_plugin
         self._table_visualizer: RetinalFundusTableVisualizer | None = None
+
+        self._image_viewer_settings_plugin = image_viewer_settings_plugin
+        self._image_viewer_settings: ImageViewerSettings | None = None
 
         self._disk_region_selector: RetinalFundusDiskRegionSelector | None = None
 
@@ -60,8 +66,10 @@ class RetinalFundusDiskRegionSelectorPlugin(Plugin):
     def _enable(self):
         self._main_window = self._main_window_plugin.main_window
         self._table_visualizer = self._table_visualizer_plugin.table_visualizer
+        self._image_viewer_settings = self._image_viewer_settings_plugin.settings
 
-        self._disk_region_selector = RetinalFundusDiskRegionSelector(self._table_visualizer)
+        self._disk_region_selector = RetinalFundusDiskRegionSelector(
+            self._table_visualizer, self._image_viewer_settings)
         self._table_visualizer.detailed_info_viewer.add_widget(self._disk_region_selector)
 
         # histograms_menu = self._main_window.menu(HistogramsMenu)
@@ -123,12 +131,12 @@ class RetinalFundusDiskRegionSelector(QWidget):
 
     selected_regions_changed = Signal()
 
-    def __init__(self, table_visualizer: RetinalFundusTableVisualizer):
+    def __init__(self, table_visualizer: RetinalFundusTableVisualizer, image_viewer_settings: ImageViewerSettings,):
         super().__init__()
 
         self._table_visualizer = table_visualizer
 
-        self._disk_viewer = LayeredFlatImageViewer(LayeredImage())
+        self._disk_viewer = LayeredFlatImageViewer(LayeredImage(), image_viewer_settings)
         self._disk_viewer.graphics_view.setRenderHint(QPainter.Antialiasing)
         self._disk_viewer.graphics_view.setFrameShape(QFrame.NoFrame)
 

@@ -85,8 +85,8 @@ class RetinalFundusHistogramVisualizerPlugin(Plugin):
 
         histograms_menu = self._main_window.menu(HistogramsMenu)
         nrr_menu = histograms_menu.addMenu('Neuroretinal Rim')
-        rgb_nrr_histogram_action = nrr_menu.addAction('RGB', None, Qt.CTRL + Qt.Key_R)
-        hsv_nrr_histogram_action = nrr_menu.addAction('HSV', None, Qt.CTRL + Qt.Key_H)
+        rgb_nrr_histogram_action = nrr_menu.addAction('RGB', None, Qt.CTRL | Qt.Key_R)
+        hsv_nrr_histogram_action = nrr_menu.addAction('HSV', None, Qt.CTRL | Qt.Key_H)
 
         rgb_nrr_histogram_action.setCheckable(True)
         hsv_nrr_histogram_action.setCheckable(True)

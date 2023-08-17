@@ -81,6 +81,10 @@ class Image(Data):
                 self.shape_changed.emit(old_shape, new_shape)
 
     @property
+    def is_pixels_valid(self) -> bool:
+        return self.pixels is not None
+
+    @property
     def shape(self) -> tuple:
         return self.array.shape
 

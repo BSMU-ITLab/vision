@@ -49,7 +49,7 @@ class ImageLayer(QObject):
 
     @property
     def image_pixels(self) -> np.ndarray:
-        return self.image.array
+        return self.image.pixels
 
     @property
     def image_path_name(self) -> str:
@@ -81,6 +81,10 @@ class ImageLayer(QObject):
     @property
     def is_indexed(self) -> bool:
         return self._image.is_indexed
+
+    @property
+    def is_image_pixels_valid(self) -> bool:
+        return self.image is not None and self.image.is_pixels_valid
 
     @property
     def visibility(self) -> Visibility:

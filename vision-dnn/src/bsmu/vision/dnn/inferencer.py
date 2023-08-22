@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ import onnxruntime as ort
 from PySide6.QtCore import QObject, Signal, QThreadPool, QTimer
 
 import bsmu.vision.core.converters.image as image_converter
-from bsmu.vision.dnn.config import OnnxConfig
+from bsmu.vision.dnn.config import OnnxConfig, CPU_PROVIDER
 
 if TYPE_CHECKING:
     from typing import Callable, Tuple, Sequence
@@ -206,8 +207,18 @@ class Inferencer(QObject):
         if self._inference_session is None:
             self._inference_session_being_created = True
 
-            self._inference_session = ort.InferenceSession(
-                str(self._model_params.path), providers=OnnxConfig.providers)
+            providers = OnnxConfig.providers
+            try:
+                self._inference_session = ort.InferenceSession(
+                    str(self._model_params.path), providers=providers)
+            except Exception as e:
+                # Current onnxruntime version throws an error instead of warning,
+                # when CUDA provider failed, and does not try other providers (e.g. CPU provider), so do it by self
+                logging.warning(f'Cannot create an inference session with {providers} providers. '
+                                f'The error: {e}'
+                                f'Trying to create the inference session using only {CPU_PROVIDER}')
+                self._inference_session = ort.InferenceSession(
+                    str(self._model_params.path), providers=[CPU_PROVIDER])
 
             self._inference_session_being_created = False
 

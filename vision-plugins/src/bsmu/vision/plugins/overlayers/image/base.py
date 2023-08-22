@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
@@ -80,13 +80,23 @@ class ImageViewerOverlayerPlugin(Plugin):
 
         layers_props = self.config.value('layers')
         layer_name = 'masks'
+        if layered_image_viewer.contains_layer(layer_name):
+            reply = QMessageBox.question(
+                self._main_window,
+                'Non-unique Layer Name',
+                f'Viewer already contains a layer with such name: {layer_name}. Repaint its content?',
+                defaultButton=QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
         mask_props = layers_props.get(layer_name)
         mask_palette = Palette.from_config(mask_props.get('palette'))
         if mask_palette is None:
             mask_palette = self._palette_pack_settings.main_palette
         mask = self._file_loading_manager.load_file(Path(file_name), palette=mask_palette)
 
-        mask_layer = layered_image_viewer.add_layer_from_image(mask, layer_name)
+        mask_layer = layered_image_viewer.add_layer_or_modify_image(layer_name, mask)
 
         mask_opacity = mask_props.get('opacity')
         if mask_opacity is not None:

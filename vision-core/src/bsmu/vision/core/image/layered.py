@@ -126,6 +126,14 @@ class LayeredImage(Data):
         self.add_layer(image_layer)
         return image_layer
 
+    def add_layer_or_modify_image(self, name: str, image: Image) -> ImageLayer:
+        layer = self.layer_by_name(name)
+        if layer is None:
+            layer = self.add_layer_from_image(image, name)
+        else:
+            layer.image = image
+        return layer
+
     def add_layer_or_modify_pixels(
             self,
             name: str,
@@ -150,6 +158,9 @@ class LayeredImage(Data):
         self._layers.remove(layer)
         del self._layer_by_name[layer.name]
         self.layer_removed.emit(layer, layer_index)
+
+    def contains_layer(self, name: str) -> bool:
+        return self.layer_by_name(name) is not None
 
     def print_layers(self):
         for index, layer in enumerate(self.layers):

@@ -18,6 +18,7 @@ from bsmu.vision.widgets.viewers.graphics_view import GraphicsView, ZoomSettings
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Type
 
     from PySide6.QtCore import QPoint
     from PySide6.QtWidgets import QWidget, QStyleOptionGraphicsItem
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.core.palette import Palette
+    from bsmu.vision.core.visibility import Visibility
 
 
 class IntensityWindowing:
@@ -512,8 +514,24 @@ class LayeredImageViewer(DataViewer):
         self.add_layer(layer)
         return layer
 
+    def add_layer_or_modify_image(self, name: str, image: Image) -> ImageLayer:
+        return self.data.add_layer_or_modify_image(name, image)
+
+    def add_layer_or_modify_pixels(
+            self,
+            name: str,
+            pixels: np.array,
+            image_type: Type[Image],
+            palette: Palette = None,
+            visibility: Visibility = None
+    ) -> ImageLayer:
+        return self.data.add_layer_or_modify_pixels(name, pixels, image_type, palette, visibility)
+
     def remove_layer(self, layer: ImageLayer):
         self.data.remove_layer(layer)
+
+    def contains_layer(self, name: str) -> bool:
+        return self.data.contains_layer(name)
 
     def add_graphics_item(self, item: QGraphicsItem):
         self.graphics_scene.addItem(item)

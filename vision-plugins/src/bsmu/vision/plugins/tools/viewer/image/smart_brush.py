@@ -17,14 +17,27 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
     from bsmu.vision.core.config.united import UnitedConfig
-    from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
+    from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
 
 class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):
-    def __init__(self, main_window_plugin: MainWindowPlugin, mdi_plugin: MdiPlugin):
-        super().__init__(main_window_plugin, mdi_plugin, SmartBrushImageViewerTool, 'Smart Brush', Qt.CTRL + Qt.Key_B)
+    def __init__(
+            self,
+            main_window_plugin: MainWindowPlugin,
+            mdi_plugin: MdiPlugin,
+            palette_pack_settings_plugin: PalettePackSettingsPlugin,
+    ):
+        super().__init__(
+            main_window_plugin,
+            mdi_plugin,
+            palette_pack_settings_plugin,
+            SmartBrushImageViewerTool,
+            'Smart Brush',
+            Qt.CTRL + Qt.Key_B,
+        )
 
 
 class Mode(Enum):

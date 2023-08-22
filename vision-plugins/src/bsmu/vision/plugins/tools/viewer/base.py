@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from typing import cast
 
 from PySide6.QtCore import Qt, QObject, QEvent
 from PySide6.QtGui import QCursor, QPixmap, QAction
@@ -19,11 +20,12 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QPoint, QPointF
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.core.image.base import Image
-    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
-    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayer
-    from bsmu.vision.widgets.viewers.base import DataViewer
+    from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+    from bsmu.vision.widgets.viewers.base import DataViewer
+    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayer
     from typing import Type
 
 
@@ -34,12 +36,14 @@ class ViewerToolPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+        'palette_pack_settings_plugin': 'bsmu.vision.plugins.palette.settings.PalettePackSettingsPlugin',
     }
 
     def __init__(
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
+            palette_pack_settings_plugin: PalettePackSettingsPlugin,
             tool_cls: Type[ViewerTool],
             tool_settings_cls: Type[ViewerToolSettings],
             tool_settings_widget_cls: Type[ViewerToolSettingsWidget],
@@ -53,6 +57,9 @@ class ViewerToolPlugin(Plugin):
 
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
+
+        self._palette_pack_settings_plugin = palette_pack_settings_plugin
+        self._palette_pack_settings: PalettePackSettings | None = None
 
         self._tool_cls = tool_cls
         self._tool_settings_cls = tool_settings_cls
@@ -71,10 +78,16 @@ class ViewerToolPlugin(Plugin):
 
         self._main_window = self._main_window_plugin.main_window
         self._mdi = self._mdi_plugin.mdi
+        self._palette_pack_settings = self._palette_pack_settings_plugin.settings
 
-        tool_settings = self._tool_settings_cls.from_config(self.config)
+        tool_settings = self._tool_settings_cls.from_config(self.config, self._palette_pack_settings)
         self._mdi_viewer_tool = MdiViewerTool(
-            self._main_window, self._mdi, self._tool_cls, tool_settings, self._tool_settings_widget_cls)
+            self._main_window,
+            self._mdi,
+            self._tool_cls,
+            tool_settings,
+            self._tool_settings_widget_cls,
+        )
 
         self._tool_action = self._main_window.add_menu_action(
             ToolsMenu, self._action_name, self._tool_action_triggered, self._action_shortcut, checkable=True)
@@ -119,7 +132,7 @@ class MdiViewerTool(QObject):
             mdi: Mdi,
             tool_cls: Type[ViewerTool],
             tool_settings: ViewerToolSettings,
-            tool_settings_widget_cls: Type[ViewerToolSettingsWidget]
+            tool_settings_widget_cls: Type[ViewerToolSettingsWidget],
     ):
         super().__init__()
 
@@ -166,11 +179,17 @@ class MdiViewerTool(QObject):
 
 
 class ViewerToolSettings(QObject):
-    def __init__(self):
+    def __init__(self, palette_pack_settings: PalettePackSettings):
         super().__init__()
+
+        self._palette_pack_settings = palette_pack_settings
 
         self._cursor_file_name = ':/icons/brush.svg'  # TODO: Take this from config and pass as parameter
         self._cursor = None
+
+    @property
+    def palette_pack_settings(self) -> PalettePackSettings:
+        return self._palette_pack_settings
 
     @property
     def cursor(self) -> QCursor:
@@ -180,8 +199,8 @@ class ViewerToolSettings(QObject):
         return self._cursor
 
     @classmethod
-    def from_config(cls, config: UnitedConfig) -> ViewerToolSettings:
-        return cls()
+    def from_config(cls, config: UnitedConfig, palette_pack_settings: PalettePackSettings) -> ViewerToolSettings:
+        return cls(palette_pack_settings)
 
 
 class ViewerToolSettingsWidget(QWidget):
@@ -216,8 +235,8 @@ class ViewerTool(QObject):
 
 
 class LayeredImageViewerToolSettings(ViewerToolSettings):
-    def __init__(self, layers_props: dict):
-        super().__init__()
+    def __init__(self, layers_props: dict, palette_pack_settings: PalettePackSettings):
+        super().__init__(palette_pack_settings)
 
         self._layers_props = layers_props
 
@@ -230,7 +249,7 @@ class LayeredImageViewerToolSettings(ViewerToolSettings):
 
     @property
     def mask_palette(self) -> Palette:
-        return self._mask_palette
+        return self._mask_palette or self.palette_pack_settings.main_palette
 
     @property
     def tool_mask_palette(self) -> Palette:
@@ -241,12 +260,17 @@ class LayeredImageViewerToolSettings(ViewerToolSettings):
         return config.value('layers')
 
     @classmethod
-    def from_config(cls, config: UnitedConfig) -> LayeredImageViewerToolSettings:
-        return cls(cls.layers_props_from_config(config))
+    def from_config(
+            cls, config: UnitedConfig, palette_pack_settings: PalettePackSettings) -> LayeredImageViewerToolSettings:
+        return cls(cls.layers_props_from_config(config), palette_pack_settings)
 
 
 class LayeredImageViewerTool(ViewerTool):
-    def __init__(self, viewer: LayeredImageViewer, settings: LayeredImageViewerToolSettings):
+    def __init__(
+            self,
+            viewer: LayeredImageViewer,
+            settings: LayeredImageViewerToolSettings,
+    ):
         super().__init__(viewer, settings)
 
         self.image_layer_view = None
@@ -256,6 +280,10 @@ class LayeredImageViewerTool(ViewerTool):
         # self.image = None
         # self.mask = None
         # self.tool_mask = None
+
+    @property
+    def settings(self) -> LayeredImageViewerToolSettings:
+        return cast(LayeredImageViewerToolSettings, self._settings)
 
     @property
     def image(self) -> FlatImage:
@@ -268,6 +296,10 @@ class LayeredImageViewerTool(ViewerTool):
     @property
     def tool_mask(self) -> FlatImage:
         return self.viewer.layer_view_by_model(self.tool_mask_layer).flat_image
+
+    @property
+    def mask_palette(self) -> Palette:
+        return self.settings.mask_palette
 
     @property
     def layers_props(self) -> dict:
@@ -334,7 +366,7 @@ class LayeredImageViewerTool(ViewerTool):
                     break
         if self.mask_layer is None:
             self.mask_layer = self.create_nonexistent_layer_with_zeros_mask(
-                'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.mask_palette)
+                'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.mask_palette)
         self.mask_layer.image_updated.connect(self._update_masks)
 
         self.tool_mask_layer = self.create_nonexistent_layer_with_zeros_mask(

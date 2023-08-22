@@ -12,6 +12,7 @@ from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewerHol
 
 if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
+    from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
@@ -21,6 +22,7 @@ class ImageViewerOverlayerPlugin(Plugin):
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
         'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+        'palette_pack_settings_plugin': 'bsmu.vision.plugins.palette.settings.PalettePackSettingsPlugin',
     }
 
     def __init__(
@@ -28,6 +30,7 @@ class ImageViewerOverlayerPlugin(Plugin):
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
             file_loading_manager_plugin: FileLoadingManagerPlugin,
+            palette_pack_settings_plugin: PalettePackSettingsPlugin,
     ):
         super().__init__()
 
@@ -40,10 +43,14 @@ class ImageViewerOverlayerPlugin(Plugin):
         self._file_loading_manager_plugin = file_loading_manager_plugin
         self._file_loading_manager: FileLoadingManager | None = None
 
+        self._palette_pack_settings_plugin = palette_pack_settings_plugin
+        self._palette_pack_settings: PalettePackSettings | None = None
+
         self._last_opened_file_dir = None
 
     def _enable(self):
         self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+        self._palette_pack_settings = self._palette_pack_settings_plugin.settings
 
     def _enable_gui(self):
         self._main_window = self._main_window_plugin.main_window
@@ -75,6 +82,8 @@ class ImageViewerOverlayerPlugin(Plugin):
         layer_name = 'masks'
         mask_props = layers_props.get(layer_name)
         mask_palette = Palette.from_config(mask_props.get('palette'))
+        if mask_palette is None:
+            mask_palette = self._palette_pack_settings.main_palette
         mask = self._file_loading_manager.load_file(Path(file_name), palette=mask_palette)
 
         mask_layer = layered_image_viewer.add_layer_from_image(mask, layer_name)

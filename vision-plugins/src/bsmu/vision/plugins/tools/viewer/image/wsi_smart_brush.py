@@ -9,7 +9,7 @@ import skimage.draw
 import skimage.measure
 from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QCursor
-from PySide6.QtWidgets import QComboBox, QFormLayout, QSpinBox
+from PySide6.QtWidgets import QFormLayout, QSpinBox
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.image.base import MASK_MAX
@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
+    from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
     from bsmu.vision.plugins.tools.viewer.base import ViewerTool, ViewerToolSettings
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
@@ -49,6 +50,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
     def __init__(
             self,
             layers_props: dict,
+            palette_pack_settings: PalettePackSettings,
             radius: float,
             min_radius: float,
             max_radius: float,
@@ -61,7 +63,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             paint_connected_component: bool,
             draw_on_mouse_move: bool,
     ):
-        super().__init__(layers_props)
+        super().__init__(layers_props, palette_pack_settings)
 
         self._radius = radius
         self._min_radius = min_radius
@@ -75,8 +77,8 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._paint_connected_component = paint_connected_component
         self._draw_on_mouse_move = draw_on_mouse_move
 
-        self._mask_background_class = self._mask_palette.row_index_by_name('background')
-        self._mask_foreground_class = self._mask_palette.row_index_by_name('foreground')
+        self._mask_background_class = self.mask_palette.row_index_by_name('background')
+        self._mask_foreground_class = self.mask_palette.row_index_by_name('foreground')
 
         self._tool_background_class = self._tool_mask_palette.row_index_by_name('background')
         self._tool_foreground_class = self._tool_mask_palette.row_index_by_name('foreground')
@@ -170,9 +172,14 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         return self._tool_unconnected_component_class
 
     @classmethod
-    def from_config(cls, config: UnitedConfig) -> WsiSmartBrushImageViewerToolSettings:
+    def from_config(
+            cls,
+            config: UnitedConfig,
+            palette_pack_settings: PalettePackSettings
+    ) -> WsiSmartBrushImageViewerToolSettings:
         return cls(
             cls.layers_props_from_config(config),
+            palette_pack_settings,
             config.value('radius', DEFAULT_RADIUS),
             config.value('min_radius', DEFAULT_MIN_RADIUS),
             config.value('max_radius', DEFAULT_MAX_RADIUS),
@@ -213,7 +220,11 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
 
 
 class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
-    def __init__(self, viewer: LayeredImageViewer, settings: WsiSmartBrushImageViewerToolSettings):
+    def __init__(
+            self,
+            viewer: LayeredImageViewer,
+            settings: WsiSmartBrushImageViewerToolSettings,
+    ):
         super().__init__(viewer, settings)
 
         self._mode = Mode.SHOW
@@ -454,6 +465,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
+            palette_pack_settings_plugin: PalettePackSettingsPlugin,
             tool_cls: Type[ViewerTool] = WsiSmartBrushImageViewerTool,
             tool_settings_cls: Type[ViewerToolSettings] = WsiSmartBrushImageViewerToolSettings,
             tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = WsiSmartBrushImageViewerToolSettingsWidget,
@@ -463,6 +475,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
         super().__init__(
             main_window_plugin,
             mdi_plugin,
+            palette_pack_settings_plugin,
             tool_cls,
             tool_settings_cls,
             tool_settings_widget_cls,

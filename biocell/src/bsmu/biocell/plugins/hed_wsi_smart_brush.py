@@ -13,8 +13,8 @@ from bsmu.vision.plugins.tools.viewer.image.wsi_smart_brush import WsiSmartBrush
 if TYPE_CHECKING:
     from typing import Type
 
-    from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
+    from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin
     from bsmu.vision.plugins.tools.viewer.base import ViewerTool, ViewerToolSettings, ViewerToolSettingsWidget
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
@@ -40,7 +40,11 @@ class HedSmartBrushImageViewerToolSettingsWidget(WsiSmartBrushImageViewerToolSet
 
 
 class HedSmartBrushImageViewerTool(WsiSmartBrushImageViewerTool):
-    def __init__(self, viewer: LayeredImageViewer, settings: HedSmartBrushImageViewerToolSettings):
+    def __init__(
+            self,
+            viewer: LayeredImageViewer,
+            settings: HedSmartBrushImageViewerToolSettings,
+    ):
         super().__init__(viewer, settings)
 
     def _preprocess_downscaled_image_in_brush_bbox(self, image: np.ndarray):
@@ -96,6 +100,7 @@ class HedSmartBrushImageViewerToolPlugin(WsiSmartBrushImageViewerToolPlugin):
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
+            palette_pack_settings_plugin: PalettePackSettingsPlugin,
             tool_cls: Type[ViewerTool] = HedSmartBrushImageViewerTool,
             tool_settings_cls: Type[ViewerToolSettings] = HedSmartBrushImageViewerToolSettings,
             tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = HedSmartBrushImageViewerToolSettingsWidget,
@@ -105,6 +110,7 @@ class HedSmartBrushImageViewerToolPlugin(WsiSmartBrushImageViewerToolPlugin):
         super().__init__(
             main_window_plugin,
             mdi_plugin,
+            palette_pack_settings_plugin,
             tool_cls,
             tool_settings_cls,
             tool_settings_widget_cls,

@@ -18,11 +18,12 @@ gleason-segmenter-model:
 #  and use: img = 255 - img (to invert image colors)
 
   # For these models do NOT need to do: img = 255 - img
-  name: 'ourdata-segformer_mit-b0-panda+empty3.onnx'  # Trained on Gleason >= 3  # The BEST model
+#  name: 'ourdata-segformer_mit-b0-panda+empty3.onnx'  # Trained on Gleason >= 3  # The BEST model
+  name: '2023.08.22-segformer_mit-b0-panda+empty3_base.onnx'
+#  name: 'segformer_mit-b0-panda+empty3.onnx'
 #  name: 'ourdata-segformer_mit-b0-panda+empty4.onnx'  # Trained on Gleason >= 4
   preprocessing-mode: 'image-net-torch'  # For models above use these preprocessing
   channels-order: 'rgb'
-
   input-size: [3, 256, 256]
   channels-axis: 0
   normalize: false

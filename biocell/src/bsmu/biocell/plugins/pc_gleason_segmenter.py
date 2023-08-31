@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from timeit import default_timer as timer
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -18,6 +19,7 @@ from bsmu.vision.plugins.windows.main import AlgorithmsMenu
 from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewerHolder
 
 if TYPE_CHECKING:
+    from typing import Sequence
     from bsmu.vision.core.data import Data
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
@@ -102,7 +104,9 @@ class BiocellPcGleasonSegmenterPlugin(Plugin):
         self._main_window = self._main_window_plugin.main_window
         self._mdi = self._mdi_plugin.mdi
 
+        # self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Prostate Tissue', self._segment_prostate_tissue)
         self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Cancer', self._segment_cancer)
+        self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Cancer - x4 Passes', self._segment_cancer_x4_passes)
         self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Gleason >= 3', self._segment_gleason_3_and_above)
         self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Gleason >= 4', self._segment_gleason_4_and_above)
 
@@ -115,31 +119,61 @@ class BiocellPcGleasonSegmenterPlugin(Plugin):
 
         raise NotImplementedError
 
-    def _segment_gleason_3_and_above(self):
+    def _active_layered_image(self) -> LayeredImage | None:
         layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
-        if layered_image_viewer_sub_window is None:
-            return
+        return layered_image_viewer_sub_window and layered_image_viewer_sub_window.layered_image_viewer.data
 
-        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
-        self._pc_gleason_3_segmenter.segment(layered_image_viewer.data, 'gleason >= 3')
+    def _segment_gleason_3_and_above(self):
+        layered_image = self._active_layered_image()
+        if layered_image is not None:
+            self._pc_gleason_3_segmenter.segment(layered_image, 'gleason >= 3')
 
     def _segment_gleason_4_and_above(self):
-        layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
-        if layered_image_viewer_sub_window is None:
-            return
-
-        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
-        self._pc_gleason_4_segmenter.segment(layered_image_viewer.data, 'gleason >= 4')
+        layered_image = self._active_layered_image()
+        if layered_image is not None:
+            self._pc_gleason_4_segmenter.segment(layered_image, 'gleason >= 4')
 
     def _segment_cancer(self):
-        layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
-        if layered_image_viewer_sub_window is None:
+        layered_image = self._active_layered_image()
+        if layered_image is None:
             return
 
-        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
         masks_layer_name = 'masks'
-        self._pc_gleason_4_segmenter.segment(layered_image_viewer.data, masks_layer_name, repaint_full_mask=False)
-        self._pc_gleason_3_segmenter.segment(layered_image_viewer.data, masks_layer_name, repaint_full_mask=False)
+        self._pc_gleason_4_segmenter.segment(layered_image, masks_layer_name, repaint_full_mask=False)
+        self._pc_gleason_3_segmenter.segment(layered_image, masks_layer_name, repaint_full_mask=False)
+
+    def _segment_cancer_x4_passes(self):
+        layered_image = self._active_layered_image()
+        if layered_image is None:
+            return
+
+        masks_layer_name = 'masks'
+        self._pc_gleason_4_segmenter.segment(layered_image, masks_layer_name, repaint_full_mask=False, pass_count=4)
+        self._pc_gleason_3_segmenter.segment(layered_image, masks_layer_name, repaint_full_mask=False, pass_count=4)
+
+    def _segment_prostate_tissue(self):
+        layered_image = self._active_layered_image()
+        if layered_image is None:
+            return
+
+        tissue_layer_name = 'prostate-tissue'
+
+        image = layered_image.layers[0].image.pixels
+        tissue_mask = segment_tissue(image)
+        print('Tissue mask: ', tissue_mask.dtype, tissue_mask.shape, tissue_mask.min(), tissue_mask.max(), np.unique(tissue_mask))
+        layered_image.add_layer_or_modify_pixels(
+            tissue_layer_name,
+            tissue_mask,
+            FlatImage,
+            Palette.default_binary(rgb_color=[100, 255, 100]),
+            Visibility(True, 0.5))
+
+
+def segment_tissue(image: np.ndarray) -> np.ndarray:
+    var = image - image.mean(-1, dtype=np.int16, keepdims=True)
+    var = abs(var).mean(-1, dtype=np.uint16)
+    tissue_mask = np.where(var > 2, True, False).astype(np.uint8)
+    return tissue_mask
 
 
 class BiocellPcGleasonSegmenter(QObject):
@@ -162,18 +196,48 @@ class BiocellPcGleasonSegmenter(QObject):
         self._background_class = self._mask_palette.row_index_by_name('background')
         self._unknown_class = self._mask_palette.row_index_by_name('unknown')
 
+    @property
+    def tile_size(self) -> int:
+        return self._model_params.input_image_size[0]
+
     def segment(
             self,
             layered_image: LayeredImage,
             mask_layer_name: str,
-            repaint_full_mask: bool = True
+            repaint_full_mask: bool = True,
+            threshold: float | None = 0,
+            pass_count: int = 1,
     ):
-        print('segment', type(layered_image))
-
         image = layered_image.layers[0].image.pixels
-        print('image:', image.shape, image.dtype, image.min(), image.max())
 
-        mask = self._segment_image(image)
+        match pass_count:
+            case 1:
+                mask, _ = self._segment_image(image, threshold=threshold)
+            case 4:
+                tile_weights = self._tile_weights(self.tile_size)
+
+                weighted_mask = None
+                weight_sum = None
+                extra_pads_list = [(0, 0), (1, 1), (1, 0), (0, 1)]
+                for extra_pads in extra_pads_list:
+                    mask, mask_weights = self._segment_image(
+                        image, extra_pads=extra_pads, threshold=None, tile_weights=tile_weights)
+                    if weighted_mask is None:
+                        weighted_mask = mask * mask_weights
+                        weight_sum = mask_weights
+                    else:
+                        weighted_mask += mask * mask_weights
+                        weight_sum += mask_weights
+                # |weight_sum| is not always identity matrix (some pixels can have other values),
+                # so we divide |weighted_mask| by |weight_sum|.
+                # It's important, that all elements of |weight_sum| are not equal to zero,
+                # else we will get division by zero.
+                mask = weighted_mask / weight_sum
+
+                mask = (mask > threshold).astype(np.uint8)
+            case _:
+                raise ValueError(f'|pass_count| with value {pass_count} is unimplemented')
+
         mask *= self._mask_class
 
         mask_layer = layered_image.layer_by_name(mask_layer_name)
@@ -186,7 +250,6 @@ class BiocellPcGleasonSegmenter(QObject):
                 Visibility(True, 0.5))
         else:
             # If there is mask, repaint only over |background| and |unknown| classes
-            print(f'{self}  segment repainting background and unknown')
             repainting_mask = \
                 (mask_layer.image_pixels == self._background_class) | (mask_layer.image_pixels == self._unknown_class)
             mask_layer.image_pixels[repainting_mask] = mask[repainting_mask]
@@ -205,124 +268,97 @@ class BiocellPcGleasonSegmenter(QObject):
             'mask',
             Visibility(True, 0.5))
 
-    def _segment_image(self, image: np.ndarray) -> np.ndarray:
+    def _segment_image(
+            self,
+            image: np.ndarray,
+            extra_pads: Sequence[float] = (0, 0),
+            threshold: float | None = 0,
+            tile_weights: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray | None]:
+        print(f'Segment image using {self._model_params.path.name} model with {extra_pads} extra pads')
+        segment_image_start = timer()
+
         # Remove alpha-channel
         if image.shape[2] == 4:
             image = image[..., :3]
 
-        tile_size = self._model_params.input_image_size[0]
-        padded_image, pads = self._padded_image_to_tile(image, tile_size)
+        tile_size = self.tile_size
+        padded_image, pads = self._padded_image_to_tile(image, tile_size, extra_pads=extra_pads)
+        padded_mask = np.zeros(shape=padded_image.shape[:-1], dtype=np.float32)
+
         tiled_image = self._tiled_image(padded_image, tile_size)
-        print('padded_image:', padded_image.shape)
-        print('tiled_image:', tiled_image.shape)
 
-        # tiled_mask = np.zeros(shape=tiled_image.shape[:-1], dtype=np.uint8)
-        # tiled_mask = tiled_mask.squeeze(2)
-
-        # tiled_mask = np.zeros(
-        #     shape=(tiled_image.shape[0], tiled_image.shape[1], tiled_image.shape[3], tiled_image.shape[4]),
-        #     dtype=np.uint8)
-
-        # tiled_mask = np.zeros(shape=padded_image.shape[:-1], dtype=np.uint8)
-        # block_shape = (tile_size, tile_size)
-        # tiled_mask = skimage.util.view_as_blocks(tiled_mask, block_shape)
-
-        tiled_mask = np.zeros(shape=padded_image.shape[:-1], dtype=np.uint8)
-
-        print('tiled_mask:', tiled_mask.shape)
-
-        for row in range(tiled_image.shape[0]):
-            for col in range(tiled_image.shape[1]):
-                # print(f'ROW: {row}   COL:{col}')
-
-
-                # if row != 3 or col != 15:
-                #     continue
-
-
-                tile = tiled_image[row, col, 0]
-                # skimage.io.imsave(r'D:\Temp\gleason-segmentation-tests\tile.png', tile)
-
-                # self._data_visualization_manager.visualize_data(FlatImage(tile, path=Path(f'{row}-{col}')))
-
-                tile = tile.astype(np.float32)
-                # tile = (255 - tile) / 255
-                # tile = tile / 255
-
+        for tile_row in range(tiled_image.shape[0]):
+            for tile_col in range(tiled_image.shape[1]):
+                tile = tiled_image[tile_row, tile_col]
                 tile_mask = self._segmenter.segment(tile)
 
-                # tiled_mask[row, col] = tile_mask > 0.5
+                row = tile_row * tile_size
+                col = tile_col * tile_size
+                padded_mask[row:(row + tile_size), col:(col + tile_size)] = tile_mask
 
-                tile_y = row * tile_size
-                tile_x = col * tile_size
-                tiled_mask[tile_y:(tile_y + tile_size), tile_x:(tile_x + tile_size)] = tile_mask > 0 #% 0.5
+        mask = self._unpad_image(padded_mask, pads)
 
-        # padded_mask = tiled_mask.transpose((0, 2, 1, 3)).reshape(padded_image.shape[:-1])
-        padded_mask = tiled_mask
+        weights = None
+        if tile_weights is not None:
+            padded_weights = np.tile(tile_weights, reps=(tiled_image.shape[:2]))
+            weights = self._unpad_image(padded_weights, pads)
 
-        print('padded_mask', padded_mask.shape)
+        if threshold is not None:
+            mask = (mask > threshold).astype(np.uint8)
 
-        print('pads:', pads)
-        mask = padded_mask[
-               pads[0][0]:padded_mask.shape[0] - pads[0][1],
-               pads[1][0]:padded_mask.shape[1] - pads[1][1]]
-        print('mask', mask.shape)
-
-        # self._data_visualization_manager.visualize_data(
-        #     FlatImage(mask, Palette.default_binary(rgb_color=[0, 255, 0])))
-
-
-        # combined_image = tiled_image.transpose((0, 3, 1, 4, 2, 5)).reshape(padded_image.shape)
-        # self._data_visualization_manager.visualize_data(FlatImage(combined_image))
-
-        return mask
-
-
-        tile = tiled_image[7]
-        tile = tile.astype(np.float32)
-        tile = (255 - tile) / 255
-
-        tile_mask = self._segmenter.segment(tile)
-        print('tile_mask', tile_mask.shape, tile_mask.dtype, tile_mask.min(), tile_mask.max())
-
-        mask = np.zeros(shape=padded_image.shape[:-1], dtype=np.uint8)
-        mask[:256, :256] = tile_mask > 0.5
-
-        print('mask', mask.shape, mask.dtype, mask.min(), mask.max())
-
-        self._data_visualization_manager.visualize_data(FlatImage(mask, Palette.default_binary(rgb_color=[0, 255, 0])))
-
-        return
-
-
-        img = np.swapaxes(tiles.reshape((8, 8, 192, 192, 3)), 1, 2)
-        # # img = img.view((192*8, 192*8, 3))
-        img = img.reshape((192 * 8, 192 * 8, 3))
-
-        self._data_visualization_manager.visualize_data(FlatImage(img))
-
-        img = img.astype(np.float32)
-        img = 255 - img
-        img /= 255
+        print(f'\tElapsed time: {timer() - segment_image_start}')
+        return mask, weights
 
     @staticmethod
     def _tiled_image(image: np.ndarray, tile_size: int) -> np.ndarray:
-        block_shape = (tile_size, tile_size, image.shape[-1])
-        print('_tiled_image')
-        print('padded image shape:', image.shape)
-        print('block_shape:', block_shape)
-        image = skimage.util.view_as_blocks(image, block_shape)
-        print('view_as_blocks:', image.shape)
-#        image = image.reshape(-1, *block_shape)
-#        print('after reshape', image.shape)
-        return image
+        tile_shape = (tile_size, tile_size, image.shape[-1])
+        tiled = skimage.util.view_as_blocks(image, tile_shape)
+        return tiled.squeeze(axis=2)
 
     @staticmethod
-    def _padded_image_to_tile(image: np.ndarray, tile_size: int, pad_value=255) -> tuple[np.ndarray, tuple]:
-        h, w, c = image.shape
+    def _padded_image_to_tile(image: np.ndarray, tile_size: int, extra_pads: Sequence[float] = (0, 0), pad_value=255) \
+            -> tuple[np.ndarray, tuple]:
+        """
+        Returns a padded |image| so that its dimensions are evenly divisible by the |tile_size|
+        :param extra_pads: additionally adds the |tile_size| multiplied by |extra_pads| to get shifted tiles
+        """
+        rows, cols, channels = image.shape
 
-        pad_h = -h % tile_size
-        pad_w = -w % tile_size
-        pads = ((pad_h // 2, pad_h - pad_h // 2), (pad_w // 2, pad_w - pad_w // 2), (0, 0))
+        pad_rows = (-rows % tile_size) + extra_pads[0] * tile_size
+        pad_cols = (-cols % tile_size) + extra_pads[1] * tile_size
+
+        pad_rows_half = pad_rows // 2
+        pad_cols_half = pad_cols // 2
+
+        pads = ((pad_rows_half, pad_rows - pad_rows_half), (pad_cols_half, pad_cols - pad_cols_half), (0, 0))
         image = np.pad(image, pads, constant_values=pad_value)
         return image, pads
+
+    @staticmethod
+    def _unpad_image(image: np.ndarray, pads: tuple) -> np.ndarray:
+        return image[
+               pads[0][0]:image.shape[0] - pads[0][1],
+               pads[1][0]:image.shape[1] - pads[1][1]]
+
+    @staticmethod
+    def _tile_weights(tile_size: int) -> np.ndarray:
+        """
+        Returns tile weights, where maximum weights (equal to 1) are in the center of the tile,
+        and the weights gradually decreases to zero towards the edges of the tile
+        E.g.: |tile_size| is equal to 6:
+        np.array([[0. , 0. , 0. , 0. , 0. , 0. ],
+                  [0. , 0.5, 0.5, 0.5, 0.5, 0. ],
+                  [0. , 0.5, 1. , 1. , 0.5, 0. ],
+                  [0. , 0.5, 1. , 1. , 0.5, 0. ],
+                  [0. , 0.5, 0.5, 0.5, 0.5, 0. ],
+                  [0. , 0. , 0. , 0. , 0. , 0. ]], dtype=float16)
+        """
+        assert tile_size % 2 == 0, 'Current method version can work only with even tile size'
+        max_int_weight = (tile_size // 2) - 1
+        int_weights = list(range(max_int_weight + 1))
+        int_weights = int_weights + int_weights[::-1]
+        row_int_weights = np.expand_dims(int_weights, 0)
+        col_int_weights = np.expand_dims(int_weights, 1)
+        tile_int_weights = np.minimum(row_int_weights, col_int_weights)
+        return (tile_int_weights / max_int_weight).astype(np.float16)

@@ -35,7 +35,7 @@ dependencies:
       - networkx==3.0
       - nibabel==5.0.1
       - numpy==1.24.2
-      - onnxruntime-gpu==1.14.1
+      - onnxruntime-gpu==1.15.1
       - opencv-python==4.7.0.72
       - openslide-python==1.2.0
       - packaging==23.0

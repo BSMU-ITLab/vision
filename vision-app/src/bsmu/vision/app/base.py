@@ -87,6 +87,8 @@ class App(QObject, DataFileProvider):
         log_level = getattr(logging, log_level_str.upper(), None)
         if not isinstance(log_level, int):
             raise ValueError(f'Invalid log level: {log_level_str}')
+
+        handlers = []
         if is_app_frozen():
             log_path = Path('logs')
             try:
@@ -95,17 +97,22 @@ class App(QObject, DataFileProvider):
                 # Create log files without common directory
                 # if the application has no rights to create the directory
                 log_path = Path('.')
-            handler = RotatingFileHandlerWithSeparator(
+            file_handler = RotatingFileHandlerWithSeparator(
                 filename=log_path / f'log-{log_level_str.lower()}.log',
                 maxBytes=2_097_152,  # 2 MB
                 backupCount=1,
                 encoding='utf-8')
-            formatter = SimpleFormatter()
+            file_handler.setFormatter(SimpleFormatter())
+            handlers.append(file_handler)
+
+            stream_handler_formatter = SimpleFormatter()
         else:
-            handler = logging.StreamHandler(stream=sys.stdout)
-            formatter = ColoredFormatter()
-        handler.setFormatter(formatter)
-        logging.basicConfig(level=log_level, handlers=[handler])
+            stream_handler_formatter = ColoredFormatter()
+
+        stream_handler = logging.StreamHandler(stream=sys.stdout)
+        stream_handler.setFormatter(stream_handler_formatter)
+        handlers.append(stream_handler)
+        logging.basicConfig(level=log_level, handlers=handlers)
 
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):

@@ -83,7 +83,7 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         slide = slideio.open_slide(str(path), slideio_driver)
         scene = slide.get_scene(0)
         full_resolution_width = scene.rect[2]
-        print('full_resolution_width', full_resolution_width)
+        logging.debug(f'full_resolution_width: {full_resolution_width}')
         # region = scene.read_block(size=(round(full_resolution_width / 7.53), 0))
         region = scene.read_block(size=(round(full_resolution_width / 8), 0))
 

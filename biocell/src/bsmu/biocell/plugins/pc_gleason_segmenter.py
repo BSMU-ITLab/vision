@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from timeit import default_timer as timer
 from typing import TYPE_CHECKING
 
@@ -275,7 +276,7 @@ class BiocellPcGleasonSegmenter(QObject):
             threshold: float | None = 0,
             tile_weights: np.ndarray | None = None,
     ) -> tuple[np.ndarray, np.ndarray | None]:
-        print(f'Segment image using {self._model_params.path.name} model with {extra_pads} extra pads')
+        logging.info(f'Segment image using {self._model_params.path.name} model with {extra_pads} extra pads')
         segment_image_start = timer()
 
         # Remove alpha-channel
@@ -307,7 +308,7 @@ class BiocellPcGleasonSegmenter(QObject):
         if threshold is not None:
             mask = (mask > threshold).astype(np.uint8)
 
-        print(f'\tElapsed time: {timer() - segment_image_start}')
+        logging.info(f'Segmentation finished. Elapsed time: {timer() - segment_image_start:.2f}')
         return mask, weights
 
     @staticmethod

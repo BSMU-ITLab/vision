@@ -22,6 +22,10 @@ class BBox:
         self.top = top
         self.bottom = bottom
 
+    def __str__(self):
+        return f'{self.__class__.__name__} {hex(id(self))}: ' \
+               f'rc-format: [{self.top}:{self.bottom}, {self.left}:{self.right}]'
+
     @property
     def width(self) -> int:
         return self.right - self.left
@@ -123,3 +127,27 @@ class BBox:
         :return: mapped point in (row, col) format
         """
         return point[0] - self.top, point[1] - self.left
+
+    def map_to_bbox(self, other: BBox):
+        """Map |self| to coordinates of |other|
+        If both bboxes are from the same array, and |other| includes |self|,
+        then |self| will get its bbox values relative to |other|
+        """
+        self.move_left(other.left)
+        self.move_top(other.top)
+
+    def mapped_to_bbox(self, other: BBox) -> BBox:
+        mapped_bbox = copy.copy(self)
+        mapped_bbox.map_to_bbox(other)
+        return mapped_bbox
+
+    def unite_with(self, other: BBox):
+        self.left = min(self.left, other.left)
+        self.right = max(self.right, other.right)
+        self.top = min(self.top, other.top)
+        self.bottom = max(self.bottom, other.bottom)
+
+    def united_with(self, other: BBox) -> BBox:
+        united_bbox = copy.copy(self)
+        united_bbox.unite_with(other)
+        return united_bbox

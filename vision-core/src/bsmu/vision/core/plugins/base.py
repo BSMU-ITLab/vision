@@ -69,8 +69,8 @@ class Plugin(QObject, DataFileProvider):
     def _disable(self):
         pass
 
-    def config_value(self, key: str) -> Any:
-        return self.config.value(key)
+    def config_value(self, key: str, default: Any = None) -> Any:
+        return self.config.value(key, default)
 
     @classmethod
     def name(cls) -> str:

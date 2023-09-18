@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin
     from bsmu.vision.plugins.tools.viewer.base import ViewerTool, ViewerToolSettings, ViewerToolSettingsWidget
+    from bsmu.vision.plugins.undo import UndoPlugin, UndoManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
@@ -43,9 +44,10 @@ class HedSmartBrushImageViewerTool(WsiSmartBrushImageViewerTool):
     def __init__(
             self,
             viewer: LayeredImageViewer,
+            undo_manager: UndoManager,
             settings: HedSmartBrushImageViewerToolSettings,
     ):
-        super().__init__(viewer, settings)
+        super().__init__(viewer, undo_manager, settings)
 
     def _preprocess_downscaled_image_in_brush_bbox(self, image: np.ndarray):
         # print('before preprocess: ', image.dtype, image.shape, image.min(), image.max())
@@ -100,6 +102,7 @@ class HedSmartBrushImageViewerToolPlugin(WsiSmartBrushImageViewerToolPlugin):
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
+            undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
             tool_cls: Type[ViewerTool] = HedSmartBrushImageViewerTool,
             tool_settings_cls: Type[ViewerToolSettings] = HedSmartBrushImageViewerToolSettings,
@@ -110,6 +113,7 @@ class HedSmartBrushImageViewerToolPlugin(WsiSmartBrushImageViewerToolPlugin):
         super().__init__(
             main_window_plugin,
             mdi_plugin,
+            undo_plugin,
             palette_pack_settings_plugin,
             tool_cls,
             tool_settings_cls,

@@ -15,6 +15,7 @@ from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.image.base import MASK_MAX
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool, \
     LayeredImageViewerToolSettings, ViewerToolSettingsWidget
+from bsmu.vision.plugins.undo import UndoCommand
 
 if TYPE_CHECKING:
     from typing import Sequence, Type
@@ -23,9 +24,11 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.core.config.united import UnitedConfig
+    from bsmu.vision.core.image.base import FlatImage
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
     from bsmu.vision.plugins.tools.viewer.base import ViewerTool, ViewerToolSettings
+    from bsmu.vision.plugins.undo import UndoPlugin, UndoManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
@@ -219,17 +222,121 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
         self._mask_foreground_class_spin_box.setValue(value)
 
 
+class ChangeMaskCommand(UndoCommand):
+    def __init__(
+            self,
+            mask: FlatImage,
+            roi_bbox: BBox,
+            roi_modified_pixels: np.ndarray,
+            new_roi_pixels: int | np.ndarray,
+            merge_id: int,
+            text: str = 'Change Mask',
+            parent: UndoCommand = None,
+    ):
+        """
+        :param roi_bbox: bbox of modified pixels
+        :param roi_modified_pixels: boolean array with True on modified pixels
+        :param new_roi_pixels: if has type int, then all modified pixels will have such value.
+        Else it is flat (one-dimensional) array with values of new pixels, which were modified
+        :param merge_id: will merge commands only with the same |merge_id|
+        """
+
+        super().__init__(text, parent)
+
+        self._mask = mask
+        self._roi_bbox = roi_bbox
+        self._roi_modified_pixels = roi_modified_pixels
+        if type(new_roi_pixels) != int:
+            raise NotImplementedError()
+        self._new_roi_pixels = new_roi_pixels
+        # Use boolean array indexing to get copy of flat (one-dimensional) array with old pixels
+        self._old_roi_pixels = mask.bboxed_pixels(roi_bbox)[roi_modified_pixels]
+        self._merge_id = merge_id
+
+    def _clean(self):
+        self._mask = None
+        self._roi_bbox = None
+        self._roi_modified_pixels = None
+        self._new_roi_pixels = None
+        self._old_roi_pixels = None
+        self._merge_id = None
+
+    def id(self) -> int:
+        return self._id
+
+    def redo(self):
+        self._mask.bboxed_pixels(self._roi_bbox)[self._roi_modified_pixels] = self._new_roi_pixels
+        self._mask.emit_pixels_modified(self._roi_bbox)
+
+    def undo(self):
+        self._mask.bboxed_pixels(self._roi_bbox)[self._roi_modified_pixels] = self._old_roi_pixels
+        self._mask.emit_pixels_modified(self._roi_bbox)
+
+    def mergeWith(self, other: ChangeMaskCommand) -> bool:
+        if self._merge_id != other._merge_id:
+            return False
+
+        if type(self._new_roi_pixels) == int and self._new_roi_pixels != other._new_roi_pixels:
+            return False
+
+        # |other| is next command after |self|. |mergeWith| method called after |other.redo| method
+        merged_roi_bbox = self._roi_bbox.united_with(other._roi_bbox)
+
+        merged_roi_modified_pixels = np.zeros(merged_roi_bbox.shape, dtype=self._roi_modified_pixels.dtype)
+        roi_bbox_mapped_to_merged = self._roi_bbox.mapped_to_bbox(merged_roi_bbox)
+        roi_bbox_mapped_to_merged.pixels(merged_roi_modified_pixels)[...] = self._roi_modified_pixels
+        other_roi_bbox_mapped_to_merged = other._roi_bbox.mapped_to_bbox(merged_roi_bbox)
+        # Use |= operator to keep True-values unchanged, else they could be replaced by False-values
+        other_roi_bbox_mapped_to_merged.pixels(merged_roi_modified_pixels)[...] |= other._roi_modified_pixels
+
+        merged_roi_mask_pixels = np.empty(merged_roi_bbox.shape, dtype=self._mask.pixels.dtype)
+        # merged_roi_mask_pixels = self._mask.bboxed_pixels(merged_roi_bbox).copy()  # what is faster? Previous line or this one?
+        other_roi_bbox_mapped_to_merged.pixels(merged_roi_mask_pixels)[other._roi_modified_pixels] = \
+            other._old_roi_pixels
+        roi_bbox_mapped_to_merged.pixels(merged_roi_mask_pixels)[self._roi_modified_pixels] = self._old_roi_pixels
+
+        self._old_roi_pixels = merged_roi_mask_pixels[merged_roi_modified_pixels]
+        self._roi_bbox = merged_roi_bbox
+        self._roi_modified_pixels = merged_roi_modified_pixels
+
+        # Weird behaviour: |other| command is not deleted (Python __dell__ is not called),
+        # when |mergeWith| method returns True. Looks like there are references to it somewhere.
+        # At the same time, underlying C++ object of |other| is deleted in the QUndoStack::push method.
+        # We nullify all properties of |other| to minimize memory leaks.
+        # But undeleted |other| command will leak very small amount of memory anyway.
+        # TODO: create minimal test app with multiple merged commands and check if they are deleted.
+        # TODO: fill a bug report if they are not deleted, when |mergeWith| returns True.
+        other._clean()
+
+        return True
+
+
 class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
     def __init__(
             self,
             viewer: LayeredImageViewer,
+            undo_manager: UndoManager,
             settings: WsiSmartBrushImageViewerToolSettings,
     ):
-        super().__init__(viewer, settings)
+        super().__init__(viewer, undo_manager, settings)
 
         self._mode = Mode.SHOW
+        # Store and increment stroke ID, when DRAW or ERASE mode is activated.
+        # We need stroke ID to undo/redo entire stroke at a time.
+        self._stroke_id = 0
 
         self._brush_bbox = None
+
+    @property
+    def mode(self) -> Mode:
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: Mode):
+        if self._mode != value:
+            self._mode = value
+            if self._mode == Mode.DRAW or self._mode == Mode.ERASE:
+                self._stroke_id += 1
 
     def activate(self):
         super().activate()
@@ -267,13 +374,13 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 # after a mouse click on the app title bar, try to change brush radius (using Ctrl + mouse wheel)
                 # event.buttons() shows, that LeftButton is pressed (but it is not pressed)
                 # that leads to draw mode, but we want only change brush radius (in show mode)
-                self._mode = Mode.DRAW
+                self.mode = Mode.DRAW
         elif event.buttons() == Qt.RightButton:
-            self._mode = Mode.ERASE
+            self.mode = Mode.ERASE
         elif event.type() == QEvent.MouseButtonPress and event.buttons() == Qt.MiddleButton:
             self.settings.smart_mode_enabled = not self.settings.smart_mode_enabled
         else:
-            self._mode = Mode.SHOW
+            self.mode = Mode.SHOW
 
     def draw_brush_event(self, event: QEvent):
         # if not self.viewer.has_image():
@@ -345,8 +452,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
             if self._mode in [Mode.ERASE, Mode.DRAW]:
-                self.mask.bboxed_pixels(self._brush_bbox)[modified_pixels] = mask_class
-                self.mask.emit_pixels_modified(self._brush_bbox)
+                command_text = 'Brush: Erase' if self._mode == Mode.ERASE else f'Brush: Draw Class {mask_class}'
+                change_mask_command = ChangeMaskCommand(
+                    self.mask, self._brush_bbox, modified_pixels, mask_class, self._stroke_id, command_text)
+                self._undo_manager.push(change_mask_command)
 
             return
 
@@ -422,10 +531,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 self.settings.tool_foreground_class)
             drawn_pixels = tool_mask_in_brush_bbox == temp_tool_foreground_class
 
-            mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
-            mask_in_brush_bbox[drawn_pixels] = self.settings.mask_foreground_class
-
-            self.mask.emit_pixels_modified(self._brush_bbox)
+            change_mask_command = ChangeMaskCommand(
+                self.mask, self._brush_bbox, drawn_pixels, self.settings.mask_foreground_class, self._stroke_id,
+                f'Brush: Draw Class {self.settings.mask_foreground_class}')
+            self._undo_manager.push(change_mask_command)
 
         self.tool_mask.emit_pixels_modified(self._brush_bbox)
         return
@@ -465,6 +574,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
+            undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
             tool_cls: Type[ViewerTool] = WsiSmartBrushImageViewerTool,
             tool_settings_cls: Type[ViewerToolSettings] = WsiSmartBrushImageViewerToolSettings,
@@ -475,6 +585,7 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
         super().__init__(
             main_window_plugin,
             mdi_plugin,
+            undo_plugin,
             palette_pack_settings_plugin,
             tool_cls,
             tool_settings_cls,

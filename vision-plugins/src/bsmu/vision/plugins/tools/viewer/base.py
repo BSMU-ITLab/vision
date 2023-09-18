@@ -7,7 +7,6 @@ from PySide6.QtCore import Qt, QObject, QEvent
 from PySide6.QtGui import QCursor, QPixmap, QAction
 from PySide6.QtWidgets import QWidget, QDockWidget
 
-from bsmu.vision.core.image.base import FlatImage
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.plugins.tools.images import icons_rc  # noqa: F401
@@ -19,9 +18,10 @@ if TYPE_CHECKING:
     import numpy as np
     from PySide6.QtCore import QPoint, QPointF
     from bsmu.vision.core.config.united import UnitedConfig
-    from bsmu.vision.core.image.base import Image
+    from bsmu.vision.core.image.base import Image, FlatImage
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
+    from bsmu.vision.plugins.undo import UndoPlugin, UndoManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
     from bsmu.vision.widgets.viewers.base import DataViewer
@@ -36,6 +36,7 @@ class ViewerToolPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
+        'undo_plugin': 'bsmu.vision.plugins.undo.UndoPlugin',
         'palette_pack_settings_plugin': 'bsmu.vision.plugins.palette.settings.PalettePackSettingsPlugin',
     }
 
@@ -43,6 +44,7 @@ class ViewerToolPlugin(Plugin):
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
+            undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
             tool_cls: Type[ViewerTool],
             tool_settings_cls: Type[ViewerToolSettings],
@@ -57,6 +59,9 @@ class ViewerToolPlugin(Plugin):
 
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
+
+        self._undo_plugin = undo_plugin
+        self._undo_manager: UndoManager
 
         self._palette_pack_settings_plugin = palette_pack_settings_plugin
         self._palette_pack_settings: PalettePackSettings | None = None
@@ -78,12 +83,14 @@ class ViewerToolPlugin(Plugin):
 
         self._main_window = self._main_window_plugin.main_window
         self._mdi = self._mdi_plugin.mdi
+        self._undo_manager = self._undo_plugin.undo_manager
         self._palette_pack_settings = self._palette_pack_settings_plugin.settings
 
         tool_settings = self._tool_settings_cls.from_config(self.config, self._palette_pack_settings)
         self._mdi_viewer_tool = MdiViewerTool(
             self._main_window,
             self._mdi,
+            self._undo_manager,
             self._tool_cls,
             tool_settings,
             self._tool_settings_widget_cls,
@@ -102,7 +109,12 @@ class ViewerToolPlugin(Plugin):
         self._mdi_viewer_tool = None
         self._tool_action = None
 
-        raise NotImplemented()
+        self._main_window = None
+        self._mdi = None
+        self._undo_manager = None
+        self._palette_pack_settings = None
+
+        raise NotImplementedError()
 
     def _tool_action_triggered(self, checked: bool):
         self._mdi_viewer_tool.activate() if checked else self._mdi_viewer_tool.deactivate()
@@ -130,6 +142,7 @@ class MdiViewerTool(QObject):
             self,
             main_window: MainWindow,
             mdi: Mdi,
+            undo_manager: UndoManager,
             tool_cls: Type[ViewerTool],
             tool_settings: ViewerToolSettings,
             tool_settings_widget_cls: Type[ViewerToolSettingsWidget],
@@ -138,6 +151,7 @@ class MdiViewerTool(QObject):
 
         self._main_window = main_window
         self._mdi = mdi
+        self._undo_manager = undo_manager
         self._tool_csl = tool_cls
         self._tool_settings = tool_settings
         self._tool_settings_widget_cls = tool_settings_widget_cls
@@ -173,7 +187,7 @@ class MdiViewerTool(QObject):
 
         viewer_tool = self._viewer_tool_by_sub_window.get(sub_window)
         if viewer_tool is None:
-            viewer_tool = self._tool_csl(sub_window.viewer, self._tool_settings)
+            viewer_tool = self._tool_csl(sub_window.viewer, self._undo_manager, self._tool_settings)
             self._viewer_tool_by_sub_window[sub_window] = viewer_tool
         return viewer_tool
 
@@ -215,10 +229,11 @@ class ViewerToolSettingsWidget(QWidget):
 
 
 class ViewerTool(QObject):
-    def __init__(self, viewer: DataViewer, settings: ViewerToolSettings):
+    def __init__(self, viewer: DataViewer, undo_manager: UndoManager, settings: ViewerToolSettings):
         super().__init__()
 
         self.viewer = viewer
+        self._undo_manager = undo_manager
         self._settings = settings
 
     @property
@@ -269,9 +284,10 @@ class LayeredImageViewerTool(ViewerTool):
     def __init__(
             self,
             viewer: LayeredImageViewer,
+            undo_manager: UndoManager,
             settings: LayeredImageViewerToolSettings,
     ):
-        super().__init__(viewer, settings)
+        super().__init__(viewer, undo_manager, settings)
 
         self.image_layer_view = None
         self.mask_layer = None

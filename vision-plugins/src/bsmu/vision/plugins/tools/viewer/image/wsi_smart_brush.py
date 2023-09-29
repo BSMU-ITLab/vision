@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import QFormLayout, QSpinBox
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.image.base import MASK_MAX
+from bsmu.vision.core.rle import encode_rle, decode_rle
 from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool, \
     LayeredImageViewerToolSettings, ViewerToolSettingsWidget
 from bsmu.vision.plugins.undo import UndoCommand
@@ -222,82 +224,134 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
         self._mask_foreground_class_spin_box.setValue(value)
 
 
-class ChangeMaskCommand(UndoCommand):
+class ModifyMaskCommand(UndoCommand):
     def __init__(
             self,
             mask: FlatImage,
-            roi_bbox: BBox,
-            roi_modified_pixels: np.ndarray,
-            new_roi_pixels: int | np.ndarray,
-            merge_id: int,
-            text: str = 'Change Mask',
+            modified_bbox: BBox,
+            modified_bbox_pixels: np.ndarray,
+            new_modified_bbox_pixels: int | np.ndarray,
+            is_last_to_merge: bool = False,
+            text: str = 'Modify Mask',
             parent: UndoCommand = None,
     ):
         """
-        :param roi_bbox: bbox of modified pixels
-        :param roi_modified_pixels: boolean array with True on modified pixels
-        :param new_roi_pixels: if has type int, then all modified pixels will have such value.
+        :param modified_bbox: bbox of modified pixels
+        :param modified_bbox_pixels: boolean array with True on modified pixels
+        :param new_modified_bbox_pixels: if has type int, then all modified pixels will have such value.
         Else it is flat (one-dimensional) array with values of new pixels, which were modified
-        :param merge_id: will merge commands only with the same |merge_id|
+        :param is_last_to_merge: the last command to be merged.
+        We need it to compress command data only after full merge, because compression can be slow
         """
 
         super().__init__(text, parent)
 
+        self._is_last_to_merge = is_last_to_merge
+        if is_last_to_merge:
+            # The last to merge command is a fake command and contains no useful data
+            # It's just an indicator, that now previous command can be compressed
+            return
+
         self._mask = mask
-        self._roi_bbox = roi_bbox
-        self._roi_modified_pixels = roi_modified_pixels
-        if type(new_roi_pixels) != int:
+        self._modified_bbox = modified_bbox
+        self._modified_bbox_pixels = modified_bbox_pixels
+        self._compressed_modified_bbox_pixels = None
+        if type(new_modified_bbox_pixels) != int:
             raise NotImplementedError()
-        self._new_roi_pixels = new_roi_pixels
-        # Use boolean array indexing to get copy of flat (one-dimensional) array with old pixels
-        self._old_roi_pixels = mask.bboxed_pixels(roi_bbox)[roi_modified_pixels]
-        self._merge_id = merge_id
+        self._new_modified_bbox_pixels = new_modified_bbox_pixels
+        self._rle_compressed_old_modified_bbox_pixels = None  # after command compression we get
+        # flat (one-dimensional) array with old values of modified pixels. Then it's compressed using RLE into
+        # tuple of (values, run_lengths) and stored into this property
+        self._old_bbox_pixels = mask.bboxed_pixels(modified_bbox).copy()
+
+        self._mergeable = True
+
+    @property
+    def _is_compressed(self) -> bool:
+        return self._modified_bbox_pixels is None
 
     def _clean(self):
+        self._is_last_to_merge = None
         self._mask = None
-        self._roi_bbox = None
-        self._roi_modified_pixels = None
-        self._new_roi_pixels = None
-        self._old_roi_pixels = None
-        self._merge_id = None
+        self._modified_bbox = None
+        self._modified_bbox_pixels = None
+        self._compressed_modified_bbox_pixels = None
+        self._new_modified_bbox_pixels = None
+        self._rle_compressed_old_modified_bbox_pixels = None
+        self._old_bbox_pixels = None
+        self._mergeable = None
 
     def id(self) -> int:
         return self._id
 
     def redo(self):
-        self._mask.bboxed_pixels(self._roi_bbox)[self._roi_modified_pixels] = self._new_roi_pixels
-        self._mask.emit_pixels_modified(self._roi_bbox)
+        modified_bbox_pixels = self._uncompressed_modified_bbox_pixels() \
+            if self._is_compressed \
+            else self._modified_bbox_pixels
+        self._mask.bboxed_pixels(self._modified_bbox)[modified_bbox_pixels] = self._new_modified_bbox_pixels
+        self._mask.emit_pixels_modified(self._modified_bbox)
 
     def undo(self):
-        self._mask.bboxed_pixels(self._roi_bbox)[self._roi_modified_pixels] = self._old_roi_pixels
-        self._mask.emit_pixels_modified(self._roi_bbox)
+        if self._is_compressed:
+            old_modified_bbox_pixels = decode_rle(*self._rle_compressed_old_modified_bbox_pixels)
+            self._mask.bboxed_pixels(self._modified_bbox)[self._uncompressed_modified_bbox_pixels()] = \
+                old_modified_bbox_pixels
+        else:
+            self._mask.modify_bboxed_pixels(self._modified_bbox, self._old_bbox_pixels)
+        self._mask.emit_pixels_modified(self._modified_bbox)
 
-    def mergeWith(self, other: ChangeMaskCommand) -> bool:
-        if self._merge_id != other._merge_id:
+    def mergeWith(self, other: ModifyMaskCommand) -> bool:
+        """
+        Method called after |other.redo| method
+        :param other: is next command after |self|
+        """
+        if not self._mergeable:
             return False
 
-        if type(self._new_roi_pixels) == int and self._new_roi_pixels != other._new_roi_pixels:
+        if other._is_last_to_merge:
+            self._compress_data()
+            return True
+
+        if type(self._new_modified_bbox_pixels) == int \
+                and self._new_modified_bbox_pixels != other._new_modified_bbox_pixels:
+            logging.warning(f'You forgot to use {FinishModifyMaskCommand.__class__.__name__} to compress the command '
+                            f'as early as possible')
+            self._compress_data()
             return False
 
-        # |other| is next command after |self|. |mergeWith| method called after |other.redo| method
-        merged_roi_bbox = self._roi_bbox.united_with(other._roi_bbox)
+        if bbox_contains_other := self._modified_bbox.contains(other._modified_bbox):
+            merged_modified_bbox = self._modified_bbox
+        else:
+            merged_modified_bbox = self._modified_bbox.united_with(other._modified_bbox)
+            # Add some reserve pads for the bbox to reduce number of mask copying.
+            # Else, e.g. during drawing by brush, we will have to copy bboxed mask every mouse move event,
+            # when |bbox_contains_other| is False.
+            # Reserve pads are proportional to the shift of |other._modified_bbox| relative to |self._modified_bbox|
+            reserve_pads = self._modified_bbox.pads_to_include(other._modified_bbox)
+            reserve_factor = 50
+            reserve_pads.resize(reserve_factor, reserve_factor)
+            merged_modified_bbox.add_bbox_pads(reserve_pads)
+            merged_modified_bbox.clip_to_shape(self._mask.shape)
 
-        merged_roi_modified_pixels = np.zeros(merged_roi_bbox.shape, dtype=self._roi_modified_pixels.dtype)
-        roi_bbox_mapped_to_merged = self._roi_bbox.mapped_to_bbox(merged_roi_bbox)
-        roi_bbox_mapped_to_merged.pixels(merged_roi_modified_pixels)[...] = self._roi_modified_pixels
-        other_roi_bbox_mapped_to_merged = other._roi_bbox.mapped_to_bbox(merged_roi_bbox)
+        other_modified_bbox_mapped_to_merged = other._modified_bbox.mapped_to_bbox(merged_modified_bbox)
+
+        if bbox_contains_other:
+            merged_modified_bbox_pixels = self._modified_bbox_pixels
+        else:
+            merged_modified_bbox_pixels = np.zeros(merged_modified_bbox.shape, dtype=self._modified_bbox_pixels.dtype)
+            modified_bbox_mapped_to_merged = self._modified_bbox.mapped_to_bbox(merged_modified_bbox)
+            modified_bbox_mapped_to_merged.pixels(merged_modified_bbox_pixels)[...] = self._modified_bbox_pixels
+
+            merged_old_bbox_pixels = self._mask.bboxed_pixels(merged_modified_bbox).copy()
+            other_modified_bbox_mapped_to_merged.pixels(merged_old_bbox_pixels)[...] = other._old_bbox_pixels
+            modified_bbox_mapped_to_merged.pixels(merged_old_bbox_pixels)[...] = self._old_bbox_pixels
+            self._old_bbox_pixels = merged_old_bbox_pixels
+
         # Use |= operator to keep True-values unchanged, else they could be replaced by False-values
-        other_roi_bbox_mapped_to_merged.pixels(merged_roi_modified_pixels)[...] |= other._roi_modified_pixels
+        other_modified_bbox_mapped_to_merged.pixels(merged_modified_bbox_pixels)[...] |= other._modified_bbox_pixels
 
-        merged_roi_mask_pixels = np.empty(merged_roi_bbox.shape, dtype=self._mask.pixels.dtype)
-        # merged_roi_mask_pixels = self._mask.bboxed_pixels(merged_roi_bbox).copy()  # what is faster? Previous line or this one?
-        other_roi_bbox_mapped_to_merged.pixels(merged_roi_mask_pixels)[other._roi_modified_pixels] = \
-            other._old_roi_pixels
-        roi_bbox_mapped_to_merged.pixels(merged_roi_mask_pixels)[self._roi_modified_pixels] = self._old_roi_pixels
-
-        self._old_roi_pixels = merged_roi_mask_pixels[merged_roi_modified_pixels]
-        self._roi_bbox = merged_roi_bbox
-        self._roi_modified_pixels = merged_roi_modified_pixels
+        self._modified_bbox = merged_modified_bbox
+        self._modified_bbox_pixels = merged_modified_bbox_pixels
 
         # Weird behaviour: |other| command is not deleted (Python __dell__ is not called),
         # when |mergeWith| method returns True. Looks like there are references to it somewhere.
@@ -310,8 +364,51 @@ class ChangeMaskCommand(UndoCommand):
 
         return True
 
+    def _compress_data(self):
+        # Use boolean array indexing to get a copy of flat (one-dimensional) array with old pixels
+        # and compress them using RLE into tuple of (values, run_lengths)
+        self._rle_compressed_old_modified_bbox_pixels = self._old_bbox_pixels[self._modified_bbox_pixels]
+        self._rle_compressed_old_modified_bbox_pixels = encode_rle(self._rle_compressed_old_modified_bbox_pixels)
+        self._old_bbox_pixels = None
+
+        self._compressed_modified_bbox_pixels = np.packbits(self._modified_bbox_pixels)
+        self._modified_bbox_pixels = None
+
+        self._mergeable = False
+
+    def _uncompressed_modified_bbox_pixels(self) -> np.ndarray:
+        modified_bbox_pixels = np.unpackbits(
+            self._compressed_modified_bbox_pixels, count=self._modified_bbox.element_count)
+        modified_bbox_pixels = modified_bbox_pixels.reshape(self._modified_bbox.shape)
+        # Change np.uint8 type to bool type using |view| method. It's much faster than |astype|
+        modified_bbox_pixels = modified_bbox_pixels.view(bool)
+        return modified_bbox_pixels
+
+
+class FinishModifyMaskCommand(ModifyMaskCommand):
+    """
+    It is a fake command and contains no useful data
+    It is used just as an indicator, that it is the last command to merge and now previous command can be compressed
+    """
+    def __init__(self, text: str = 'Finish Modify Mask', parent: UndoCommand = None):
+        super().__init__(None, None, None, None, True, text, parent)
+
+    def id(self) -> int:
+        # We need to merge commands of such type with ModifyMaskCommand commands
+        return ModifyMaskCommand.command_type_id()
+
+    def redo(self):
+        pass
+
+    def undo(self):
+        pass
+
 
 class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
+    # Store and increment stroke ID, when DRAW or ERASE mode is activated.
+    # Use class attribute, because new instances of tool are created, when tool is activated/deactivated
+    _STROKE_ID = 0
+
     def __init__(
             self,
             viewer: LayeredImageViewer,
@@ -321,10 +418,6 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         super().__init__(viewer, undo_manager, settings)
 
         self._mode = Mode.SHOW
-        # Store and increment stroke ID, when DRAW or ERASE mode is activated.
-        # We need stroke ID to undo/redo entire stroke at a time.
-        self._stroke_id = 0
-
         self._brush_bbox = None
 
     @property
@@ -336,7 +429,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         if self._mode != value:
             self._mode = value
             if self._mode == Mode.DRAW or self._mode == Mode.ERASE:
-                self._stroke_id += 1
+                WsiSmartBrushImageViewerTool._STROKE_ID += 1
+            else:
+                finish_stroke_command = FinishModifyMaskCommand()
+                self._undo_manager.push(finish_stroke_command)
 
     def activate(self):
         super().activate()
@@ -381,6 +477,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.settings.smart_mode_enabled = not self.settings.smart_mode_enabled
         else:
             self.mode = Mode.SHOW
+
+    @property
+    def _brush_stroke_text(self) -> str:
+        return f'Brush Stroke #{self._STROKE_ID}'
 
     def draw_brush_event(self, event: QEvent):
         # if not self.viewer.has_image():
@@ -452,10 +552,12 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
             if self._mode in [Mode.ERASE, Mode.DRAW]:
-                command_text = 'Brush: Erase' if self._mode == Mode.ERASE else f'Brush: Draw Class {mask_class}'
-                change_mask_command = ChangeMaskCommand(
-                    self.mask, self._brush_bbox, modified_pixels, mask_class, self._stroke_id, command_text)
-                self._undo_manager.push(change_mask_command)
+                command_text = f'{self._brush_stroke_text}: Erase' \
+                    if self._mode == Mode.ERASE \
+                    else f'{self._brush_stroke_text}: Draw Class {mask_class}'
+                modify_mask_command = ModifyMaskCommand(
+                    self.mask, self._brush_bbox, modified_pixels, mask_class, text=command_text)
+                self._undo_manager.push(modify_mask_command)
 
             return
 
@@ -531,10 +633,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 self.settings.tool_foreground_class)
             drawn_pixels = tool_mask_in_brush_bbox == temp_tool_foreground_class
 
-            change_mask_command = ChangeMaskCommand(
-                self.mask, self._brush_bbox, drawn_pixels, self.settings.mask_foreground_class, self._stroke_id,
-                f'Brush: Draw Class {self.settings.mask_foreground_class}')
-            self._undo_manager.push(change_mask_command)
+            modify_mask_command = ModifyMaskCommand(
+                self.mask, self._brush_bbox, drawn_pixels, self.settings.mask_foreground_class,
+                text=f'{self._brush_stroke_text}: Draw Class {self.settings.mask_foreground_class}')
+            self._undo_manager.push(modify_mask_command)
 
         self.tool_mask.emit_pixels_modified(self._brush_bbox)
         return

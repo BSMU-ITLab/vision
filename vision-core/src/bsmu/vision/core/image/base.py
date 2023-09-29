@@ -117,6 +117,9 @@ class Image(Data):
     def bboxed_pixels(self, bbox: BBox) -> np.ndarray:
         return self.array[bbox.top:bbox.bottom, bbox.left:bbox.right]
 
+    def modify_bboxed_pixels(self, bbox: BBox, new_pixels: np.ndarray):
+        self.bboxed_pixels(bbox)[...] = new_pixels
+
     @property
     def palette(self) -> Palette:
         return self._palette

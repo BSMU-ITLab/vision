@@ -149,3 +149,7 @@ class UndoCommand(QUndoCommand, metaclass=UndoCommandMeta):
         super().__init__(text, parent)
 
         # print(f'{self.__class__.__name__} id={self._id}')
+
+    @classmethod
+    def command_type_id(cls) -> int:
+        return cls._id

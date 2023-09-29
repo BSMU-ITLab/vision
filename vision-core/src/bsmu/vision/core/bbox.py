@@ -43,6 +43,10 @@ class BBox:
         return self.height, self.width
 
     @property
+    def element_count(self):
+        return self.width * self.height
+
+    @property
     def empty(self) -> bool:
         return self.width == 0 or self.height == 0
 
@@ -82,7 +86,8 @@ class BBox:
         return clipped_bbox
 
     def calculate_clip_bbox(self, src_bbox: BBox) -> BBox:
-        """Calculates bbox, which have to be applied to |src_bbox| to get |self| (clipped bbox)
+        """
+        Calculates bbox, which have to be applied to |src_bbox| to get |self| (clipped bbox)
         :param src_bbox: source (not clipped) bbox
         :return: calculated bbox
         """
@@ -93,6 +98,7 @@ class BBox:
             src_bbox.height - (src_bbox.bottom - self.bottom)
         )
 
+    # TODO: rename margins to pads
     def add_margins(self, margin_size: int):
         self.left -= margin_size
         self.right += margin_size
@@ -110,6 +116,12 @@ class BBox:
         self.top -= y_margin
         self.bottom += y_margin
 
+    def add_bbox_pads(self, pads: BBox):
+        self.left -= pads.left
+        self.right += pads.right
+        self.top -= pads.top
+        self.bottom += pads.bottom
+
     def move_left(self, value: int):
         self.left -= value
         self.right -= value
@@ -122,14 +134,16 @@ class BBox:
         return array[self.top:self.bottom, self.left:self.right]
 
     def map_rc_point(self, point: Sequence) -> tuple:
-        """Map point into coordinates of this BBox
+        """
+        Map point into coordinates of this BBox
         :param point: point in (row, col) format
         :return: mapped point in (row, col) format
         """
         return point[0] - self.top, point[1] - self.left
 
     def map_to_bbox(self, other: BBox):
-        """Map |self| to coordinates of |other|
+        """
+        Map |self| to coordinates of |other|
         If both bboxes are from the same array, and |other| includes |self|,
         then |self| will get its bbox values relative to |other|
         """
@@ -151,3 +165,25 @@ class BBox:
         united_bbox = copy.copy(self)
         united_bbox.unite_with(other)
         return united_bbox
+
+    def contains(self, other: BBox) -> bool:
+        return self.left <= other.left and self.right >= other.right \
+               and self.top <= other.top and self.bottom >= other.bottom
+
+    def max(self, value):
+        self.left = max(self.left, value)
+        self.right = max(self.right, value)
+        self.top = max(self.top, value)
+        self.bottom = max(self.bottom, value)
+
+    def pads_to_include(self, other: BBox) -> BBox:
+        """
+        Returns pads (as BBox object), which have to be added to |self| to include |other|
+        (i.e. after the pads is added self.contains(other) will return True)
+        """
+        pads = BBox(self.left - other.left,
+                    other.right - self.right,
+                    self.top - other.top,
+                    other.bottom - self.bottom)
+        pads.max(0)
+        return pads

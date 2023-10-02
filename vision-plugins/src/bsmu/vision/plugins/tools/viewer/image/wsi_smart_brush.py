@@ -314,7 +314,7 @@ class ModifyMaskCommand(UndoCommand):
 
         if type(self._new_modified_bbox_pixels) == int \
                 and self._new_modified_bbox_pixels != other._new_modified_bbox_pixels:
-            logging.warning(f'You forgot to use {FinishModifyMaskCommand.__class__.__name__} to compress the command '
+            logging.warning(f'You forgot to use {FinishModifyMaskCommand.__name__} to compress the command '
                             f'as early as possible')
             self._compress_data()
             return False
@@ -419,6 +419,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
         self._mode = Mode.SHOW
         self._brush_bbox = None
+        self._is_stroke_finished = True
 
     @property
     def mode(self) -> Mode:
@@ -429,10 +430,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         if self._mode != value:
             self._mode = value
             if self._mode == Mode.DRAW or self._mode == Mode.ERASE:
+                self._is_stroke_finished = False
                 WsiSmartBrushImageViewerTool._STROKE_ID += 1
             else:
-                finish_stroke_command = FinishModifyMaskCommand()
-                self._undo_manager.push(finish_stroke_command)
+                self._finish_stroke()
 
     def activate(self):
         super().activate()
@@ -443,6 +444,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         self._draw_brush_in_pos(mouse_pos_in_viewport)
 
     def deactivate(self):
+        if not self._is_stroke_finished:
+            self._finish_stroke()
+
         self.viewer.viewport.setMouseTracking(False)
 
         super().deactivate()
@@ -643,6 +647,11 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
     def _preprocess_downscaled_image_in_brush_bbox(self, image: np.ndarray):
         return image
+
+    def _finish_stroke(self):
+        finish_stroke_command = FinishModifyMaskCommand()
+        self._undo_manager.push(finish_stroke_command)
+        self._is_stroke_finished = True
 
     @staticmethod
     def resize_indexed_binary_image(

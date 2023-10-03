@@ -37,8 +37,9 @@ if TYPE_CHECKING:
 
 class Mode(Enum):
     SHOW = 1
-    DRAW = 2
-    ERASE = 3
+    HIDE = 2
+    DRAW = 3
+    ERASE = 4
 
 
 DEFAULT_RADIUS = 600
@@ -417,7 +418,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
     ):
         super().__init__(viewer, undo_manager, settings)
 
-        self._mode = Mode.SHOW
+        self._mode = None
         self._brush_bbox = None
         self._is_stroke_finished = True
 
@@ -440,18 +441,24 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
         self.viewer.viewport.setMouseTracking(True)
 
-        mouse_pos_in_viewport = self.viewer.viewport.mapFromGlobal(QCursor.pos())
-        self._draw_brush_in_pos(mouse_pos_in_viewport)
+        if self.viewer.viewport.underMouse():
+            self.mode = Mode.SHOW
+            mouse_pos_in_viewport = self.viewer.viewport.mapFromGlobal(QCursor.pos())
+            self._draw_brush_in_pos(mouse_pos_in_viewport)
+        else:
+            self.mode = Mode.HIDE
 
     def deactivate(self):
-        if not self._is_stroke_finished:
-            self._finish_stroke()
+        self.mode = None
 
         self.viewer.viewport.setMouseTracking(False)
 
         super().deactivate()
 
     def eventFilter(self, watched_obj: QObject, event: QEvent):
+        if event.type() == QEvent.Leave:
+            self.draw_brush_event(event)
+            return False
         if event.type() == QEvent.MouseButtonPress or event.type() == QEvent.MouseButtonRelease:
             self.draw_brush_event(event)
             return True
@@ -469,7 +476,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             return super().eventFilter(watched_obj, event)
 
     def update_mode(self, event: QEvent):
-        if event.buttons() == Qt.LeftButton and (self.settings.draw_on_mouse_move or event.type() != QEvent.MouseMove):
+        if event.type() == QEvent.Leave:
+            self.mode = Mode.HIDE
+        elif event.buttons() == Qt.LeftButton and (self.settings.draw_on_mouse_move or event.type() != QEvent.MouseMove):
             if event.type() != QEvent.Wheel:  # This condition is used only to fix strange bug
                 # after a mouse click on the app title bar, try to change brush radius (using Ctrl + mouse wheel)
                 # event.buttons() shows, that LeftButton is pressed (but it is not pressed)
@@ -491,18 +500,20 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         #     return
 
         self.update_mode(event)
-        self._draw_brush_in_pos(event.position().toPoint())
+
+        # Erase old tool mask
+        if self._brush_bbox is not None:
+            self.tool_mask.bboxed_pixels(self._brush_bbox).fill(self.settings.tool_background_class)
+            self.tool_mask.emit_pixels_modified(self._brush_bbox)
+
+        if self._mode != Mode.HIDE:
+            self._draw_brush_in_pos(event.position().toPoint())
 
     def _draw_brush_in_pos(self, pos: QPoint):
         image_pixel_indexes = self.pos_to_image_pixel_indexes(pos, self.tool_mask)
         self.draw_brush(*image_pixel_indexes)
 
     def draw_brush(self, row_f: float, col_f: float):
-        # Erase old tool mask
-        if self._brush_bbox is not None:
-            self.tool_mask.bboxed_pixels(self._brush_bbox).fill(self.settings.tool_background_class)
-            self.tool_mask.emit_pixels_modified(self._brush_bbox)
-
         row_spatial_radius, col_spatial_radius = \
             self.tool_mask.spatial_size_to_indexed(np.array([self.settings.radius, self.settings.radius]))
         not_clipped_brush_bbox = BBox(
@@ -649,6 +660,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         return image
 
     def _finish_stroke(self):
+        if self._is_stroke_finished:
+            return
+
         finish_stroke_command = FinishModifyMaskCommand()
         self._undo_manager.push(finish_stroke_command)
         self._is_stroke_finished = True

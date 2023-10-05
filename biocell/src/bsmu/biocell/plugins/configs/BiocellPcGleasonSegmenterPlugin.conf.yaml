@@ -1,37 +1,14 @@
-gleason-segmenter-model:
-#  Trained on Kaggle's data
-#  name: 'u-vgg16_bn-panda_no_jitter.onnx'
-#  name: 'u-vgg16_bn-panda_hue_jitter.onnx'
-#  name: 'u-vgg16_bn-panda_color_jitter.onnx'
-#  name: 'u-tu-resnetv2_50x1_bitm_in21k-panda.onnx'
-
-# Trained on our data
-#  name: 'ourdata-BADPADDINGS-u-vgg16_bn-panda.onnx'
-#  name: 'ourdata-BADPADDINGS-CGM-u-vgg16_bn-panda+empty.onnx'
-
-#  name: 'ourdata-CGM-u-tu-resnetv2_50x1_bitm_in21k-panda+empty.onnx'  # Very good model
-#  name: 'new-to-test/u-tu-resnetv2_50x1_bitm_in21k-panda.onnx'  # Bad: a lot of rubbish (cause trained without empty tiles)
-#  name: 'new-to-test/u-tu-resnetv2_50x1_bitm_in21k-panda+empty.onnx'  # not bad (almost like the Very good model above)
-#  name: 'new-to-test/u-tu-resnetv2_50x1_bitm_in21k-panda+empty+crop.onnx'  # worse than previous: more missed cancer
-#  preprocessing-mode: ''  # For models above use these preprocessing
-#  channels-order: 'bgr'
-#  and use: img = 255 - img (to invert image colors)
-
-  # For these models do NOT need to do: img = 255 - img
-#  name: 'ourdata-segformer_mit-b0-panda+empty3.onnx'  # Trained on Gleason >= 3  # The BEST model
-  name: '2023.08.22-segformer_mit-b0-panda+empty3_base.onnx'
-#  name: 'segformer_mit-b0-panda+empty3.onnx'
-#  name: 'ourdata-segformer_mit-b0-panda+empty4.onnx'  # Trained on Gleason >= 4
-  preprocessing-mode: 'image-net-torch'  # For models above use these preprocessing
+gleason-3-segmenter-model:  # trained on Gleason >= 3
+  name: '2023.10.04-segformer_mit-b0-panda+empty3.onnx'
+  preprocessing-mode: 'image-net-torch'
   channels-order: 'rgb'
   input-size: [3, 256, 256]
   channels-axis: 0
   normalize: false
   preload: false
 
-
-gleason-4-segmenter-model:
-  name: 'ourdata-segformer_mit-b0-panda+empty4.onnx'  # Trained on Gleason >= 4
+gleason-4-segmenter-model:  # trained on Gleason >= 4
+  name: '2023.10.04-segformer_mit-b0-panda+empty4.onnx'
   preprocessing-mode: 'image-net-torch'
   channels-order: 'rgb'
   input-size: [3, 256, 256]

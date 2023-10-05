@@ -82,7 +82,7 @@ class BiocellPcGleasonSegmenterPlugin(Plugin):
         self._palette_pack_settings = self._palette_pack_settings_plugin.settings
 
         model_params_gleason_3 = DnnModelParams.from_config(
-            self.config.value('gleason-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
+            self.config.value('gleason-3-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
         model_params_gleason_4 = DnnModelParams.from_config(
             self.config.value('gleason-4-segmenter-model'), self.data_path(self._DNN_MODELS_DIR_NAME))
 

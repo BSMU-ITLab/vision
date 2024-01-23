@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import numpy as np
 from PySide6.QtCore import QPoint, QRect
-from PySide6.QtWidgets import QMdiSubWindow
+from PySide6QtAds import CDockWidget
 
 
-class DataViewerSubWindow(QMdiSubWindow):
+class DataViewerSubWindow(CDockWidget):
     def __init__(self, viewer: DataViewer):
-        super().__init__()
+        super().__init__('')
 
         self.viewer = viewer
 

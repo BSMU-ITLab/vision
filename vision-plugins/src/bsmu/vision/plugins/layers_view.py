@@ -4,7 +4,8 @@ import typing
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, QModelIndex
-from PySide6.QtWidgets import QTableView, QDockWidget
+from PySide6.QtWidgets import QTableView, QDockWidget, QLabel
+from PySide6QtAds import CDockManager, CDockWidget, LeftDockWidgetArea
 
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.plugins.base import Plugin
@@ -49,8 +50,10 @@ class LayersTableViewPlugin(Plugin):
         self._mdi = self._mdi_plugin.mdi
 
         self._layers_table_view = LayersTableView()
-        self._layers_table_view_dock_widget = QDockWidget('Layers', self._main_window)
-        self._layers_table_view_dock_widget.setWidget(self._layers_table_view)
+
+        # self._layers_table_view_dock_widget = CDockWidget('Layers', self._mdi.main_dock_container)#, self._main_window)
+        # self._layers_table_view_dock_widget.setWidget(self._layers_table_view)
+        # self._layers_table_view_dock_widget.setFeature(CDockWidget.DockWidgetFocusable, False)
 
         self._layers_table_model = LayersTableModel()
         self._layers_table_view.setModel(self._layers_table_model)
@@ -59,9 +62,12 @@ class LayersTableViewPlugin(Plugin):
         visibility_column_number = self._layers_table_model.column_number(VisibilityTableColumn)
         self._layers_table_view.setItemDelegateForColumn(visibility_column_number, self._visibility_delegate)
 
-        self._mdi.subWindowActivated.connect(self._on_mdi_sub_window_activated)
+        # self._mdi.subWindowActivated.connect(self._on_mdi_sub_window_activated)
 
-        self._main_window.addDockWidget(Qt.LeftDockWidgetArea, self._layers_table_view_dock_widget)
+
+        # self._main_window.addDockWidget(Qt.LeftDockWidgetArea, self._layers_table_view_dock_widget)
+        # self._mdi.main_dock_container.addDockWidget(LeftDockWidgetArea, self._layers_table_view_dock_widget)
+        self._mdi.add_dockable_widget(LeftDockWidgetArea, 'Layers', self._layers_table_view)
 
     def _disable(self):
         self._main_window.removeDockWidget(self._layers_table_view_dock_widget)

@@ -43,7 +43,7 @@ class DataVisualizer(QObject, metaclass=DataVisualizerMeta):
     def __init__(self, mdi, settings: Settings):
         super().__init__()
 
-        self.mdi = mdi
+        self._mdi = mdi
         self._settings = settings
 
     @property

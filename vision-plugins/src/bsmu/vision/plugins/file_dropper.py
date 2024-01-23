@@ -64,11 +64,11 @@ class FileDropperPlugin(Plugin):
             self._data_visualization_manager,
         )
 
-        self._mdi.setAcceptDrops(True)
-        self._mdi.installEventFilter(self._file_dropper)
+        self._mdi.central_dock_area.setAcceptDrops(True)
+        self._mdi.central_dock_area.installEventFilter(self._file_dropper)
 
     def _disable(self):
-        self._mdi.removeEventFilter(self._file_dropper)
+        self._mdi.removeEventFilter(self._file_dropper)  # Change it!!!
 
         self._file_dropper = None
 
@@ -96,6 +96,7 @@ class FileDropper(QObject):
             return super().eventFilter(watched_obj, event)
 
     def on_drag_enter(self, event):
+        print('on_drag_enter')
         self.dragged_loadable_file_paths.clear()
 
         mime_data = event.mimeData()

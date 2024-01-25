@@ -54,12 +54,14 @@ class ImageModelParams(ModelParams):
     DEFAULT_CHANNELS_ORDER = 'rgb'
     DEFAULT_NORMALIZE = True
     DEFAULT_PREPROCESSING_MODE = 'image-net-torch'
+    DEFAULT_MASK_BINARIZATION_THRESHOLD = 0.5
 
     input_size: Sequence = DEFAULT_INPUT_SIZE
     channels_axis: int = DEFAULT_CHANNELS_AXIS
     channels_order: str = DEFAULT_CHANNELS_ORDER
     normalize: bool = DEFAULT_NORMALIZE
     preprocessing_mode: str = DEFAULT_PREPROCESSING_MODE
+    mask_binarization_threshold: float = DEFAULT_MASK_BINARIZATION_THRESHOLD
 
     @classmethod
     def from_config(cls, config_data: dict, model_dir: Path) -> ImageModelParams:
@@ -71,6 +73,8 @@ class ImageModelParams(ModelParams):
             channels_order=config_data.get('channels-order', cls.DEFAULT_CHANNELS_ORDER),
             normalize=config_data.get('normalize', cls.DEFAULT_NORMALIZE),
             preprocessing_mode=config_data.get('preprocessing-mode', cls.DEFAULT_PREPROCESSING_MODE),
+            mask_binarization_threshold=config_data.get(
+                'mask_binarization_threshold', cls.DEFAULT_MASK_BINARIZATION_THRESHOLD),
         )
 
     def copy_but_change_name(self, new_name: str) -> ImageModelParams:

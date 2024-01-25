@@ -1,5 +1,5 @@
 radius: 600
-min_radius: 20
+min_radius: 4
 max_radius: 2200
 radius_zoom_factor: 1
 max_radius_without_downscale: 150

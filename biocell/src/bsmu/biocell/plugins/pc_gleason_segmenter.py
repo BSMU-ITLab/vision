@@ -127,30 +127,40 @@ class BiocellPcGleasonSegmenterPlugin(Plugin):
     def _segment_gleason_3_and_above(self):
         layered_image = self._active_layered_image()
         if layered_image is not None:
-            self._pc_gleason_3_segmenter.segment(layered_image, 'gleason >= 3')
+            self._pc_gleason_3_segmenter.segment(
+                layered_image,
+                'gleason >= 3',
+                threshold=self._pc_gleason_3_segmenter.model_params.mask_binarization_threshold)
 
     def _segment_gleason_4_and_above(self):
         layered_image = self._active_layered_image()
         if layered_image is not None:
-            self._pc_gleason_4_segmenter.segment(layered_image, 'gleason >= 4')
+            self._pc_gleason_4_segmenter.segment(
+                layered_image,
+                'gleason >= 4',
+                threshold=self._pc_gleason_4_segmenter.model_params.mask_binarization_threshold)
 
-    def _segment_cancer(self):
+    def _segment_cancer(self, pass_count: int = 1):
         layered_image = self._active_layered_image()
         if layered_image is None:
             return
 
         masks_layer_name = 'masks'
-        self._pc_gleason_4_segmenter.segment(layered_image, masks_layer_name, repaint_full_mask=False)
-        self._pc_gleason_3_segmenter.segment(layered_image, masks_layer_name, repaint_full_mask=False)
+        self._pc_gleason_4_segmenter.segment(
+            layered_image,
+            masks_layer_name,
+            repaint_full_mask=False,
+            threshold=self._pc_gleason_4_segmenter.model_params.mask_binarization_threshold,
+            pass_count=pass_count)
+        self._pc_gleason_3_segmenter.segment(
+            layered_image,
+            masks_layer_name,
+            repaint_full_mask=False,
+            threshold=self._pc_gleason_3_segmenter.model_params.mask_binarization_threshold,
+            pass_count=pass_count)
 
     def _segment_cancer_x4_passes(self):
-        layered_image = self._active_layered_image()
-        if layered_image is None:
-            return
-
-        masks_layer_name = 'masks'
-        self._pc_gleason_4_segmenter.segment(layered_image, masks_layer_name, repaint_full_mask=False, pass_count=4)
-        self._pc_gleason_3_segmenter.segment(layered_image, masks_layer_name, repaint_full_mask=False, pass_count=4)
+        self._segment_cancer(pass_count=4)
 
     def _segment_prostate_tissue(self):
         layered_image = self._active_layered_image()
@@ -196,6 +206,10 @@ class BiocellPcGleasonSegmenter(QObject):
 
         self._background_class = self._mask_palette.row_index_by_name('background')
         self._unknown_class = self._mask_palette.row_index_by_name('unknown')
+
+    @property
+    def model_params(self) -> DnnModelParams:
+        return self._model_params
 
     @property
     def tile_size(self) -> int:

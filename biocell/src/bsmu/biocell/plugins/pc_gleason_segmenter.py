@@ -106,7 +106,7 @@ class BiocellPcGleasonSegmenterPlugin(Plugin):
         self._mdi = self._mdi_plugin.mdi
 
         # self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Prostate Tissue', self._segment_prostate_tissue)
-        self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Cancer', self._segment_cancer)
+        self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Cancer', self._segment_cancer_1_pass)
         self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Cancer - x4 Passes', self._segment_cancer_x4_passes)
         self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Gleason >= 3', self._segment_gleason_3_and_above)
         self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Gleason >= 4', self._segment_gleason_4_and_above)
@@ -158,6 +158,9 @@ class BiocellPcGleasonSegmenterPlugin(Plugin):
             repaint_full_mask=False,
             threshold=self._pc_gleason_3_segmenter.model_params.mask_binarization_threshold,
             pass_count=pass_count)
+
+    def _segment_cancer_1_pass(self):
+        self._segment_cancer(pass_count=1)
 
     def _segment_cancer_x4_passes(self):
         self._segment_cancer(pass_count=4)

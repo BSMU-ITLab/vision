@@ -79,6 +79,10 @@ class ThreadPool(QObject):
 
     @classmethod
     def call_async_with_callback(cls, fn: Callable, /, *fn_args, **fn_kwargs) -> ExtendedFuture:
+        """
+        :param fn: is positional-only parameter,
+        because it allows to pass into fn_kwargs keyword argument named as fn.
+        """
         assert cls._instance, 'You must first call the |init_executor| method once'
 
         future = cls._instance.executor.submit(fn, *fn_args, **fn_kwargs)

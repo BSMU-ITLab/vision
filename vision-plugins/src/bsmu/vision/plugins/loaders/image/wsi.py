@@ -39,7 +39,7 @@ class WholeSlideImageFileLoader(ImageFileLoader):
             '.tif': 'GDAL',
         }
 
-    def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
+    def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs) -> Data:
         logging.info('Load Whole-Slide Image')
 
         # multi_image_level = 1

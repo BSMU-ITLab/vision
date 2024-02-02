@@ -9,6 +9,9 @@ from PySide6.QtCore import QObject, QEvent
 from bsmu.vision.core.plugins.base import Plugin
 
 if TYPE_CHECKING:
+    from PySide6.QtGui import QDragEnterEvent, QDropEvent
+
+    from bsmu.vision.core.data import Data
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
@@ -85,17 +88,17 @@ class FileDropper(QObject):
 
         self.dragged_loadable_file_paths = []
 
-    def eventFilter(self, watched_obj, event):
+    def eventFilter(self, watched_obj: QObject, event: QEvent):
         if event.type() == QEvent.DragEnter:
-            self.on_drag_enter(event)
+            self._on_drag_enter(event)
             return True
         elif event.type() == QEvent.Drop:
-            self.on_drop(event)
+            self._on_drop(event)
             return True
         else:
             return super().eventFilter(watched_obj, event)
 
-    def on_drag_enter(self, event):
+    def _on_drag_enter(self, event: QDragEnterEvent):
         self.dragged_loadable_file_paths.clear()
 
         mime_data = event.mimeData()
@@ -106,9 +109,12 @@ class FileDropper(QObject):
 
         event.setAccepted(bool(self.dragged_loadable_file_paths))
 
-    def on_drop(self, event):
+    def _on_drop(self, event: QDropEvent):
         logging.info(f'Drop: {self.dragged_loadable_file_paths}')
         for file_path in self.dragged_loadable_file_paths:
-            data = self.file_loading_manager.load_file(file_path)
-            data = self.post_load_conversion_manager.convert_data(data)
-            self.visualization_manager.visualize_data(data)
+            future = self.file_loading_manager.load_file_async(file_path)
+            future.add_done_unpacked_callback(self._on_file_loaded)
+
+    def _on_file_loaded(self, data: Data | None):
+        data = self.post_load_conversion_manager.convert_data(data)
+        self.visualization_manager.visualize_data(data)

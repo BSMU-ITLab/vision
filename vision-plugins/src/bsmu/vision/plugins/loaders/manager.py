@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
-from typing import Type, Optional
 
 from PySide6.QtCore import QObject, Signal
 
+from bsmu.vision.core.concurrent import ExtendedFuture, ThreadPool
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins.base import Plugin
 
 if TYPE_CHECKING:
+    from typing import Type
     from pathlib import Path
 
     from bsmu.vision.plugins.loaders.base import FileLoader
@@ -50,20 +51,29 @@ class FileLoadingManager(QObject):
     def can_load_file(self, path: Path) -> bool:
         return self._loader_cls(path) is not None
 
-    def load_file(self, path: Path, **kwargs) -> Optional[Data]:
+    def load_file(self, path: Path, **kwargs) -> Data | None:
         logging.info(f'Load file: {path}')
+        data = None
         if path.exists():
             format_loader_cls = self._loader_cls(path)
-            if format_loader_cls is None:
-                return None
-            format_loader = format_loader_cls()
-            data = format_loader.load_file(path, **kwargs)
+            if format_loader_cls is not None:
+                format_loader = format_loader_cls()
+                data = format_loader.load_file(path, **kwargs)
+            else:
+                logging.info(f'Cannot load the {path} file, because suitable loader is not found')
         else:
-            data = None
+            logging.info(f'Cannot load the {path} file, because it is not exist')
         self.file_loaded.emit(data)
         return data
 
-    def _loader_cls(self, path: Path) -> Optional[Type[FileLoader]]:
+    def load_file_async(self, path: Path, **kwargs) -> ExtendedFuture:
+        return ThreadPool.call_async_with_callback(
+            self.load_file,
+            path,
+            **kwargs,
+        )
+
+    def _loader_cls(self, path: Path) -> Type[FileLoader] | None:
         """Return FileLoader for a file with this path.
         Start to check file format from biggest part after first dot,
         e.g. for NiftiFile.nii.gz

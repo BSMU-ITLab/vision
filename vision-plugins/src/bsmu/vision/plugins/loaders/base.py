@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
+from bsmu.vision.core.concurrent import ExtendedFuture, ThreadPool
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins.processor.base import ProcessorPlugin
 
@@ -46,6 +47,13 @@ class FileLoader(QObject, metaclass=FileLoaderMeta):
         data = self._load_file(path, **kwargs)
         self.file_loaded.emit(data)
         return data
+
+    def load_file_async(self, path: Path, **kwargs) -> ExtendedFuture:
+        return ThreadPool.call_async_with_callback(
+            self.load_file,
+            path,
+            **kwargs,
+        )
 
     @abc.abstractmethod
     def _load_file(self, path: Path, **kwargs) -> Data:

@@ -130,18 +130,13 @@ class Segmenter(Inferencer):
             use_square_image: bool = True,
             callback: Callable = None,
     ):
-        ThreadPool.call_async_with_callback(
+        segmentation_task = ThreadPool.call_async_dnn(
             self.segment_largest_connected_component_and_return_mask_with_bbox,
             image,
             use_square_image,
-            callback=callback,
         )
-        # self._call_async_with_callback(
-        #     callback,
-        #     self.segment_largest_connected_component_and_return_mask_with_bbox,
-        #     image,
-        #     use_square_image,
-        # )
+        segmentation_task.on_finished = callback
+
 
     def segment_on_splitted_into_tiles(
             self,
@@ -187,22 +182,14 @@ class Segmenter(Inferencer):
             border_size: int = 10,
             callback: Callable = None,
     ):
-        ThreadPool.call_async_with_callback(
+        segmentation_task = ThreadPool.call_async_dnn(
             self.segment_on_splitted_into_tiles,
             image,
             use_square_image,
             tile_grid_shape,
             border_size,
-            callback=callback,
         )
-        # self._call_async_with_callback(
-        #     callback,
-        #     self.segment_on_splitted_into_tiles,
-        #     image,
-        #     use_square_image,
-        #     tile_grid_shape,
-        #     border_size,
-        # )
+        segmentation_task.on_finished = callback
 
 
 def largest_connected_component_soft_mask(soft_mask: np.ndarray) -> Tuple[np.ndarray, BBox]:

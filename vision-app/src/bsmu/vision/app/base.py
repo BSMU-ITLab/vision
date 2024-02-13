@@ -56,7 +56,9 @@ class App(QObject, DataFileProvider):
         self._qApp.setApplicationName(name)
         self._qApp.setApplicationVersion(version)
 
-        ThreadPool.init_executor(self._config.value('max_thread_count'))
+        ThreadPool.create_instance(
+            self._config.value('max_general_thread_count'),
+            self._config.value('max_dnn_thread_count'))
 
         if self._config.value('warn-with-traceback'):
             warnings.showwarning = warn_with_traceback

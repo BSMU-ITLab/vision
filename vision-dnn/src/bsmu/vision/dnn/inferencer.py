@@ -3,23 +3,20 @@ from __future__ import annotations
 import copy
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from functools import partial
 from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
 import onnxruntime as ort
-from PySide6.QtCore import QObject, Signal, QThreadPool, QTimer
+from PySide6.QtCore import QObject, QThreadPool, QTimer
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.dnn.config import OnnxConfig, CPU_PROVIDER
 
 if TYPE_CHECKING:
-    from typing import Callable, Tuple, Sequence
+    from typing import Tuple, Sequence
     from pathlib import Path
-    from concurrent.futures import Future
 
 
 @dataclass
@@ -176,8 +173,6 @@ def padding_removed(image: np.ndarray, padding: Padding) -> np.ndarray:
 
 
 class Inferencer(QObject):
-    async_finished = Signal(object, object)  # Signal(callback: Callable, result: Tuple | Any)
-
     def __init__(self, model_params: ModelParams, parent: QObject = None):
         super().__init__(parent)
 
@@ -185,9 +180,6 @@ class Inferencer(QObject):
 
         self._inference_session: ort.InferenceSession | None = None
         self._inference_session_being_created: bool = False
-
-        # Use this signal to call slot in the thread, where inferencer was created (most often this is the main thread)
-        self.async_finished.connect(self._call_async_callback_in_inferencer_thread)
 
         if self._model_params.preload_model:
             # Use zero timer to start method whenever there are no pending events (see QCoreApplication::exec doc)
@@ -225,27 +217,3 @@ class Inferencer(QObject):
                     str(self._model_params.path), providers=[CPU_PROVIDER])
 
             self._inference_session_being_created = False
-
-    def _call_async_callback_in_inferencer_thread(self, callback: Callable, result):
-        if type(result) is tuple:
-            callback(*result)
-        else:
-            callback(result)
-
-    def _async_callback_with_future(self, callback: Callable, future: Future):
-        """
-        This callback most often will be called in the async thread (where async method was called)
-        But we want to call |callback| in the thread, where inferencer was created.
-        So we use Qt signal to do it.
-        See https://doc.qt.io/qt-6/threads-qobject.html#signals-and-slots-across-threads
-        """
-        result = future.result()
-        self.async_finished.emit(callback, result)
-
-    def _call_async_with_callback(self, callback: Callable, async_method: Callable, *async_method_args):
-        assert callback is not None, 'Callback to call async method has to be not None'
-
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(async_method, *async_method_args)
-        future.add_done_callback(
-            partial(self._async_callback_with_future, callback))

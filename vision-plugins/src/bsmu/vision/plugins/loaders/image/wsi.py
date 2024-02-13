@@ -81,9 +81,14 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         file_extension = path.suffix
         slideio_driver = self._slideio_driver_by_file_extension[file_extension]
         slide = slideio.open_slide(str(path), slideio_driver)
+        logging.debug(f'slide.raw_metadata: {slide.raw_metadata}')
+        logging.debug(f'slide.get_aux_image_names(): {slide.get_aux_image_names()}')
         scene = slide.get_scene(0)
         full_resolution_width = scene.rect[2]
         logging.debug(f'full_resolution_width: {full_resolution_width}')
+        logging.debug(f'resolution: {scene.resolution} t_resolution: {scene.t_resolution} '
+                      f'z_resolution: {scene.z_resolution}')
+        logging.debug(f'magnification: {scene.magnification}')
         # region = scene.read_block(size=(round(full_resolution_width / 7.53), 0))
         region = scene.read_block(size=(round(full_resolution_width / 8), 0))
 

@@ -112,8 +112,8 @@ class FileDropper(QObject):
     def _on_drop(self, event: QDropEvent):
         logging.info(f'Drop: {self.dragged_loadable_file_paths}')
         for file_path in self.dragged_loadable_file_paths:
-            future = self.file_loading_manager.load_file_async(file_path)
-            future.add_done_unpacked_callback(self._on_file_loaded)
+            file_loading_task = self.file_loading_manager.load_file_async(file_path)
+            file_loading_task.on_finished = self._on_file_loaded
 
     def _on_file_loaded(self, data: Data | None):
         data = self.post_load_conversion_manager.convert_data(data)

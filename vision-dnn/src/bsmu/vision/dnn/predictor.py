@@ -35,8 +35,8 @@ class Predictor(Inferencer):
         return prediction
 
     def predict_async(self, image: np.ndarray, callback: Callable):
-        ThreadPool.call_async_with_callback(self.predict, image, callback=callback)
-        # self._call_async_with_callback(callback, self.predict, image)
+        prediction_task = ThreadPool.call_async_dnn(self.predict, image)
+        prediction_task.on_finished = callback
 
 
 class MlPredictor(Inferencer):

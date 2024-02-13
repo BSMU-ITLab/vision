@@ -18,7 +18,8 @@ plugins:
 
 enable-gui: true
 
-max_thread_count: 1
+max_general_thread_count: null  # If null, then `QThread.idealThreadCount() - max_dnn_thread_count` will be used
+max_dnn_thread_count: 1
 
 warn-with-traceback: false
 

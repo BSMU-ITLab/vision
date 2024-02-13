@@ -1,90 +1,102 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+import logging
 from functools import partial
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QThread, QThreadPool
+
+from bsmu.vision.core.task import Task, FnTask
 
 if TYPE_CHECKING:
     from typing import Callable, Any
-    from concurrent.futures import Future
-
-
-class ExtendedFuture(QObject):
-    _async_finished = Signal(object, object)  # Signal(callback: Callable, result: Tuple | Any)
-
-    def __init__(self, future: Future):
-        super().__init__()
-
-        self._future = future
-
-        # Use this signal to call slot in the thread, where class instance was created
-        # (most often this is the main thread)
-        self._async_finished.connect(self._call_async_callback_in_instance_thread)
-
-    def __getattr__(self, name):
-        return getattr(self._future, name)
-
-    def add_done_unpacked_callback(self, callback: Callable):
-        """Attaches a callable that will be called when the future finishes.
-
-        :param callback: A callable that will be called when the future completes or is cancelled.
-        Callable will be called with the same arguments as those returned
-        from the running asynchronous function or method.
-        Callable will always be called in the same thread, where ExtendedFuture instance was created.
-        If the future has already completed or been cancelled then the callable will be called as soon,
-        as control returns to the event loop of this ExtendedFuture instance thread.
-        These callables are called in undefined order.
-        """
-        self._future.add_done_callback(partial(self._async_callback_with_future, callback))
-
-    def _async_callback_with_future(self, callback: Callable, future: Future):
-        """
-        The callback added with concurrent.futures.Future.add_done_callback
-        most often will be called in the async thread (where async method runs).
-        But we want to call the |callback| in the thread, where ExtendedFuture instance was created.
-        So we use Qt signal to do it.
-        See https://doc.qt.io/qt-6/threads-qobject.html#signals-and-slots-across-threads
-        """
-        result = future.result()
-        self._async_finished.emit(callback, result)
-
-    @staticmethod
-    def _call_async_callback_in_instance_thread(callback: Callable, result: tuple | Any):
-        if type(result) is tuple:
-            callback(*result)
-        else:
-            callback(result)
 
 
 class ThreadPool(QObject):
     _instance = None
 
-    def __init__(self, max_workers=None):
+    _task_to_finished_callback = {}
+
+    def __init__(self, max_general_thread_count: int = None, max_dnn_thread_count: int = 1):
+        """
+        Initializes a ThreadPool object with two thread pools: one for general tasks and one for DNN tasks.
+        DNN tasks use different thread pool,
+        because the number of simultaneously running neural networks are very limited.
+        For general tasks (e.g. input/output or calculations) we can use more threads.
+        """
         super().__init__()
 
-        self._executor = ThreadPoolExecutor(max_workers)
+        max_dnn_thread_count = max(max_dnn_thread_count, 0)
+
+        self._general_thread_pool = QThreadPool(self)
+        if max_general_thread_count is None:
+            max_general_thread_count = QThread.idealThreadCount() - max_dnn_thread_count
+        self._general_thread_pool.setMaxThreadCount(max(max_general_thread_count, 1))
+
+        if max_dnn_thread_count > 0:
+            self._dnn_thread_pool = QThreadPool(self)
+            self._dnn_thread_pool.setMaxThreadCount(max_dnn_thread_count)
+        else:
+            self._dnn_thread_pool = None
+        logging.info(f'ThreadPool: '
+                     f'general threads: {self._general_thread_pool.maxThreadCount()} / '
+                     f'DNN threads: '
+                     f'{self._dnn_thread_pool.maxThreadCount() if self._dnn_thread_pool is not None else 0}')
 
     @property
-    def executor(self) -> ThreadPoolExecutor:
-        return self._executor
+    def general_thread_pool(self) -> QThreadPool:
+        return self._general_thread_pool
+
+    @property
+    def dnn_thread_pool(self) -> QThreadPool | None:
+        return self._dnn_thread_pool
 
     @classmethod
-    def init_executor(cls, max_workers=None):
-        if cls._instance:
-            cls._instance.executor.shutdown()
-
-        cls._instance = cls(max_workers)
+    def create_instance(cls, max_general_thread_count: int = None, max_dnn_thread_count: int = 1):
+        cls._instance = cls(max_general_thread_count, max_dnn_thread_count)
 
     @classmethod
-    def call_async_with_callback(cls, fn: Callable, /, *fn_args, **fn_kwargs) -> ExtendedFuture:
+    def call_async(cls, fn: Callable, /, *fn_args, **fn_kwargs) -> Task:
         """
         :param fn: is positional-only parameter,
         because it allows to pass into fn_kwargs keyword argument named as fn.
         """
-        assert cls._instance, 'You must first call the |init_executor| method once'
+        task = cls.fn_task(fn, *fn_args, **fn_kwargs)
+        cls.run_async_task(task)
+        return task
 
-        future = cls._instance.executor.submit(fn, *fn_args, **fn_kwargs)
-        extended_future = ExtendedFuture(future)
-        return extended_future
+    @classmethod
+    def call_async_dnn(cls, fn: Callable, /, *fn_args, **fn_kwargs) -> Task:
+        task = cls.fn_task(fn, *fn_args, **fn_kwargs)
+        cls.run_async_dnn_task(task)
+        return task
+
+    @staticmethod
+    def fn_task(fn: Callable, /, *fn_args, **fn_kwargs) -> Task:
+        return FnTask(fn, *fn_args, **fn_kwargs)
+
+    @classmethod
+    def run_async_task(cls, task: Task, dnn: bool = False):
+        # We have to process task finished callback in the ThreadPool (not in the Task class),
+        # because else task will be deleted by ThreadPool when the task exits the run function.
+        # In the current approach, the task is not deleted until `_on_task_finished` is executed.
+        task_finished_callback = partial(cls._on_task_finished, task)
+        cls._task_to_finished_callback[task] = task_finished_callback
+        task.finished.connect(task_finished_callback)
+
+        assert cls._instance, 'You must first call the `create_instance` method once'
+        if dnn and cls._instance.dnn_thread_pool is not None:
+            cls._instance.dnn_thread_pool.start(task)
+        else:
+            cls._instance.general_thread_pool.start(task)
+
+    @classmethod
+    def run_async_dnn_task(cls, task: Task):
+        cls.run_async_task(task, dnn=True)
+
+    @classmethod
+    def _on_task_finished(cls, task: Task, result: tuple | Any):
+        task.finished.disconnect(cls._task_to_finished_callback[task])
+        del cls._task_to_finished_callback[task]
+
+        task.call_finished_callback()

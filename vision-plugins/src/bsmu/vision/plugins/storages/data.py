@@ -37,7 +37,7 @@ class DataStoragePlugin(Plugin):
         self._data_storage = None
 
 
-class DataStorage(QObject):
+class DataStorage(QObject):  # TODO: use ItemStorage as base class
     data_added = Signal(Data)
 
     def __init__(self):

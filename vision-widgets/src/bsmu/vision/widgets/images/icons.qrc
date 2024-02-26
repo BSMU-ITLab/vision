@@ -12,6 +12,7 @@ To generate a *.py file use the next command in the terminal:
     <file>icons/arrow-outlined-down-disabled.svg</file>
     <file>icons/arrow-outlined-up.svg</file>
     <file>icons/arrow-outlined-up-disabled.svg</file>
+    <file>icons/check-mark.svg</file>
     <file>icons/eye.svg</file>
     <file>icons/eye-crossed-out.svg</file>
     <file>icons/eye-outlined.svg</file>

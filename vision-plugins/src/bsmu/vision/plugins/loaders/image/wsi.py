@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from time import sleep
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -89,6 +90,10 @@ class WholeSlideImageFileLoader(ImageFileLoader):
         logging.debug(f'resolution: {scene.resolution} t_resolution: {scene.t_resolution} '
                       f'z_resolution: {scene.z_resolution}')
         logging.debug(f'magnification: {scene.magnification}')
+        # Use time.sleep to update the UI, before scene.read_block will freeze the app.
+        # It freezes the app, even when used separate thread.
+        # TODO: try to release the GIL in Python Slideio wrapper for scene.read_block method
+        sleep(0.05)
         # region = scene.read_block(size=(round(full_resolution_width / 7.53), 0))
         region = scene.read_block(size=(round(full_resolution_width / 8), 0))
 

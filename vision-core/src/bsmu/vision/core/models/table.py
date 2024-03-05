@@ -258,7 +258,7 @@ class RecordTableModel(QAbstractTableModel, metaclass=QABCMeta):
         return signal, handler
 
     def _remove_record_connections(self, record):
-        record_property_changed_connections = self._property_changed_connections_by_record.pop(record)
+        record_property_changed_connections = self._property_changed_connections_by_record.pop(record, set())
         for signal, handler in record_property_changed_connections:
             signal.disconnect(handler)
 

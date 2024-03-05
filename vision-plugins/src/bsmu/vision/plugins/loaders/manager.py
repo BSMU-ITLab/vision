@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Signal
 from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.task import FnTask
 
 if TYPE_CHECKING:
     from typing import Type
@@ -16,17 +17,20 @@ if TYPE_CHECKING:
     from bsmu.vision.core.task import Task
     from bsmu.vision.plugins.loaders.base import FileLoader
     from bsmu.vision.plugins.loaders.registry import FileLoaderRegistryPlugin
+    from bsmu.vision.plugins.storages import TaskStorage, TaskStoragePlugin
 
 
 class FileLoadingManagerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'file_loader_registry_plugin': 'bsmu.vision.plugins.loaders.registry.FileLoaderRegistryPlugin',
+        'task_storage_plugin': 'bsmu.vision.plugins.storages.task_storage.TaskStoragePlugin',
     }
 
-    def __init__(self, file_loader_registry_plugin: FileLoaderRegistryPlugin):
+    def __init__(self, file_loader_registry_plugin: FileLoaderRegistryPlugin, task_storage_plugin: TaskStoragePlugin):
         super().__init__()
 
         self._file_loader_registry_plugin = file_loader_registry_plugin
+        self._task_storage_plugin = task_storage_plugin
 
         self._file_loading_manager: FileLoadingManager | None = None
 
@@ -35,7 +39,8 @@ class FileLoadingManagerPlugin(Plugin):
         return self._file_loading_manager
 
     def _enable(self):
-        self._file_loading_manager = FileLoadingManager(self._file_loader_registry_plugin.processor_registry)
+        self._file_loading_manager = FileLoadingManager(
+            self._file_loader_registry_plugin.processor_registry, self._task_storage_plugin.task_storage)
 
     def _disable(self):
         self._file_loading_manager = None
@@ -44,10 +49,11 @@ class FileLoadingManagerPlugin(Plugin):
 class FileLoadingManager(QObject):
     file_loaded = Signal(Data)
 
-    def __init__(self, file_loader_registry: FileLoaderRegistry):
+    def __init__(self, file_loader_registry: FileLoaderRegistry, task_storage: TaskStorage | None = None):
         super().__init__()
 
         self.file_loader_registry = file_loader_registry
+        self._task_storage = task_storage
 
     def can_load_file(self, path: Path) -> bool:
         return self._loader_cls(path) is not None
@@ -73,6 +79,13 @@ class FileLoadingManager(QObject):
             path,
             **kwargs,
         )
+
+    def load_file_async_and_add_task_into_task_storage(self, path: Path, **kwargs) -> Task:
+        file_loading_task = FnTask(self.load_file, f'File Loading: {path.name}')
+        if self._task_storage is not None:
+            self._task_storage.add_item(file_loading_task)
+        ThreadPool.run_async_task_with_args(file_loading_task, path, **kwargs)
+        return file_loading_task
 
     def _loader_cls(self, path: Path) -> Type[FileLoader] | None:
         """Return FileLoader for a file with this path.

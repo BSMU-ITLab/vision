@@ -33,6 +33,15 @@ class ItemStorage(QObject):
     def remove_item(self, item):
         self._remove_item(item, self._items.index(item))
 
+    def try_remove_item(self, item) -> bool:
+        try:
+            item_index = self._items.index(item)
+        except ValueError:
+            return False
+        else:
+            self._remove_item(item, item_index)
+            return True
+
     def remove_item_by_index(self, index: int = None):
         """
         :param index: if is None then remove last item

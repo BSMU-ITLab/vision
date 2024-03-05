@@ -87,9 +87,9 @@ class ProgressDelegate(QStyledItemDelegate):
                     if not self._is_updating_items_with_busy_indicators:
                         self._busy_indicator_item_indexes.add(index)
 
-            painter.restore()
+                self._draw_label(painter, progress_option)
 
-            QApplication.style().drawControl(QStyle.CE_ProgressBarLabel, progress_option, painter)
+            painter.restore()
         else:
             super().paint(painter, option, index)
 
@@ -113,6 +113,11 @@ class ProgressDelegate(QStyledItemDelegate):
         painter.setBrush(self.FOREGROUND_COLOR)
         painter.drawRect(progress_option.rect)
 
+        painter.restore()
+
+        # Draw label up to finished task icon (icon will be rendered over the label)
+        self._draw_label(painter, progress_option)
+
         icon_rect = QRect(progress_option.rect)
         X_MARGIN_FACTOR = 0.02
         Y_MARGIN_FACTOR = 0.16
@@ -127,8 +132,6 @@ class ProgressDelegate(QStyledItemDelegate):
             icon_rect.setWidth(icon_rect_width)
 
         self._check_mark_icon_svg.render(painter, icon_rect)
-
-        painter.restore()
 
     @classmethod
     def _draw_background(cls, painter: QPainter, progress_option: QStyleOptionProgressBar):
@@ -179,3 +182,7 @@ class ProgressDelegate(QStyledItemDelegate):
         painter.drawRect(x, progress_option.rect.y(), indicator_width, progress_option.rect.height())
 
         painter.restore()
+
+    @classmethod
+    def _draw_label(cls, painter: QPainter, progress_option: QStyleOptionProgressBar):
+        QApplication.style().drawControl(QStyle.CE_ProgressBarLabel, progress_option, painter)

@@ -81,7 +81,7 @@ class FileLoadingManager(QObject):
         )
 
     def load_file_async_and_add_task_into_task_storage(self, path: Path, **kwargs) -> Task:
-        file_loading_task = FnTask(self.load_file, f'File Loading: {path.name}')
+        file_loading_task = FnTask(self.load_file, f'File Loading [{path.name}]')
         if self._task_storage is not None:
             self._task_storage.add_item(file_loading_task)
         ThreadPool.run_async_task_with_args(file_loading_task, path, **kwargs)

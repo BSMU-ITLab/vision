@@ -110,6 +110,9 @@ class Task(QRunnable):
         # To prevent double calling of the callback
         self._on_finished = None
 
+    def _change_step_progress(self, finished_step_count: int, total_step_count: int):
+        self.progress = finished_step_count / total_step_count * 100
+
 
 class DnnTask(Task):
     def __init__(self, name: str = ''):

@@ -105,6 +105,9 @@ class MenuBar(QMenuBar):
         menu.addAction(action)
         return action
 
+    def add_submenu(self, menu_type: Type[MainMenu], title: str) -> QMenu:
+        return self.menu(menu_type).addMenu(title)
+
     def _menu_order_index(self, menu_type: Type[MainMenu]) -> int:
         return self._menus_order_indexes[menu_type]
 
@@ -133,6 +136,9 @@ class MainWindow(QMainWindow):
             checkable: bool = False
     ) -> QAction:
         return self._menu_bar.add_menu_action(menu_type, action_name, method, shortcut, checkable)
+
+    def add_submenu(self, menu_type: Type[MainMenu], title: str) -> QMenu:
+        return self._menu_bar.add_submenu(menu_type, title)
 
     def menu(self, menu_type: Type[MainMenu], add_nonexistent: bool = True) -> MainMenu | None:
         return self._menu_bar.menu(menu_type, add_nonexistent)

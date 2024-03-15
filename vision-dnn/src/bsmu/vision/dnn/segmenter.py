@@ -137,7 +137,6 @@ class Segmenter(Inferencer):
         )
         segmentation_task.on_finished = callback
 
-
     def segment_on_splitted_into_tiles(
             self,
             image: np.ndarray,

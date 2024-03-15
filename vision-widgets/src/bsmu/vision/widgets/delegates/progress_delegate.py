@@ -48,13 +48,19 @@ class ProgressDelegate(QStyledItemDelegate):
             # and style sheet has to be set for all application (not only for some widget).
             # Busy indicator is not working with other methods, like this one:
             # https://stackoverflow.com/questions/10630360/customized-color-on-progressbar-delegate/10630476#10630476
+
+            GROOVE_BORDER_WIDTH: Final[int] = 1
+            # TODO: we have to get `GROOVE_BORDER_WIDTH` value somehow from QStyle.CE_ProgressBarGroove
+            #  or draw the groove yourself
+
             progress_option = QStyleOptionProgressBar()
             progress_option.rect = option.rect
             progress_option.minimum = 0
             progress_option.maximum = 100
             progress_option.progress = task.progress
-            text = f'{task.name}: {task.progress}%' if task.progress_known else f'{task.name}'
-            progress_option.text = text
+            text = f'{task.name}: {task.progress:.0f}%' if task.progress_known else f'{task.name}'
+            progress_option.text = progress_option.fontMetrics.elidedText(
+                text, Qt.ElideMiddle, progress_option.rect.width() - 2 * GROOVE_BORDER_WIDTH)
             progress_option.textAlignment = Qt.AlignCenter
             progress_option.textVisible = True
             palette = progress_option.palette
@@ -66,9 +72,6 @@ class ProgressDelegate(QStyledItemDelegate):
 
             painter.save()
 
-            GROOVE_BORDER_WIDTH: Final[int] = 1
-            # TODO: we have to get `GROOVE_BORDER_WIDTH` value somehow from QStyle.CE_ProgressBarGroove
-            #  or draw the groove yourself
             # Set clipping rectangle to avoid drawing over the groove border
             painter.setClipRect(
                 progress_option.rect.adjusted(

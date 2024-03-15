@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import TYPE_CHECKING
 
 import cv2 as cv
@@ -21,17 +21,19 @@ if TYPE_CHECKING:
 
 @dataclass
 class ModelParams:
-    DEFAULT_PRELOAD_MODEL = False
-
     path: Path
-    preload_model: bool = DEFAULT_PRELOAD_MODEL
+    output_object_name: str = 'Object'
+    output_object_short_name: str = 'Obj'
+    preload: bool = False
 
     @classmethod
     def from_config(cls, config_data: dict, model_dir: Path) -> ModelParams:
-        return ModelParams(
-            path=model_dir / config_data['name'],
-            preload_model=config_data.get('preload', cls.DEFAULT_PRELOAD_MODEL),
-        )
+        field_names = {field.name for field in fields(cls)}
+        SENTINEL = object()
+        field_name_to_config_value = \
+            {field_name: config_value for field_name in field_names
+             if (config_value := config_data.get(field_name, SENTINEL)) != SENTINEL}
+        return cls(path=model_dir / config_data['name'], **field_name_to_config_value)
 
     def preprocessed_input(self, src: np.ndarray) -> np.ndarray:
         pass
@@ -46,33 +48,12 @@ class ModelParams:
 
 @dataclass
 class ImageModelParams(ModelParams):
-    DEFAULT_INPUT_SIZE = (256, 256, 3)
-    DEFAULT_CHANNELS_AXIS = 2
-    DEFAULT_CHANNELS_ORDER = 'rgb'
-    DEFAULT_NORMALIZE = True
-    DEFAULT_PREPROCESSING_MODE = 'image-net-torch'
-    DEFAULT_MASK_BINARIZATION_THRESHOLD = 0.5
-
-    input_size: Sequence = DEFAULT_INPUT_SIZE
-    channels_axis: int = DEFAULT_CHANNELS_AXIS
-    channels_order: str = DEFAULT_CHANNELS_ORDER
-    normalize: bool = DEFAULT_NORMALIZE
-    preprocessing_mode: str = DEFAULT_PREPROCESSING_MODE
-    mask_binarization_threshold: float = DEFAULT_MASK_BINARIZATION_THRESHOLD
-
-    @classmethod
-    def from_config(cls, config_data: dict, model_dir: Path) -> ImageModelParams:
-        return ImageModelParams(
-            path=model_dir / config_data['name'],
-            preload_model=config_data.get('preload', cls.DEFAULT_PRELOAD_MODEL),
-            input_size=config_data.get('input-size', cls.DEFAULT_INPUT_SIZE),
-            channels_axis=config_data.get('channels-axis', cls.DEFAULT_CHANNELS_AXIS),
-            channels_order=config_data.get('channels-order', cls.DEFAULT_CHANNELS_ORDER),
-            normalize=config_data.get('normalize', cls.DEFAULT_NORMALIZE),
-            preprocessing_mode=config_data.get('preprocessing-mode', cls.DEFAULT_PREPROCESSING_MODE),
-            mask_binarization_threshold=config_data.get(
-                'mask_binarization_threshold', cls.DEFAULT_MASK_BINARIZATION_THRESHOLD),
-        )
+    input_size: Sequence = (256, 256, 3)
+    channels_axis: int = 2
+    channels_order: str = 'rgb'
+    normalize: bool = True
+    preprocessing_mode: str = 'image-net-torch'
+    mask_binarization_threshold: float = 0.5
 
     def copy_but_change_name(self, new_name: str) -> ImageModelParams:
         model_params_copy = copy.deepcopy(self)
@@ -181,7 +162,7 @@ class Inferencer(QObject):
         self._inference_session: ort.InferenceSession | None = None
         self._inference_session_being_created: bool = False
 
-        if self._model_params.preload_model:
+        if self._model_params.preload:
             # Use zero timer to start method whenever there are no pending events (see QCoreApplication::exec doc)
             QTimer.singleShot(0, self._preload_model)
 

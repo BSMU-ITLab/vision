@@ -67,9 +67,9 @@ class BiocellPcIsupPredictorPlugin(Plugin):
         self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
 
         model_1_params = DnnModelParams.from_config(
-            self.config.value('predictor-model-fold-1'), self.data_path(self._DNN_MODELS_DIR_NAME))
-        model_2_params = model_1_params.copy_but_change_name(self.config.value('predictor-model-fold-4')['name'])
-        model_3_params = model_1_params.copy_but_change_name(self.config.value('predictor-model-fold-5')['name'])
+            self.config.value('predictor_model_fold_1'), self.data_path(self._DNN_MODELS_DIR_NAME))
+        model_2_params = model_1_params.copy_but_change_name(self.config.value('predictor_model_fold_4')['name'])
+        model_3_params = model_1_params.copy_but_change_name(self.config.value('predictor_model_fold_5')['name'])
 
         self._pc_isup_predictor = BiocellPcIsupPredictor(
             self._data_visualization_manager, (model_1_params, model_2_params, model_3_params))

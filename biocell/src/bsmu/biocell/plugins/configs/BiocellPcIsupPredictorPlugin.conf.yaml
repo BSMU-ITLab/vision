@@ -1,14 +1,15 @@
-predictor-model-fold-1:
+predictor_model_fold_1:
   name: 'efficientnet-b1_kfold_1.onnx'
-  input-size: [3, 1536, 1536]
-  channels-axis: 0
-  channels-order: 'rgb'  #'bgr'
-  normalize: false
-  preprocessing-mode: ''
+  output_object_name: 'ISUP'
   preload: false
+  input_size: [3, 1536, 1536]
+  channels_axis: 0
+  channels_order: 'rgb'  #'bgr'
+  normalize: false
+  preprocessing_mode: ''
 
-predictor-model-fold-4:
+predictor_model_fold_4:
   name: 'efficientnet-b1_kfold_4.onnx'
 
-predictor-model-fold-5:
+predictor_model_fold_5:
   name: 'efficientnet-b1_kfold_5.onnx'

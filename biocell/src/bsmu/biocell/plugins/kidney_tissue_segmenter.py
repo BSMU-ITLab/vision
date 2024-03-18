@@ -7,6 +7,7 @@ import numpy as np
 import skimage.color
 from PySide6.QtCore import Qt, QObject
 from PySide6.QtWidgets import QMessageBox
+from skimage import morphology
 
 from bsmu.vision.core.converters.image import normalized_uint8
 from bsmu.vision.core.image.base import FlatImage
@@ -53,7 +54,8 @@ class BiocellKidneyTissueSegmenterPlugin(Plugin):
         self._main_window = self._main_window_plugin.main_window
         self._mdi = self._mdi_plugin.mdi
 
-        self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Tissue', self._segment_tissue, Qt.Key_9)
+        self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Tissue - Stain Separation', self._segment_tissue, Qt.Key_9)
+        self._main_window.add_menu_action(AlgorithmsMenu, 'Segment Tissue - Saturation Threshold', self._segment_tissue_using_saturation_threshold, Qt.Key_7)
         self._main_window.add_menu_action(AlgorithmsMenu, 'Analyze Blue Ratio', self._analyze_blue_ratio, Qt.Key_0)
 
     def _disable(self):
@@ -69,6 +71,14 @@ class BiocellKidneyTissueSegmenterPlugin(Plugin):
 
         layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
         self._kidney_tissue_segmenter.segment_tissue(layered_image_viewer)
+
+    def _segment_tissue_using_saturation_threshold(self):
+        layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
+        if layered_image_viewer_sub_window is None:
+            return
+
+        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
+        self._kidney_tissue_segmenter.segment_tissue_using_saturation_threshold(layered_image_viewer)
 
     def _analyze_blue_ratio(self):
         layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
@@ -174,6 +184,23 @@ class BiocellKidneyTissueSegmenter(QObject):
                         f'\nEroded Blue: {self._float_to_persent_str(eroded_blue_to_tissue_ratio)}'
         QMessageBox.information(layered_image_viewer, 'Blue Ratio', ratio_message)
 
+    def segment_tissue_using_saturation_threshold(self, layered_image_viewer: LayeredImageViewer):
+        print('segment_tissue_using_saturation_threshold', type(layered_image_viewer))
+
+        image = layered_image_viewer.active_layer.image
+
+        # tissue_mask = _get_tissue(image.array, thresh=0, gauss_kernel=(5, 5), cv2flags=cv.THRESH_OTSU)
+        # tissue_mask = _get_tissue(image.pixels, thresh=25, gauss_kernel=(5, 5))
+        tissue_mask = _get_tissue(image.pixels, thresh=1, gauss_kernel=(41, 41), sensivity_holes=300, sensivity_objects=300)
+        tissue_mask = tissue_mask.astype(np.uint8)
+        print(f'tissue_mask: {tissue_mask.min()} {tissue_mask.max()} {np.unique(tissue_mask)}  {tissue_mask.dtype}')
+
+        # skimage.io.imsave(str(r'D:/Temp/MMM.png'), tissue_mask, check_contrast=False)
+
+        tissue_palette = Palette.default_binary(rgb_color=[131, 151, 98])
+        layered_image_viewer.data.add_layer_or_modify_pixels(
+            TISSUE_MASK_LAYER_NAME, tissue_mask, FlatImage, tissue_palette)
+
     def _pixel_count_ratio(self, a: np.ndarray, b: np.ndarray) -> float:
         a_pixel_count = cv.countNonZero(a)
         b_pixel_count = cv.countNonZero(b)
@@ -183,3 +210,39 @@ class BiocellKidneyTissueSegmenter(QObject):
 
     def _float_to_persent_str(self, value: float) -> str:
         return f'{value * 100:.2f}%'
+
+
+def _apply_threshold(image, thresh=0, gauss_kernel=(5, 5), cv2flags=cv.THRESH_OTSU):
+    if gauss_kernel is not None:
+        image = cv.GaussianBlur(image, gauss_kernel, 0)
+
+    _, threshold_image = cv.threshold(
+        image, thresh, 255, cv.THRESH_BINARY + cv2flags
+    )
+
+    return threshold_image
+
+
+def _get_tissue(rgb_image, thresh=7, sensivity_holes=3000, sensivity_objects=3000, gauss_kernel=None, cv2flags=0):
+    hsv_image = cv.cvtColor(rgb_image, cv.COLOR_RGB2HSV)
+
+    saturation = hsv_image[..., 1]
+
+    kernel = np.full((5, 5), -1.)
+    kernel[2, 2] = 25
+    kernel /= 12.5
+    saturation = cv.filter2D(saturation, -1, kernel)
+
+    value = hsv_image[..., 2]
+    saturation[value == 255] = 0
+
+    mask = _apply_threshold(saturation, thresh, gauss_kernel, cv2flags)
+
+    mask = mask != 0
+
+    if sensivity_holes is not None:
+        mask = morphology.remove_small_holes(mask, area_threshold=sensivity_holes)
+    if sensivity_objects is not None:
+        mask = morphology.remove_small_objects(mask, min_size=sensivity_objects)
+
+    return mask

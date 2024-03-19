@@ -1,3 +1,4 @@
+# For prostate cancer on biopsy scans
 main_palette:
   row-by-name:
     background: [ 0, 0, 0, 0, 0 ]
@@ -10,5 +11,19 @@ main_palette:
     nerve_trunk: [ 7, 0, 0, 255, 255 ]
     not_cancer: [ 8, 0, 255, 0, 255 ]
     unknown: [ 9, 0, 0, 0, 255 ]
-  #  root: [ 2, 50, 170, 230, 255 ]
-  #  reflection: [ 3, 255, 0, 0, 255 ]
+
+# For kidney biopsy scans
+#main_palette:
+#  row-by-name:
+#    background: [ 0, 0, 0, 0, 0 ]
+#    foreground: [ 1, 131, 151, 98, 255 ]
+#    blue: [ 2, 255, 179, 19, 255 ]
+#    eroded_blue: [ 3, 255, 110, 19, 255 ]
+
+# For root segmentation task
+#main_palette:
+#  row-by-name:
+#    background: [ 0, 0, 0, 0, 0 ]
+#    foreground: [ 1, 50, 170, 230, 255 ]
+#    root: [ 2, 50, 170, 230, 255 ]
+#    reflection: [ 3, 255, 0, 0, 255 ]

@@ -45,6 +45,25 @@ class FileLoaderMeta(type(QObject), abc.ABCMeta):
 class FileLoader(QObject, metaclass=FileLoaderMeta):
     file_loaded = Signal(Data)
 
+    @classmethod
+    def can_load(cls, path: Path) -> bool:
+        """
+        Returns True, if a file with the `path` can be loaded by this loader.
+        Start to check file extension from the biggest part after the first dot,
+        e.g. for NiftiFile.nii.gz
+        at first check 'nii.gz', then check 'gz'
+        """
+        file_extension = path.name.lower()
+        while True:
+            if file_extension in cls._FORMATS:
+                return True
+
+            dot_index = file_extension.find('.')
+            if dot_index == -1:
+                return False
+
+            file_extension = file_extension[dot_index + 1:]  # dot_index + 1 to remove dot
+
     def load_file(self, path: Path, **kwargs) -> Data:
         data = self._load_file(path, **kwargs)
         self.file_loaded.emit(data)

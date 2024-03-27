@@ -118,6 +118,8 @@ class GenericImageFileWriter(FileWriter):
     _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tif', 'tiff')
 
     def _write_to_file(self, data: Image, path: Path, **kwargs):
-        logging.info('Write Generic Image')
+        # TODO: move the logging into base class
+        logging.info(f'Write Generic Image: {path}')
 
+        # TODO: use OpenCV to save the image (compare performance)
         skimage.io.imsave(str(path), data.pixels, check_contrast=False)

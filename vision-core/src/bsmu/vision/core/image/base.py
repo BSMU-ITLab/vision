@@ -44,6 +44,9 @@ class Image(Data):
 
     def __init__(self, array: np.ndarray = None, palette: Palette = None, path: Path = None,
                  spatial: SpatialAttrs = None):
+        if type(self) is Image:
+            raise TypeError('Image class is abstract and cannot be instantiated directly.')
+
         super().__init__(path)
 
         assert palette is None or array.dtype == np.uint8, 'Indexed images (with palette) have to be of np.uint8 type'

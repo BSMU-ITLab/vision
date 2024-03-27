@@ -113,6 +113,10 @@ class Task(QRunnable):
     def _change_step_progress(self, finished_step_count: int, total_step_count: int):
         self.progress = finished_step_count / total_step_count * 100
 
+    def _change_subtask_based_progress(
+            self, finished_subtask_count: int, total_subtask_count: int, current_subtask_progress: float):
+        self.progress = (finished_subtask_count * 100 + current_subtask_progress) / total_subtask_count
+
 
 class DnnTask(Task):
     def __init__(self, name: str = ''):

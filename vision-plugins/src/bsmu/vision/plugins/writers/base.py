@@ -40,7 +40,10 @@ class FileWriterMeta(type(QObject), abc.ABCMeta):
 class FileWriter(QObject, metaclass=FileWriterMeta):
     file_written = Signal(Path)
 
-    def write_to_file(self, data: Data, path: Path, **kwargs):
+    def write_to_file(self, data: Data, path: Path, mkdir=False, **kwargs):
+        if mkdir:
+            path.parent.mkdir(parents=True, exist_ok=True)
+
         self._write_to_file(data, path, **kwargs)
         self.file_written.emit(path)
 

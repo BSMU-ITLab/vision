@@ -3,7 +3,7 @@ plugins:
       replace: bsmu.vision.plugins.windows.main.MainWindowPlugin
       alias: main_window
 #  - bsmu.biocell.plugins.pc_isup_predictor.BiocellPcIsupPredictorPlugin
-  - bsmu.biocell.plugins.pc_gleason_segmenter.BiocellPcGleasonSegmenterPlugin
+  - bsmu.biocell.plugins.pc_gui_segmenter.PcGuiSegmenterPlugin
   - bsmu.biocell.plugins.pc_dir_gui_segmenter.PcDirGuiSegmenterPlugin
   - bsmu.biocell.plugins.hed_wsi_smart_brush.HedSmartBrushImageViewerToolPlugin
 #  - bsmu.biocell.plugins.kidney_tissue_segmenter.BiocellKidneyTissueSegmenterPlugin

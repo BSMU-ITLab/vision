@@ -178,14 +178,19 @@ class PcGleasonSegmenter(QObject):
         self._model_params = model_params
         self._task_storage = task_storage
 
-        self._mask_background_class = mask_palette.row_index_by_name('background')
-        self._mask_foreground_class = mask_palette.row_index_by_name(mask_foreground_class_name)
+        self._mask_palette = mask_palette
+        self._mask_background_class = self._mask_palette.row_index_by_name('background')
+        self._mask_foreground_class = self._mask_palette.row_index_by_name(mask_foreground_class_name)
 
         self._segmenter = DnnSegmenter(self._model_params)
 
     @property
     def segmenter(self) -> DnnSegmenter:
         return self._segmenter
+
+    @property
+    def mask_palette(self) -> Palette:
+        return self._mask_palette
 
     @property
     def mask_background_class(self) -> int:

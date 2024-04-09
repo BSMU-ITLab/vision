@@ -1,16 +1,22 @@
-# For prostate cancer on biopsy scans
+# For tissue segmentation on biopsy scans
 main_palette:
   row-by-name:
     background: [ 0, 0, 0, 0, 0 ]
-    foreground: [ 1, 50, 170, 230, 255 ]
-    gleason_2: [ 2, 170, 230, 50, 255 ]
-    gleason_3: [ 3, 255, 255, 0, 255 ]
-    gleason_4: [ 4, 255, 165, 0, 255 ]
-    gleason_5: [ 5, 255, 0, 0, 255 ]
-    seminal_vesicles: [ 6, 0, 255, 255, 255 ]
-    nerve_trunk: [ 7, 0, 0, 255, 255 ]
-    not_cancer: [ 8, 0, 255, 0, 255 ]
-    unknown: [ 9, 0, 0, 0, 255 ]
+    foreground: [ 1, 70, 191, 0, 255 ]
+
+# For prostate cancer on biopsy scans
+#main_palette:
+#  row-by-name:
+#    background: [ 0, 0, 0, 0, 0 ]
+#    foreground: [ 1, 50, 170, 230, 255 ]
+#    gleason_2: [ 2, 170, 230, 50, 255 ]
+#    gleason_3: [ 3, 255, 255, 0, 255 ]
+#    gleason_4: [ 4, 255, 165, 0, 255 ]
+#    gleason_5: [ 5, 255, 0, 0, 255 ]
+#    seminal_vesicles: [ 6, 0, 255, 255, 255 ]
+#    nerve_trunk: [ 7, 0, 0, 255, 255 ]
+#    not_cancer: [ 8, 0, 255, 0, 255 ]
+#    unknown: [ 9, 0, 0, 0, 255 ]
 
 # For kidney biopsy scans
 #main_palette:

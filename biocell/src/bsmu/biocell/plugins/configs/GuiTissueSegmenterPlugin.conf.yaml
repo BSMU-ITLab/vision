@@ -1,0 +1,6 @@
+tissue_segmenter:
+  blur_size: 3
+  saturation_threshold: 0.075
+  brightness_threshold: 0.03
+  remove_small_object_size: 500
+  fill_hole_size: 0

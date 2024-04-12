@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from typing import Any, TypeVar, get_type_hints
+from typing import TYPE_CHECKING
+
+from ruamel.yaml import YAML
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 Self = TypeVar('Self', bound='Config')  # Use `from typing import Self` in Python 3.11
 
@@ -36,3 +42,8 @@ class Config:
             field_name_to_config_value[field_name] = config_value
 
         return cls(**field_name_to_config_value)
+
+    def save_to_yaml(self, file_path: Path):
+        yaml = YAML()
+        with open(file_path, 'w') as file:
+            yaml.dump(asdict(self), file)

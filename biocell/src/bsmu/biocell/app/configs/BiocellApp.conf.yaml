@@ -6,7 +6,7 @@ plugins:
   - bsmu.biocell.plugins.pc_gui_segmenter.PcGuiSegmenterPlugin
   - bsmu.biocell.plugins.pc_dir_gui_segmenter.PcDirGuiSegmenterPlugin
   - bsmu.biocell.plugins.hed_wsi_smart_brush.HedSmartBrushImageViewerToolPlugin
-  - bsmu.biocell.plugins.gui_tissue_segmenter.GuiTissueSegmenterPlugin
+#  - bsmu.biocell.plugins.gui_dnn_tissue_segmenter.GuiDnnTissueSegmenterPlugin
 #  - bsmu.biocell.plugins.kidney_tissue_segmenter.BiocellKidneyTissueSegmenterPlugin
 
   - bsmu.vision.plugins.overlayers.image.base.ImageViewerOverlayerPlugin
@@ -15,6 +15,8 @@ plugins:
   - bsmu.vision.plugins.loaders.image.wsi.WholeSlideImageFileLoaderPlugin
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
   - bsmu.vision.plugins.writers.image.generic.GenericImageFileWriterPlugin
+
+  - bsmu.biocell.plugins.gui_tissue_segmenter.GuiTissueSegmenterPlugin
 
   - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
   - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin

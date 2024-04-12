@@ -1,5 +1,10 @@
 tissue_segmenter:
   blur_size: 3
+  gradient_corner_values:
+    top_left: 1.0
+    top_right: 1.0
+    bottom_left: 1.0
+    bottom_right: 1.0
   saturation_threshold: 0.075
   brightness_threshold: 0.03
   remove_small_object_size: 500

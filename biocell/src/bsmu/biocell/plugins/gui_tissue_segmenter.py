@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGridLayout, QMessageBox,
     QSlider, QVBoxLayout, QSpinBox, QWidget
@@ -165,6 +165,8 @@ class TissueSegmentationConfigDialog(QDialog):
 
         self.setWindowTitle(title)
 
+        self.setAttribute(Qt.WA_DeleteOnClose)
+
         self._blur_size_spin_box: QSpinBox | None = None
 
         self._gradient_corner_editor: GradientCornerEditor | None = None
@@ -192,8 +194,10 @@ class TissueSegmentationConfigDialog(QDialog):
         # self._brightness_threshold_slider.setValue(self._config.brightness_threshold)
 
         self._blur_size_spin_box = QSpinBox()
-        self._blur_size_spin_box.setRange(0, 999)
+        self._blur_size_spin_box.setRange(1, 99)
+        self._blur_size_spin_box.setSingleStep(2)
         self._blur_size_spin_box.setValue(self._config.blur_size)
+        self._blur_size_spin_box.setToolTip(self.tr('Enter only odd values.'))
 
         self._gradient_corner_editor = GradientCornerEditor(self._config.gradient_corner_values)
 
@@ -211,14 +215,16 @@ class TissueSegmentationConfigDialog(QDialog):
 
         self._remove_small_object_size_spin_box = QSpinBox()
         self._remove_small_object_size_spin_box.setRange(0, 9999)
+        self._remove_small_object_size_spin_box.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
         self._remove_small_object_size_spin_box.setValue(self._config.remove_small_object_size)
 
         self._fill_hole_size_spin_box = QSpinBox()
-        self._fill_hole_size_spin_box.setRange(0, 999)
+        self._fill_hole_size_spin_box.setRange(0, 9999)
+        self._fill_hole_size_spin_box.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
         self._fill_hole_size_spin_box.setValue(self._config.fill_hole_size)
 
         form_layout = QFormLayout()
-        form_layout.addRow(self.tr('Blur Size:'), self._blur_size_spin_box)
+        form_layout.addRow(self.tr('Blur Size (Odd Value):'), self._blur_size_spin_box)
         form_layout.addRow(self.tr('Gradient Corner Values:'), self._gradient_corner_editor)
         form_layout.addRow(self.tr('Saturation Threshold:'), self._saturation_spin_box)
         form_layout.addRow(self.tr('Brightness Threshold:'), self._brightness_spin_box)
@@ -237,6 +243,14 @@ class TissueSegmentationConfigDialog(QDialog):
         self.setLayout(layout)
 
     def _apply(self):
+        if self._blur_size_spin_box.value() % 2 == 0:
+            QMessageBox.warning(
+                self,
+                self.tr('Incorrect Blur Size Value'),
+                self.tr('The Blur Size Must Be Odd.'),
+            )
+            return
+
         # self._config.saturation_threshold = self._saturation_threshold_slider.value()
         # self._config.brightness_threshold = self._brightness_threshold_slider.value()
 
@@ -261,17 +275,18 @@ class GuiTissueSegmenter(QObject):
         super().__init__()
 
         self._tissue_segmentation_config = tissue_segmentation_config
-        self._main_window = main_window
         self._mdi = mdi
         self._mask_palette = mask_palette
+        self._main_window = main_window
 
+        self._tissue_segmentation_config_dialog: TissueSegmentationConfigDialog | None = None
         self._mask_layer_name = 'masks'
 
     def segment_with_dialog(self):
-        tissue_segmentation_config_dialog = TissueSegmentationConfigDialog(
-            self._tissue_segmentation_config, self.tr('Tissue Segmentation Settings'), self._main_window)
-        tissue_segmentation_config_dialog.applied.connect(self.segment)
-        tissue_segmentation_config_dialog.show()
+        config_dialog = self._created_tissue_segmentation_config_dialog
+        config_dialog.show()
+        config_dialog.raise_()
+        config_dialog.activateWindow()
 
     def segment(self):
         layered_image = self._active_layered_image()
@@ -313,8 +328,22 @@ class GuiTissueSegmenter(QObject):
         except Exception as e:
             QMessageBox.warning(
                 self._main_window,
-                'Save Error',
-                f'Cannot save the mask.\n{e}')
+                self.tr('Save Error'),
+                self.tr(f'Cannot save the mask.\n{e}'),
+            )
+
+    @property
+    def _created_tissue_segmentation_config_dialog(self) -> TissueSegmentationConfigDialog:
+        if self._tissue_segmentation_config_dialog is None:
+            self._tissue_segmentation_config_dialog = TissueSegmentationConfigDialog(
+                self._tissue_segmentation_config, self.tr('Tissue Segmentation Settings'), self._main_window)
+            self._tissue_segmentation_config_dialog.applied.connect(self.segment)
+            self._tissue_segmentation_config_dialog.destroyed.connect(
+                self._on_tissue_segmentation_config_dialog_destroyed)
+        return self._tissue_segmentation_config_dialog
+
+    def _on_tissue_segmentation_config_dialog_destroyed(self):
+        self._tissue_segmentation_config_dialog = None
 
     def _active_layered_image(self) -> LayeredImage | None:
         layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
@@ -334,7 +363,7 @@ class TissueSegmenter(QObject):
         image = np.float32(image) / 255
         hsb_image = cv.cvtColor(image, cv.COLOR_RGB2HSV)
 
-        if config.blur_size != 0:
+        if config.blur_size > 1:
             blur_kernel_size = (config.blur_size, config.blur_size)
             hsb_image = cv.GaussianBlur(hsb_image, blur_kernel_size, 0)
 
@@ -353,7 +382,7 @@ class TissueSegmenter(QObject):
 
         mask = (saturation_thresholded > 0) & (brightness_thresholded > 0)
 
-        if config.remove_small_object_size != 0:
+        if config.remove_small_object_size > 0:
             small_object_removing_start = timer()
 
             mask = self._mask_to_uint8(mask)
@@ -361,7 +390,7 @@ class TissueSegmenter(QObject):
 
             logging.debug(f'Small object removing time: {timer() - small_object_removing_start}')
 
-        if config.fill_hole_size != 0:
+        if config.fill_hole_size > 0:
             holes_removing_start = timer()
 
             mask = self._mask_to_uint8(mask)

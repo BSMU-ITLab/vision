@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.visibility import Visibility
 from bsmu.vision.plugins.windows.main import FileMenu
 from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewerHolder
 
@@ -96,8 +97,6 @@ class ImageViewerOverlayerPlugin(Plugin):
             mask_palette = self._palette_pack_settings.main_palette
         mask = self._file_loading_manager.load_file(Path(file_name), palette=mask_palette)
 
-        mask_layer = layered_image_viewer.add_layer_or_modify_image(layer_name, mask)
-
         mask_opacity = mask_props.get('opacity')
-        if mask_opacity is not None:
-            layered_image_viewer.layer_view_by_model(mask_layer).opacity = mask_opacity
+        mask_visibility = None if mask_opacity is None else Visibility(opacity=mask_opacity)
+        layered_image_viewer.add_layer_or_modify_image(layer_name, mask, mask_visibility)

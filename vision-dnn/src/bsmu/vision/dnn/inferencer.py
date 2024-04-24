@@ -15,7 +15,7 @@ import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.dnn.config import OnnxConfig, CPU_PROVIDER
 
 if TYPE_CHECKING:
-    from typing import Tuple, Sequence
+    from typing import Sequence
     from pathlib import Path
 
 
@@ -115,42 +115,6 @@ class ImageModelParams(ModelParams):
         image = np.moveaxis(image, DEFAULT_CHANNELS_AXIS, self.channels_axis)
 
         return image
-
-
-class Padding:
-    def __init__(
-            self,
-            left: int,
-            right: int,
-            top: int,
-            bottom: int,
-    ):
-        self.left = left
-        self.right = right
-        self.top = top
-        self.bottom = bottom
-
-
-def padded_to_square_shape(image: np.ndarray) -> Tuple[np.ndarray, Padding]:
-    max_size = max(image.shape[:2])
-    height_pad = max_size - image.shape[0]
-    top_pad = int(height_pad / 2)
-    bottom_pad = height_pad - top_pad
-    width_pad = max_size - image.shape[1]
-    left_pad = int(width_pad / 2)
-    right_pad = width_pad - left_pad
-
-    pad_value = [0] * image.shape[2]
-    image = cv.copyMakeBorder(image, top_pad, bottom_pad, left_pad, right_pad, cv.BORDER_CONSTANT, value=pad_value)
-    padding = Padding(left_pad, right_pad, top_pad, bottom_pad)
-    return image, padding
-
-
-def padding_removed(image: np.ndarray, padding: Padding) -> np.ndarray:
-    return image[
-           padding.top: image.shape[0] - padding.bottom,
-           padding.left: image.shape[1] - padding.right,
-           ...]
 
 
 class Inferencer(QObject):

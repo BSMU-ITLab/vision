@@ -10,7 +10,8 @@ import onnxruntime as ort
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.image import tile_splitter
-from bsmu.vision.dnn.inferencer import Inferencer, padded_to_square_shape, padding_removed
+from bsmu.vision.core.padding import padded_to_square_shape, padding_removed
+from bsmu.vision.dnn.inferencer import Inferencer
 
 if TYPE_CHECKING:
     from typing import Callable, List, Tuple, Sequence

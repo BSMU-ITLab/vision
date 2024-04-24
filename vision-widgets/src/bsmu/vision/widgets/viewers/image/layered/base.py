@@ -514,8 +514,8 @@ class LayeredImageViewer(DataViewer):
         self.add_layer(layer)
         return layer
 
-    def add_layer_or_modify_image(self, name: str, image: Image) -> ImageLayer:
-        return self.data.add_layer_or_modify_image(name, image)
+    def add_layer_or_modify_image(self, name: str, image: Image, visibility: Visibility = None) -> ImageLayer:
+        return self.data.add_layer_or_modify_image(name, image, visibility)
 
     def add_layer_or_modify_pixels(
             self,

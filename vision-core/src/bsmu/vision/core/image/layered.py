@@ -126,10 +126,10 @@ class LayeredImage(Data):
         self.add_layer(image_layer)
         return image_layer
 
-    def add_layer_or_modify_image(self, name: str, image: Image) -> ImageLayer:
+    def add_layer_or_modify_image(self, name: str, image: Image, visibility: Visibility = None) -> ImageLayer:
         layer = self.layer_by_name(name)
         if layer is None:
-            layer = self.add_layer_from_image(image, name)
+            layer = self.add_layer_from_image(image, name, visibility)
         else:
             layer.image = image
         return layer

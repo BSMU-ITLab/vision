@@ -365,7 +365,14 @@ class TissueSegmenter(QObject):
 
         if config.blur_size > 1:
             blur_kernel_size = (config.blur_size, config.blur_size)
-            hsb_image = cv.GaussianBlur(hsb_image, blur_kernel_size, 0)
+            cv.GaussianBlur(hsb_image, blur_kernel_size, sigmaX=0, dst=hsb_image)
+
+            # Erode image to compensate for the increased size of objects after the blur
+            erode_radius = config.blur_size // 3
+            if erode_radius % 2 == 0:
+                erode_radius -= 1
+            kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (erode_radius, erode_radius))
+            cv.erode(hsb_image, kernel, dst=hsb_image, iterations=1)
 
         saturation = hsb_image[..., 1]
         brightness = hsb_image[..., 2]

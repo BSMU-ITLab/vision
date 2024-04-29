@@ -1,6 +1,0 @@
-ms-predictor-model:
-  name: 'ms-model-072.onnx'
-  preload: false
-  input_size: [256, 256, 3]
-  normalize: false
-  preprocessing_mode: 'image-net-torch'

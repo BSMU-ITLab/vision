@@ -28,15 +28,24 @@ class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
+            undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
+            tool_cls: Type[ViewerTool] = SmartBrushImageViewerTool,
+            tool_settings_cls: Type[ViewerToolSettings] = SmartBrushImageViewerToolSettings,
+            tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = SmartBrushImageViewerToolSettingsWidget,
+            action_name: str = 'Smart Brush',
+            action_shortcut: Qt.Key = Qt.CTRL | Qt.Key_B,
     ):
         super().__init__(
             main_window_plugin,
             mdi_plugin,
+            undo_plugin,
             palette_pack_settings_plugin,
-            SmartBrushImageViewerTool,
-            'Smart Brush',
-            Qt.CTRL + Qt.Key_B,
+            tool_cls,
+            tool_settings_cls,
+            tool_settings_widget_cls,
+            action_name,
+            action_shortcut,
         )
 
 

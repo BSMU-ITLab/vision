@@ -54,9 +54,9 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
         self._mdi_image_layer_file_walker = MdiImageLayerFileWalker(self._mdi, self._file_loading_manager)
 
         self._main_window.add_menu_action(
-            ViewMenu, 'Next Image', self._mdi_image_layer_file_walker.show_next_image, Qt.CTRL + Qt.Key_Right)
+            ViewMenu, 'Next Image', self._mdi_image_layer_file_walker.show_next_image, Qt.CTRL | Qt.Key_Right)
         self._main_window.add_menu_action(
-            ViewMenu, 'Previous Image', self._mdi_image_layer_file_walker.show_previous_image, Qt.CTRL + Qt.Key_Left)
+            ViewMenu, 'Previous Image', self._mdi_image_layer_file_walker.show_previous_image, Qt.CTRL | Qt.Key_Left)
 
     def _disable(self):
         self._mdi_image_layer_file_walker = None

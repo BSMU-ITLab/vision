@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -7,11 +8,10 @@ from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
-from bsmu.vision.core.image.base import Image
+from bsmu.vision.core.image import Image
 from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
-    from pathlib import Path
     from typing import Type, List
 
     from bsmu.vision.core.palette import Palette
@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
 class ImageLayer(QObject):
     max_id = 0
+
+    path_changed = Signal(Path)
 
     image_updated = Signal(Image)
 
@@ -30,7 +32,7 @@ class ImageLayer(QObject):
         self.id = ImageLayer.max_id
         ImageLayer.max_id += 1
 
-        self.path = None
+        self._path: Path | None = None
         self.palette = None
 
         self._image = None
@@ -38,6 +40,17 @@ class ImageLayer(QObject):
         self.name = name if name else 'Layer ' + str(self.id)
 
         self._visibility = Visibility() if visibility is None else visibility
+
+    @property
+    def path(self) -> Path | None:
+        """ The layer's path is the directory of its last image that is not None. """
+        return self._path
+
+    @path.setter
+    def path(self, value: Path | None):
+        if self._path != value:
+            self._path = value
+            self.path_changed.emit(self._path)
 
     @property
     def image_path(self) -> Path | None:

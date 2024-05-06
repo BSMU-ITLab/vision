@@ -37,9 +37,9 @@ class MdiVolumeSliceWalkerPlugin(Plugin):
         self._mdi_volume_slice_walker = MdiVolumeSliceWalker(self._mdi)
 
         self._main_window.add_menu_action(
-            ViewMenu, 'Next Slice', self._mdi_volume_slice_walker.show_next_slice, Qt.CTRL + Qt.Key_Up)
+            ViewMenu, 'Next Slice', self._mdi_volume_slice_walker.show_next_slice, Qt.CTRL | Qt.Key_Up)
         self._main_window.add_menu_action(
-            ViewMenu, 'Previous Slice', self._mdi_volume_slice_walker.show_prev_slice, Qt.CTRL + Qt.Key_Down)
+            ViewMenu, 'Previous Slice', self._mdi_volume_slice_walker.show_prev_slice, Qt.CTRL | Qt.Key_Down)
 
     def _disable(self):
         self._mdi_volume_slice_walker = None

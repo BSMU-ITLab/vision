@@ -121,5 +121,5 @@ class GenericImageFileWriter(FileWriter):
         # TODO: move the logging into base class
         logging.info(f'Write Generic Image: {path}')
 
-        # TODO: use OpenCV to save the image (compare performance)
+        # TODO: use OpenCV to save the image (compare performance and size of the resulting files)
         skimage.io.imsave(str(path), data.pixels, check_contrast=False)

@@ -95,6 +95,9 @@ class Image(Data):
     def shape_or_none(self) -> tuple | None:
         return None if self.array is None else self.shape
 
+    def zeros(self, palette: Palette = None) -> Image:
+        return self.zeros_like(self, palette=palette)
+
     def zeros_mask(self, palette: Palette = None) -> Image:
         return self.zeros_mask_like(self, palette=palette)
 

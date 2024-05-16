@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PySide6.QtCore import QObject
 
+from bsmu.vision.core.config import IntList
 from bsmu.vision.core.image import Image, LayeredImage
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins import Plugin
@@ -108,15 +109,24 @@ class ImageViewerIntersectionOverlayer(QObject):
             if not isinstance(new_image, Image):
                 continue
 
+            layer_classes = IntList(layer_properties.get('classes', 'all'))
+            layer_background_class = layer_properties.get('background_class', 0)
+            used_for_intersection_mask = (
+                new_image.pixels != layer_background_class
+                if layer_classes.contains_all_values
+                else layer_classes.elements_in_list_mask(new_image.pixels)
+            )
+
             if intersection_image is None:
-                intersection_image = new_image
-                intersection_image.pixels[intersection_image.pixels > 0] = palette_layer_index
+                intersection_image = new_image.zeros()
+                intersection_image.pixels[used_for_intersection_mask] = palette_layer_index
             else:
-                masked_new_image = new_image.pixels > 0
                 intersection_image.pixels[
-                    masked_new_image & (intersection_image.pixels > 0)
+                    used_for_intersection_mask & (intersection_image.pixels > 0)
                 ] = intersection_palette_layer_index
-                intersection_image.pixels[masked_new_image & (intersection_image.pixels == 0)] = palette_layer_index
+                intersection_image.pixels[
+                    used_for_intersection_mask & (intersection_image.pixels == 0)
+                ] = palette_layer_index
 
         if intersection_image is not None:
             intersection_palette_array[intersection_palette_layer_index] = self._intersection_layer_properties['color']

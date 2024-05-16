@@ -1,9 +1,17 @@
 layers:
   masks:
     extension: 'png'
+    background_class: 0
+    classes: 'all'
     color: [0, 0, 255, 255]
   predictions:
     extension: 'png'
+    background_class: 0
+    classes: 'all'
+#    classes:
+#      start: 7
+#      stop: 12
+#    classes: [1, 2, 3]
     color: [255, 0, 0, 255]
 
 intersection_layer:

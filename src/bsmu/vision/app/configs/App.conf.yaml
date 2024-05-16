@@ -2,7 +2,7 @@ plugins:
   - bsmu.vision.plugins.windows.main.MainWindowPlugin
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
-  - bsmu.vision.plugins.loaders.image.wsi.WholeSlideImageFileLoaderPlugin
+#  - bsmu.vision.plugins.loaders.image.wsi.WholeSlideImageFileLoaderPlugin
 #  - bsmu.vision.plugins.loaders.nifti.base.NiftiFileLoaderPlugin
   - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
   - bsmu.vision.plugins.visualizers.image.flat.FlatImageVisualizerPlugin

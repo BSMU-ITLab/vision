@@ -51,7 +51,11 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
         self._mdi = self._mdi_plugin.mdi
         self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
 
-        self._mdi_image_layer_file_walker = MdiImageLayerFileWalker(self._mdi, self._file_loading_manager)
+        self._mdi_image_layer_file_walker = MdiImageLayerFileWalker(
+            self._mdi,
+            self._file_loading_manager,
+            self.config_value('extensions'),
+        )
 
         self._main_window.add_menu_action(
             ViewMenu, 'Next Image', self._mdi_image_layer_file_walker.show_next_image, Qt.CTRL | Qt.Key_Right)
@@ -65,13 +69,14 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
 
 
 class MdiImageLayerFileWalker(QObject):
-    def __init__(self, mdi: Mdi, file_loading_manager: FileLoadingManager):
+    def __init__(self, mdi: Mdi, file_loading_manager: FileLoadingManager, allowed_extensions: list):
         super().__init__()
 
         self.mdi = mdi
         self.file_loading_manager = file_loading_manager
 
         self.image_layer_file_walkers = {}  # DataViewerSubWindow: ImageLayerFileWalker
+        self.allowed_extensions = allowed_extensions
 
     def show_next_image(self):
         walker = self._image_layer_file_walker()
@@ -90,17 +95,19 @@ class MdiImageLayerFileWalker(QObject):
 
         image_layer_file_walker = self.image_layer_file_walkers.get(active_sub_window)
         if image_layer_file_walker is None:
-            image_layer_file_walker = ImageLayerFileWalker(active_sub_window.viewer, self.file_loading_manager)
+            image_layer_file_walker = ImageLayerFileWalker(
+                active_sub_window.viewer, self.file_loading_manager, self.allowed_extensions)
             self.image_layer_file_walkers[active_sub_window] = image_layer_file_walker
         return image_layer_file_walker
 
 
 class ImageLayerFileWalker(QObject):
-    def __init__(self, image_viewer: LayeredImageViewer, file_loading_manager: FileLoadingManager):
+    def __init__(
+            self, image_viewer: LayeredImageViewer, file_loading_manager: FileLoadingManager, allowed_extensions: list):
         super().__init__()
-
         self.image_viewer = image_viewer
         self.file_loading_manager = file_loading_manager
+        self.allowed_extensions = allowed_extensions
 
         self._main_layer_image_dir = None
         self._main_layer_dir_images = None
@@ -119,7 +126,9 @@ class ImageLayerFileWalker(QObject):
     @property
     def main_layer_dir_images(self):
         if self._main_layer_dir_images is None:
-            self._main_layer_dir_images = sorted(os.listdir(self.main_layer_image_dir))
+            # TODO: try to use pathlib instead of os.listdir
+            self._main_layer_dir_images = sorted([file for file in os.listdir(self.main_layer_image_dir) if file.split('.')[-1] in self.allowed_extensions]) 
+            # list of only files with allowed extensions
         return self._main_layer_dir_images
 
     @property
@@ -141,10 +150,10 @@ class ImageLayerFileWalker(QObject):
         # next_image = self.loading_manager.load_file(next_file_path)
         # self.main_layer.image = next_image
         self._main_layer_image_index = index
-
+        extension = next_file_name.rsplit(".")[-1]
         # update images of all layers
         for layer in self.image_viewer.layers:
             # Load new image, but use palette of old image (so, if palette is not None, image will be loaded as gray)
-            if layer.path is not None:
-                file_path = (layer.path / next_file_name).with_suffix(layer.image_path.suffix)
+            if layer.path is not None and extension in self.allowed_extensions:
+                file_path = (layer.path / next_file_name).with_suffix("." + extension)
                 layer.image = self.file_loading_manager.load_file(file_path, palette=layer.palette)

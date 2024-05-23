@@ -30,3 +30,5 @@ warn-with-traceback: false
 onnx_providers:
   - CUDAExecutionProvider
   - CPUExecutionProvider
+
+opencv_io_max_pixels: 10995116277760000

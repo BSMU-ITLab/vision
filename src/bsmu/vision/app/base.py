@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import argparse
 import locale
 import logging
@@ -65,6 +66,8 @@ class App(QObject, DataFileProvider):
             warnings.simplefilter('always')
 
         OnnxConfig.providers = self._config.value('onnx_providers')
+
+        os.environ["OPENCV_IO_MAX_IMAGE_PIXELS"] = str(self._config.value('opencv_io_max_pixels'))
 
         self._plugin_manager = PluginManager(self)
         self._plugin_manager.plugin_enabled.connect(self.plugin_enabled)

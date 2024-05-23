@@ -19,6 +19,7 @@ plugins:
   - bsmu.vision.plugins.tools.viewer.image.wsi_smart_brush.WsiSmartBrushImageViewerToolPlugin
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
   - bsmu.vision.plugins.layers_view.LayersTableViewPlugin
+  - bsmu.vision.plugins.task_storage_view.TaskStorageViewPlugin
 
 enable-gui: true
 
@@ -31,4 +32,4 @@ onnx_providers:
   - CUDAExecutionProvider
   - CPUExecutionProvider
 
-opencv_io_max_pixels: 10995116277760000
+opencv_io_max_image_pixels: 1_099_511_627_776  # 1 TB = 2 ^ 40 bytes

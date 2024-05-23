@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt
@@ -10,6 +9,8 @@ from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
@@ -69,7 +70,7 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
 
 
 class MdiImageLayerFileWalker(QObject):
-    def __init__(self, mdi: Mdi, file_loading_manager: FileLoadingManager, allowed_extensions: list):
+    def __init__(self, mdi: Mdi, file_loading_manager: FileLoadingManager, allowed_extensions: list[str] | None):
         super().__init__()
 
         self.mdi = mdi
@@ -103,7 +104,11 @@ class MdiImageLayerFileWalker(QObject):
 
 class ImageLayerFileWalker(QObject):
     def __init__(
-            self, image_viewer: LayeredImageViewer, file_loading_manager: FileLoadingManager, allowed_extensions: list):
+            self,
+            image_viewer: LayeredImageViewer,
+            file_loading_manager: FileLoadingManager,
+            allowed_extensions: list[str] | None,
+    ):
         super().__init__()
         self.image_viewer = image_viewer
         self.file_loading_manager = file_loading_manager
@@ -118,7 +123,7 @@ class ImageLayerFileWalker(QObject):
         return self.image_viewer.active_layer_view
 
     @property
-    def main_layer_image_dir(self):
+    def main_layer_image_dir(self) -> Path | None:
         if self._main_layer_image_dir is None:
             self._main_layer_image_dir = self.active_layer.image_path.parent
         return self._main_layer_image_dir
@@ -126,9 +131,15 @@ class ImageLayerFileWalker(QObject):
     @property
     def main_layer_dir_images(self):
         if self._main_layer_dir_images is None:
-            # TODO: try to use pathlib instead of os.listdir
-            self._main_layer_dir_images = sorted([file for file in os.listdir(self.main_layer_image_dir) if file.split('.')[-1] in self.allowed_extensions]) 
-            # list of only files with allowed extensions
+            # TODO: add support of compound extensions, e.g. `.nii.gz`
+            # TODO: try to use itertools.cycle and iterdir() generator instead of storing file names in the list
+            # Generate list of file names with allowed extensions
+            self._main_layer_dir_images = sorted(
+                [
+                    file_path.name for file_path in list(self.main_layer_image_dir.iterdir())
+                    if self.allowed_extensions is None or file_path.suffix[1:] in self.allowed_extensions
+                ]
+            )
         return self._main_layer_dir_images
 
     @property
@@ -146,14 +157,14 @@ class ImageLayerFileWalker(QObject):
     def _show_image_with_index(self, index: int):
         index = index % len(self.main_layer_dir_images)
         next_file_name = self.main_layer_dir_images[index]
-        # next_file_path = self.main_layer_image_dir / next_file_name
-        # next_image = self.loading_manager.load_file(next_file_path)
-        # self.main_layer.image = next_image
         self._main_layer_image_index = index
-        extension = next_file_name.rsplit(".")[-1]
-        # update images of all layers
+        # Update images of all layers
         for layer in self.image_viewer.layers:
+            if layer.path is None:
+                continue
+
             # Load new image, but use palette of old image (so, if palette is not None, image will be loaded as gray)
-            if layer.path is not None and extension in self.allowed_extensions:
-                file_path = (layer.path / next_file_name).with_suffix("." + extension)
-                layer.image = self.file_loading_manager.load_file(file_path, palette=layer.palette)
+            file_path = layer.path / next_file_name
+            if layer != self.image_viewer.active_layer and layer.extension is not None:
+                file_path = file_path.with_suffix(layer.extension)
+            layer.image = self.file_loading_manager.load_file(file_path, palette=layer.palette)

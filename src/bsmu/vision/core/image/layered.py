@@ -21,6 +21,7 @@ class ImageLayer(QObject):
     max_id = 0
 
     path_changed = Signal(Path)
+    extension_changed = Signal(str)
 
     image_updated = Signal(Image)
 
@@ -33,6 +34,7 @@ class ImageLayer(QObject):
         ImageLayer.max_id += 1
 
         self._path: Path | None = None
+        self._extension: str | None = None
         self.palette = None
 
         self._image = None
@@ -51,6 +53,17 @@ class ImageLayer(QObject):
         if self._path != value:
             self._path = value
             self.path_changed.emit(self._path)
+
+    @property
+    def extension(self) -> str | None:
+        """ Extension of its last image file that is not None. """
+        return self._extension
+
+    @extension.setter
+    def extension(self, value: str | None):
+        if self._extension != value:
+            self._extension = value
+            self.extension_changed.emit(self._extension)
 
     @property
     def image_path(self) -> Path | None:
@@ -87,6 +100,7 @@ class ImageLayer(QObject):
         if self._image is not None:
             if self._image.path is not None:
                 self.path = self._image.path.parent
+                self.extension = self._image.path.suffix
             self.palette = self._image.palette
             self._image.pixels_modified.connect(self.image_pixels_modified)
             self._image.shape_changed.connect(self.image_shape_changed)

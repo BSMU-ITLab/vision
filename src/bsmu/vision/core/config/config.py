@@ -1,48 +1,78 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
-from typing import Any, TypeVar, get_type_hints
-from typing import TYPE_CHECKING
+from pathlib import Path
+from types import UnionType
+from typing import get_type_hints, TypeVar, TYPE_CHECKING
 
 import numpy as np
 from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from typing import Any, Type
 
 Self = TypeVar('Self', bound='Config')  # Use `from typing import Self` in Python 3.11
+
+
+_SENTINEL: object = object()
+
+# Define the permissible source types that can be cast to the specified target types.
+# The keys are the target types, and the values are the unions of source types
+# that can be safely cast to the corresponding key type.
+_TARGET_CASTING_TO_SOURCE_TYPES: dict[Type, Type | UnionType] = {
+    float: int,
+    Path: str,
+}
 
 
 @dataclass
 class Config:
     @classmethod
     def from_dict(cls, config_dict: dict[str, Any]) -> Self:
-        SENTINEL = object()
         field_name_to_config_value: dict[str, Any] = {}
         # Get actual type hints for the fields, resolving forward references. See:
         # https://stackoverflow.com/questions/55937859/dataclasses-field-doesnt-resolve-type-annotation-to-actual-type
         type_hints = get_type_hints(cls)
         for field in fields(cls):
             field_name = field.name
-            if (config_value := config_dict.get(field_name, SENTINEL)) == SENTINEL:
+            if (config_value := config_dict.get(field_name, _SENTINEL)) is _SENTINEL:
                 continue
 
             # Do not use field.type, because it can contain string instead of actual resolved type.
             field_type = type_hints[field_name]
-            # Check if config_value type is not the same as field_type.
-            if type(config_value) != field_type:
-                # If config_value is a dictionary and the field_type is a subclass of Config,
-                # then recursively call from_dict to create a nested Config object.
-                if isinstance(config_value, dict) and issubclass(field_type, Config):
-                    config_value = field_type.from_dict(config_value)
+            if not isinstance(config_value, field_type):
+                # Try to convert `config_value` to `field_type`.
+                if isinstance(field_type, UnionType):
+                    # Iterate through individual types from the UnionType
+                    # and try to find a suitable one to convert the `config_value`
+                    is_converted = False
+                    for union_member_type in field_type.__args__:
+                        config_value, is_converted = cls._converted_value_to_type(config_value, union_member_type)
+                        if is_converted:
+                            break
+                    if not is_converted:
+                        raise ValueError(f'Cannot convert {config_value} to any type from {field_type}')
                 else:
-                    # Convert config_value to field_type by calling its constructor.
-                    # This is useful, e.g. to create Path object from a string.
-                    config_value = field_type(config_value)
+                    config_value, is_converted = cls._converted_value_to_type(config_value, field_type)
+                    if not is_converted:
+                        raise ValueError(f'Cannot convert {config_value} to {field_type}')
 
             field_name_to_config_value[field_name] = config_value
 
         return cls(**field_name_to_config_value)
+
+    @classmethod
+    def _converted_value_to_type(cls, value: Any, type_: Type) -> tuple[Any, bool]:
+        # If `value` is a dictionary and the `type_` is a subclass of Config,
+        # then recursively call from_dict to create a nested Config object.
+        if isinstance(value, dict) and issubclass(type_, Config):
+            return type_.from_dict(value), True
+        else:
+            # Try to cast `value` to `type_` according to the `_TARGET_CASTING_TO_SOURCE_TYPES`.
+            for target_type, source_type in _TARGET_CASTING_TO_SOURCE_TYPES.items():
+                if issubclass(type_, target_type) and isinstance(value, source_type):
+                    return type_(value), True
+        return value, False
 
     def save_to_yaml(self, file_path: Path):
         yaml = YAML()

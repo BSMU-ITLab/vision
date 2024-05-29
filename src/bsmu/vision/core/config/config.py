@@ -51,11 +51,14 @@ class Config:
                         if is_converted:
                             break
                     if not is_converted:
-                        raise ValueError(f'Cannot convert {config_value} to any type from {field_type}')
+                        raise ValueError(
+                            f'Cannot convert {config_value} to any type from {field_type} '
+                            f'for field name {field_name!r} of {cls}')
                 else:
                     config_value, is_converted = cls._converted_value_to_type(config_value, field_type)
                     if not is_converted:
-                        raise ValueError(f'Cannot convert {config_value} to {field_type}')
+                        raise ValueError(
+                            f'Cannot convert {config_value} to {field_type} for field name {field_name!r} of {cls}')
 
             field_name_to_config_value[field_name] = config_value
 

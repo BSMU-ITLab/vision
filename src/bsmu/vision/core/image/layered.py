@@ -28,12 +28,16 @@ class ImageLayer(QObject):
     image_shape_changed = Signal(object, object)
     image_pixels_modified = Signal(BBox)
 
-    def __init__(self, image: Image | None = None, name: str = '', visibility: Visibility = None):
+    def __init__(self, image: Image | None = None, name: str = '', path: Path = None, visibility: Visibility = None):
+        """
+        :param name: Layer name.
+        :param path: Layer path used to iterate over images.
+        """
         super().__init__()
         self.id = ImageLayer.max_id
         ImageLayer.max_id += 1
 
-        self._path: Path | None = None
+        self._path: Path | None = path
         self._extension: str | None = None
         self.palette = None
 
@@ -45,7 +49,6 @@ class ImageLayer(QObject):
 
     @property
     def path(self) -> Path | None:
-        """ The layer's path is the directory of its last image that is not None. """
         return self._path
 
     @path.setter
@@ -99,7 +102,6 @@ class ImageLayer(QObject):
 
         if self._image is not None:
             if self._image.path is not None:
-                self.path = self._image.path.parent
                 self.extension = self._image.path.suffix
             self.palette = self._image.palette
             self._image.pixels_modified.connect(self.image_pixels_modified)
@@ -148,15 +150,16 @@ class LayeredImage(Data):
         self.layer_added.emit(layer, layer_index)
 
     def add_layer_from_image(
-            self, image: Image | None, name: str = '', visibility: Visibility = None) -> ImageLayer:
-        image_layer = ImageLayer(image, name, visibility)
+            self, image: Image | None, name: str = '', path: Path = None, visibility: Visibility = None) -> ImageLayer:
+        image_layer = ImageLayer(image, name, path, visibility)
         self.add_layer(image_layer)
         return image_layer
 
-    def add_layer_or_modify_image(self, name: str, image: Image, visibility: Visibility = None) -> ImageLayer:
+    def add_layer_or_modify_image(
+            self, name: str, image: Image, path: Path = None, visibility: Visibility = None) -> ImageLayer:
         layer = self.layer_by_name(name)
         if layer is None:
-            layer = self.add_layer_from_image(image, name, visibility)
+            layer = self.add_layer_from_image(image, name, path, visibility)
         else:
             layer.image = image
         return layer
@@ -167,11 +170,12 @@ class LayeredImage(Data):
             pixels: np.array,
             image_type: Type[Image],
             palette: Palette = None,
+            path: Path = None,
             visibility: Visibility = None,
     ) -> ImageLayer:
         layer = self.layer_by_name(name)
         if layer is None:
-            layer = self.add_layer_from_image(image_type(pixels, palette), name, visibility)
+            layer = self.add_layer_from_image(image_type(pixels, palette), name, path, visibility)
         elif layer.image is None:
             layer.image = image_type(pixels, palette)
         else:

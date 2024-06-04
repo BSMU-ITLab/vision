@@ -49,7 +49,7 @@ class ImageLayerConfig(Config):
             layer_path = image_path.parent
         elif not image_path.is_relative_to(layer_path):
             logging.warning(
-                f'Image path {image_path} has to be relative to layer path {layer_path}. '
+                f'Layer path {layer_path} has to be one of the parent directories of image path {image_path}. '
                 f'Image parent {image_path.parent} will be used as layer path.'
             )
             layer_path = image_path.parent
@@ -64,12 +64,10 @@ class ImageToLayeredImagePostLoadConverterPlugin(PostLoadConverterPlugin):
 
     def _enable(self):
         image_layer_config = ImageLayerConfig.from_dict(self.config_value('created_layer'))
-        print(f'image_layer_config:\n{image_layer_config}')
 
-        test_image_path = Path(r'D:\Projects\vision\tests\test-data\images\01-eye-fundus-8UC3.png')
-        layer_name, layer_path = image_layer_config.resolved_layer_name_and_path_from_image(test_image_path)
-        print(f'layer_path: {layer_path}')
-        print(f'layer_name: {layer_name}')
+        # TODO: it's a temporary workaround to pass the config into converter class.
+        #  Remove this, when config will be passed into all processor classes
+        ImageToLayeredImagePostLoadConverter.config = image_layer_config
 
 
 class ImageToLayeredImagePostLoadConverter(PostLoadConverter):
@@ -77,5 +75,6 @@ class ImageToLayeredImagePostLoadConverter(PostLoadConverter):
 
     def _convert_data(self, data: Data) -> Data:
         layered_image = LayeredImage()
-        layered_image.add_layer_from_image(data, name=data.dir_name)
+        layer_name, layer_path = self.config.resolved_layer_name_and_path_from_image(data.path)
+        layered_image.add_layer_from_image(data, layer_name, layer_path, self.config.visibility)
         return layered_image

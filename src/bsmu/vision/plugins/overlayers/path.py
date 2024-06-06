@@ -75,7 +75,8 @@ class ImageViewerPathOverlayer(QObject):
         layers_dir = first_layer.path.parent
 
         for new_layer_name, layer_props in self.layers_config_data.items():
-            new_layer_image_path = layers_dir / new_layer_name / first_layer_image_name
+            new_layer_path = layers_dir / new_layer_name
+            new_layer_image_path = new_layer_path / first_layer_image_name
 
             layer_extension_prop = layer_props.get('extension')
             if layer_extension_prop is not None:
@@ -90,7 +91,7 @@ class ImageViewerPathOverlayer(QObject):
             palette = Palette.from_config(palette_prop)
 
             new_image = self.loading_manager.load_file(new_layer_image_path, palette=palette)
-            new_image_layer = data.add_layer_from_image(new_image, new_layer_name)
+            new_image_layer = data.add_layer_from_image(new_image, new_layer_name, new_layer_path)
 
             layer_opacity = layer_props.get('opacity')
             if layer_opacity is not None:

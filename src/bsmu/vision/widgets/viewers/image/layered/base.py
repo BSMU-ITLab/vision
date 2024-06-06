@@ -490,7 +490,7 @@ class LayeredImageViewer(DataViewer):
         return self.active_layer_view.image_layer
 
     @property
-    def layers(self):
+    def layers(self) -> list[ImageLayer]:
         return self.data.layers
 
     @property

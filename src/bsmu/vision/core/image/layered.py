@@ -12,7 +12,7 @@ from bsmu.vision.core.image import Image
 from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
-    from typing import Type, List
+    from typing import Type
 
     from bsmu.vision.core.palette import Palette
 
@@ -132,11 +132,11 @@ class LayeredImage(Data):
     def __init__(self, path: Path = None):
         super().__init__(path)
 
-        self._layers = []
+        self._layers: list[ImageLayer] = []
         self._layer_by_name = {}
 
     @property
-    def layers(self) -> List[ImageLayer]:
+    def layers(self) -> list[ImageLayer]:
         return self._layers
 
     def layer_by_name(self, name: str) -> ImageLayer | None:

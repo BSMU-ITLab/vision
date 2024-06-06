@@ -1,0 +1,21 @@
+created_layer:
+  # If null, then layer path name will be used.
+  name: 'images'
+
+  # Use an absolute path or a path relative to the image parent.
+  # Example of relative path: '../..'.
+  # If `path` and `search_path` are not defined, the parent of the image path is used.
+  path: null
+  # `search_path` is used, when `path` is not defined.
+  # The path will be searched by `name` within the parent dirs of the image.
+  # up to a specified `depth`.
+  # Use parent of the image as layer path if path with `name` is not found within parent dirs.
+  search_path:
+    # The name of a parent dir to search for.
+    name: 'images'
+    # The number of parent dirs to scan.
+    depth: 2
+
+  visibility:
+    visible: true
+    opacity: 1

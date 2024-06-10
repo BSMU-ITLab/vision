@@ -29,11 +29,3 @@ layers:
 #      - [2, 255, 0, 255, 255]
 
     opacity: 0.4
-
-  masks-glass-box:
-    extension: png
-    palette:
-      - [0, 0, 0, 0, 0]
-      - [1, 238, 147, 224, 255]
-
-    opacity: 1

@@ -136,5 +136,5 @@ class ImageViewerIntersectionOverlayer(QObject):
             data.add_layer_from_image(
                 intersection_image,
                 self._intersection_layer_properties['name'],
-                Visibility(opacity=intersection_layer_opacity),
+                visibility=Visibility(opacity=intersection_layer_opacity),
             )

@@ -15,6 +15,8 @@ plugins:
   - bsmu.vision.plugins.layouts.base.MdiLayoutPlugin
   - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
 #  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
+  - bsmu.vision.plugins.tools.viewer.viewer_tool_manager.ViewerToolManagerPlugin
+  - bsmu.vision.plugins.tools.viewer.image.pointer_tool.PointerImageViewerToolPlugin
 #  - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
   - bsmu.vision.plugins.tools.viewer.image.wsi_smart_brush.WsiSmartBrushImageViewerToolPlugin
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin

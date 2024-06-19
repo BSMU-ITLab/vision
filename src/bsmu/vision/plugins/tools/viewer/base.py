@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import cast
 
-from PySide6.QtCore import Qt, QObject, QEvent
-from PySide6.QtGui import QCursor, QPixmap, QAction
+from PySide6.QtCore import Qt, QObject, Signal
+from PySide6.QtGui import QCursor, QPixmap, QAction, QIcon
 from PySide6.QtWidgets import QWidget, QDockWidget
 
 from bsmu.vision.core.palette import Palette
@@ -48,7 +48,7 @@ class ViewerToolPlugin(Plugin):
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
             tool_cls: Type[ViewerTool],
             tool_settings_cls: Type[ViewerToolSettings],
-            tool_settings_widget_cls: Type[ViewerToolSettingsWidget],
+            tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = None,
             action_name: str = '',
             action_shortcut: Qt.Key = None,
     ):
@@ -75,7 +75,18 @@ class ViewerToolPlugin(Plugin):
         self._mdi_viewer_tool: MdiViewerTool | None = None
 
         self._tool_action: QAction | None = None
-        self._tool_temporary_deactivated: bool = False
+
+    @property
+    def mdi_viewer_tool(self) -> MdiViewerTool | None:
+        return self._mdi_viewer_tool
+
+    @property
+    def tool_action(self) -> QAction | None:
+        return self._tool_action
+
+    @property
+    def action_shortcut(self) -> Qt.Key | None:
+        return self._action_shortcut
 
     def _enable(self):
         if not self._action_name:
@@ -98,14 +109,13 @@ class ViewerToolPlugin(Plugin):
 
         self._tool_action = self._main_window.add_menu_action(
             ToolsMenu, self._action_name, self._tool_action_triggered, self._action_shortcut, checkable=True)
+        self._tool_action.setData(self._mdi_viewer_tool)
+        self._tool_action.setAutoRepeat(False)
+        self._tool_action.setIcon(QIcon(tool_settings.icon_file_name))
 
-        self._main_window.add_menu_action(ToolsMenu, 'Uncheck Tool', self._deactivate_active_tool, Qt.Key_Escape)
-
-        self._main_window.installEventFilter(self)
+        self._mdi_viewer_tool.activation_changed.connect(self._on_mdi_viewer_tool_activation_changed)
 
     def _disable(self):
-        self._main_window.removeEventFilter(self)
-
         self._mdi_viewer_tool = None
         self._tool_action = None
 
@@ -114,30 +124,23 @@ class ViewerToolPlugin(Plugin):
         self._undo_manager = None
         self._palette_pack_settings = None
 
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _tool_action_triggered(self, checked: bool):
         self._mdi_viewer_tool.activate() if checked else self._mdi_viewer_tool.deactivate()
 
-    def _deactivate_active_tool(self):
-        if self._tool_action.isChecked():
-            self._tool_action.activate(QAction.Trigger)
-
-    def eventFilter(self, watched_obj: QObject, event: QEvent):
-        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_1 and not event.isAutoRepeat():
-            if self._tool_action.isChecked():
-                self._tool_action.activate(QAction.Trigger)
-                self._tool_temporary_deactivated = True
-                return True
-        elif event.type() == QEvent.KeyRelease and event.key() == Qt.Key_1 and not event.isAutoRepeat():
-            if self._tool_temporary_deactivated and not self._tool_action.isChecked():
-                self._tool_action.activate(QAction.Trigger)
-                self._tool_temporary_deactivated = False
-                return True
-        return super().eventFilter(watched_obj, event)
+    def _on_mdi_viewer_tool_activation_changed(self, is_mdi_viewer_tool_active: bool):
+        self._tool_action.setChecked(is_mdi_viewer_tool_active)
 
 
 class MdiViewerTool(QObject):
+    activating = Signal(QObject)  # MdiViewerTool is not defined yet, so use QObject
+    activated = Signal(QObject)
+    deactivating = Signal(QObject)
+    deactivated = Signal(QObject)
+
+    activation_changed = Signal(bool)
+
     def __init__(
             self,
             main_window: MainWindow,
@@ -158,12 +161,32 @@ class MdiViewerTool(QObject):
         self._tool_settings_widget = None
         self._tool_settings_dock_widget = None
 
-        self._viewer_tool_by_sub_window = {}  # DataViewerSubWindow: ViewerTool
+        self._viewer_tool_by_sub_window: dict[DataViewerSubWindow, ViewerTool] = {}
+
+        self._is_active = False
+        self._is_activating = False
+        self._is_deactivating = False
+
+    @property
+    def is_active(self) -> bool:
+        return self._is_active
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        if self._is_active != value:
+            self._is_active = value
+            self.activation_changed.emit(self._is_active)
 
     def activate(self):
-        if self._tool_settings_widget is None:
+        if self._is_active or self._is_activating:
+            return
+
+        self._is_activating = True
+        self.activating.emit(self)
+
+        if self._tool_settings_widget is None and self._tool_settings_widget_cls is not None:
             self._tool_settings_widget = self._tool_settings_widget_cls(self._tool_settings)
-            self._tool_settings_dock_widget = QDockWidget('Tool Settings', self._main_window)
+            self._tool_settings_dock_widget = QDockWidget(self.tr('Tool Settings'), self._main_window)
             self._tool_settings_dock_widget.setWidget(self._tool_settings_widget)
             self._main_window.addDockWidget(Qt.LeftDockWidgetArea, self._tool_settings_dock_widget)
 
@@ -172,7 +195,17 @@ class MdiViewerTool(QObject):
             if viewer_tool is not None:
                 viewer_tool.activate()
 
+        self.is_active = True
+        self.activated.emit(self)
+        self._is_activating = False
+
     def deactivate(self):
+        if not self._is_active or self._is_deactivating:
+            return
+
+        self._is_deactivating = True
+        self.deactivating.emit(self)
+
         for viewer_tool in self._viewer_tool_by_sub_window.values():
             viewer_tool.deactivate()
         self._viewer_tool_by_sub_window.clear()
@@ -180,6 +213,10 @@ class MdiViewerTool(QObject):
         self._main_window.removeDockWidget(self._tool_settings_dock_widget)
         self._tool_settings_dock_widget = None
         self._tool_settings_widget = None
+
+        self.is_active = False
+        self.deactivated.emit(self)
+        self._is_deactivating = False
 
     def _sub_window_viewer_tool(self, sub_window: DataViewerSubWindow):
         if not isinstance(sub_window, LayeredImageViewerSubWindow):
@@ -193,12 +230,12 @@ class MdiViewerTool(QObject):
 
 
 class ViewerToolSettings(QObject):
-    def __init__(self, palette_pack_settings: PalettePackSettings):
+    def __init__(self, palette_pack_settings: PalettePackSettings, icon_file_name: str = ''):
         super().__init__()
 
         self._palette_pack_settings = palette_pack_settings
 
-        self._cursor_file_name = ':/icons/brush.svg'  # TODO: Take this from config and pass as parameter
+        self._icon_file_name = icon_file_name
         self._cursor = None
 
     @property
@@ -206,10 +243,17 @@ class ViewerToolSettings(QObject):
         return self._palette_pack_settings
 
     @property
+    def icon_file_name(self) -> str:
+        return self._icon_file_name
+
+    @property
     def cursor(self) -> QCursor:
         if self._cursor is None:
-            cursor_icon = QPixmap(self._cursor_file_name, format=b'svg')
-            self._cursor = QCursor(cursor_icon, hotX=0, hotY=0)
+            if self._icon_file_name:
+                cursor_icon = QPixmap(self._icon_file_name, format=b'svg')
+                self._cursor = QCursor(cursor_icon, hotX=0, hotY=0)
+            else:
+                self._cursor = QCursor()
         return self._cursor
 
     @classmethod
@@ -250,8 +294,8 @@ class ViewerTool(QObject):
 
 
 class LayeredImageViewerToolSettings(ViewerToolSettings):
-    def __init__(self, layers_props: dict, palette_pack_settings: PalettePackSettings):
-        super().__init__(palette_pack_settings)
+    def __init__(self, layers_props: dict, palette_pack_settings: PalettePackSettings, icon_file_name: str = ''):
+        super().__init__(palette_pack_settings, icon_file_name)
 
         self._layers_props = layers_props
 

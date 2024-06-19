@@ -68,8 +68,9 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             paint_dark_cluster: bool,
             paint_connected_component: bool,
             draw_on_mouse_move: bool,
+            icon_file_name: str = ':/icons/brush.svg',
     ):
-        super().__init__(layers_props, palette_pack_settings)
+        super().__init__(layers_props, palette_pack_settings, icon_file_name)
 
         self._radius = radius
         self._min_radius = min_radius

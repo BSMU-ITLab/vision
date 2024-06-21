@@ -152,15 +152,20 @@ class ImageLayerFileWalker(QObject):
     @property
     def main_layer_file_index(self) -> int | None:
         if self._main_layer_file_index is None:
-            self._main_layer_file_index = self.main_layer_dir_relative_file_paths.index(
-                self.active_layer.image_path.relative_to(self.main_layer_dir))
+            relative_file_path = self.active_layer.image_path.relative_to(self.main_layer_dir)
+            try:
+                self._main_layer_file_index = self.main_layer_dir_relative_file_paths.index(relative_file_path)
+            except ValueError:
+                return None
         return self._main_layer_file_index
 
     def show_next_image(self):
-        self._show_image_with_index(self.main_layer_file_index + 1)
+        if self.main_layer_file_index is not None:
+            self._show_image_with_index(self.main_layer_file_index + 1)
 
     def show_prev_image(self):
-        self._show_image_with_index(self.main_layer_file_index - 1)
+        if self.main_layer_file_index is not None:
+            self._show_image_with_index(self.main_layer_file_index - 1)
 
     def _show_image_with_index(self, index: int):
         self._main_layer_file_index = index % len(self.main_layer_dir_relative_file_paths)

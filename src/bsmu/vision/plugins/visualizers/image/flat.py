@@ -25,6 +25,6 @@ class FlatImageVisualizer(ImageVisualizer):
         image_viewer = LayeredFlatImageViewer(layered_image)
         sub_window = LayeredImageViewerSubWindow(image_viewer)
         image_viewer.data_name_changed.connect(sub_window.setWindowTitle)
-        self.mdi.addSubWindow(sub_window)
+        self.mdi.add_sub_window(sub_window)
         sub_window.show()
         return [sub_window]

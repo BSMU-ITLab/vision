@@ -44,7 +44,7 @@ class LayeredImageVisualizer(DataVisualizer):
             viewer_sub_windows.append(sub_window)
 
         for sub_window in viewer_sub_windows:
-            self.mdi.addSubWindow(sub_window)
+            self.mdi.add_sub_window(sub_window)
             sub_window.show()
 
         return viewer_sub_windows

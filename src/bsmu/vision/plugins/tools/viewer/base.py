@@ -17,6 +17,8 @@ from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
 if TYPE_CHECKING:
     import numpy as np
     from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtWidgets import QMdiSubWindow
+
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.core.image.base import Image, FlatImage
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
@@ -26,7 +28,6 @@ if TYPE_CHECKING:
     from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
     from bsmu.vision.widgets.viewers.base import DataViewer
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayer
-    from typing import Type
 
 
 LAYER_NAME_PROPERTY_KEY = 'name'
@@ -46,9 +47,9 @@ class ViewerToolPlugin(Plugin):
             mdi_plugin: MdiPlugin,
             undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
-            tool_cls: Type[ViewerTool],
-            tool_settings_cls: Type[ViewerToolSettings],
-            tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = None,
+            tool_cls: type[ViewerTool],
+            tool_settings_cls: type[ViewerToolSettings],
+            tool_settings_widget_cls: type[ViewerToolSettingsWidget] = None,
             action_name: str = '',
             action_shortcut: Qt.Key = None,
     ):
@@ -116,6 +117,8 @@ class ViewerToolPlugin(Plugin):
         self._mdi_viewer_tool.activation_changed.connect(self._on_mdi_viewer_tool_activation_changed)
 
     def _disable(self):
+        self._mdi_viewer_tool.activation_changed.disconnect(self._on_mdi_viewer_tool_activation_changed)
+        self._mdi_viewer_tool.cleanup()
         self._mdi_viewer_tool = None
         self._tool_action = None
 
@@ -146,9 +149,9 @@ class MdiViewerTool(QObject):
             main_window: MainWindow,
             mdi: Mdi,
             undo_manager: UndoManager,
-            tool_cls: Type[ViewerTool],
+            tool_cls: type[ViewerTool],
             tool_settings: ViewerToolSettings,
-            tool_settings_widget_cls: Type[ViewerToolSettingsWidget],
+            tool_settings_widget_cls: type[ViewerToolSettingsWidget],
     ):
         super().__init__()
 
@@ -166,6 +169,11 @@ class MdiViewerTool(QObject):
         self._is_active = False
         self._is_activating = False
         self._is_deactivating = False
+
+        self._mdi.sub_window_added.connect(self._on_sub_window_added)
+
+    def cleanup(self):
+        self._mdi.sub_window_added.disconnect(self._on_sub_window_added)
 
     @property
     def is_active(self) -> bool:
@@ -191,9 +199,7 @@ class MdiViewerTool(QObject):
             self._main_window.addDockWidget(Qt.LeftDockWidgetArea, self._tool_settings_dock_widget)
 
         for sub_window in self._mdi.subWindowList():
-            viewer_tool = self._sub_window_viewer_tool(sub_window)
-            if viewer_tool is not None:
-                viewer_tool.activate()
+            self._activate_on_subwindow(sub_window)
 
         self.is_active = True
         self.activated.emit(self)
@@ -217,6 +223,15 @@ class MdiViewerTool(QObject):
         self.is_active = False
         self.deactivated.emit(self)
         self._is_deactivating = False
+
+    def _on_sub_window_added(self, sub_window: QMdiSubWindow):
+        if self._is_active:
+            self._activate_on_subwindow(sub_window)
+
+    def _activate_on_subwindow(self, sub_window: QMdiSubWindow):
+        viewer_tool = self._sub_window_viewer_tool(sub_window)
+        if viewer_tool is not None:
+            viewer_tool.activate()
 
     def _sub_window_viewer_tool(self, sub_window: DataViewerSubWindow):
         if not isinstance(sub_window, LayeredImageViewerSubWindow):

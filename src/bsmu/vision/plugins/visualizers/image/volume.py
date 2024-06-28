@@ -28,7 +28,7 @@ class VolumeImageVisualizer(DataVisualizer):
         for plane_axis in PlaneAxis:
             image_viewer = VolumeSliceImageViewer(plane_axis, None, layered_image)
             sub_window = VolumeSliceImageViewerSubWindow(image_viewer)
-            self.mdi.addSubWindow(sub_window)
+            self.mdi.add_sub_window(sub_window)
             sub_window.show()
             viewer_sub_windows.append(sub_window)
         return viewer_sub_windows

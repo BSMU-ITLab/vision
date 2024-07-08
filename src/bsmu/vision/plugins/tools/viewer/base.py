@@ -262,13 +262,10 @@ class ViewerToolSettings(QObject):
         return self._icon_file_name
 
     @property
-    def cursor(self) -> QCursor:
-        if self._cursor is None:
-            if self._icon_file_name:
-                cursor_icon = QPixmap(self._icon_file_name, format=b'svg')
-                self._cursor = QCursor(cursor_icon, hotX=0, hotY=0)
-            else:
-                self._cursor = QCursor()
+    def cursor(self) -> QCursor | None:
+        if self._cursor is None and self._icon_file_name:
+            cursor_icon = QPixmap(self._icon_file_name, format=b'svg')
+            self._cursor = QCursor(cursor_icon, hotX=0, hotY=0)
         return self._cursor
 
     @classmethod
@@ -300,7 +297,8 @@ class ViewerTool(QObject):
         return self._settings
 
     def activate(self):
-        self.viewer.viewport.setCursor(self._settings.cursor)
+        if self._settings.cursor is not None:
+            self.viewer.viewport.setCursor(self._settings.cursor)
         self.viewer.viewport.installEventFilter(self)
 
     def deactivate(self):
@@ -397,6 +395,8 @@ class LayeredImageViewerTool(ViewerTool):
         return layer
 
     def activate(self):
+        self.viewer.disable_panning()
+
         super().activate()
 
         image_layer_props = self.layers_props['image']
@@ -425,6 +425,8 @@ class LayeredImageViewerTool(ViewerTool):
         self._remove_tool_mask_layer()
 
         super().deactivate()
+
+        self.viewer.enable_panning()
 
     def _on_layer_image_updated(self):
         self.mask_layer = None

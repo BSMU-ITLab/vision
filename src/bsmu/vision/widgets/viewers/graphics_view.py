@@ -36,15 +36,21 @@ class GraphicsViewSettings(Settings):
 
 
 class GraphicsView(QGraphicsView):
+    zoom_finished = Signal()
+    scrollable_reset = Signal()
+
     def __init__(self, scene: QGraphicsScene, settings: GraphicsViewSettings):
         super().__init__()
 
         self.setScene(scene)
 
+        self._view_pan: _ViewPan | None = None
+        self._is_scrollable: bool | None = None
+
         self._settings = settings
         if self._settings.zoomable:
             self.enable_zooming()
-        self._enable_panning()
+        self.enable_panning()
 
         self._cur_scale = self._calculate_scale()
 
@@ -69,21 +75,39 @@ class GraphicsView(QGraphicsView):
         # self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         # Now we override the scrollContentsBy method instead of changing the mode to FullViewportUpdate
 
+    @property
+    def is_scrollable(self) -> bool:
+        if self._is_scrollable is None:
+            transformed_scene_rect = self.transform().mapRect(self.sceneRect())
+            viewport_rect = self.viewport().rect()
+
+            can_scroll_horizontally = transformed_scene_rect.width() > viewport_rect.width()
+            can_scroll_vertically = transformed_scene_rect.height() > viewport_rect.height()
+
+            self._is_scrollable = can_scroll_horizontally or can_scroll_vertically
+        return self._is_scrollable
+
     def enable_zooming(self):
         self.setTransformationAnchor(QGraphicsView.NoAnchor)
         self.setResizeAnchor(QGraphicsView.NoAnchor)
 
         view_smooth_zoom = _ViewSmoothZoom(self, self._settings.zoom_settings, self)
         view_smooth_zoom.zoom_finished.connect(self._on_zoom_finished)
+        view_smooth_zoom.zoom_finished.connect(self.zoom_finished)
         self.viewport().installEventFilter(view_smooth_zoom)
 
-    def _enable_panning(self):
+    def enable_panning(self):
         # We can use |setDragMode| method, but that will not allow to add some inertia after drag
         # (like during drag and scroll on mobile phones)
         # self.setDragMode(QGraphicsView.ScrollHandDrag)
 
-        view_pan = _ViewPan(self, self)
-        view_pan.activate()
+        if self._view_pan is None:
+            self._view_pan = _ViewPan(self, self)
+        self._view_pan.activate()
+
+    def disable_panning(self):
+        if self._view_pan is not None:
+            self._view_pan.deactivate()
 
     def set_visualized_scene_rect(self, rect: QRectF):
         self.setSceneRect(rect)
@@ -126,6 +150,11 @@ class GraphicsView(QGraphicsView):
 
         self._update_viewport_anchors()
 
+    def _reset_scrollable(self):
+        if self._is_scrollable is not None:
+            self._is_scrollable = None
+            self.scrollable_reset.emit()
+
     def _calculate_scale(self) -> float:
         cur_transform = self.transform()
         assert cur_transform.m11() == cur_transform.m22(), 'Scaled without keeping aspect ratio'
@@ -136,6 +165,7 @@ class GraphicsView(QGraphicsView):
 
     def _on_zoom_finished(self):
         self._update_scale()
+        self._reset_scrollable()
         self._update_viewport_anchors()
 
     def _update_viewport_anchors(self):
@@ -259,27 +289,51 @@ class _ZoomTimeLine(QTimeLine):
 
 
 class _ViewPan(QObject):
-    def __init__(self, view: QGraphicsView, parent: QObject = None):
+    def __init__(self, view: GraphicsView, parent: QObject = None):
         super().__init__(parent)
 
         self._view = view
 
         self._old_pos = None
 
+        self._is_active = False
+
+        self._view.scrollable_reset.connect(self._update_cursor)
+
+    @property
+    def is_panning(self) -> bool:
+        return self._old_pos is not None
+
     def activate(self):
+        if self._is_active:
+            return
+
         self._view.setTransformationAnchor(QGraphicsView.NoAnchor)
+        self._update_cursor()
         self._view.viewport().installEventFilter(self)
+
+        self._is_active = True
+
+    def deactivate(self):
+        if not self._is_active:
+            return
+
+        self._view.viewport().removeEventFilter(self)
+
+        self._reset()
+
+        self._is_active = False
 
     def eventFilter(self, watched_obj, event):
         if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
-            self._view.setCursor(Qt.ClosedHandCursor)
             self._old_pos = self.event_pos(event)
+            self._update_cursor()
             return True
-        elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
+        elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton and self.is_panning:
             self._old_pos = None
-            self._view.unsetCursor()
+            self._update_cursor()
             return False
-        elif event.type() == QEvent.MouseMove and event.buttons() == Qt.LeftButton and self._old_pos is not None:
+        elif event.type() == QEvent.MouseMove and event.buttons() == Qt.LeftButton and self.is_panning:
             new_pos = self.event_pos(event)
             delta = self._view.mapToScene(new_pos.toPoint()) - self._view.mapToScene(self._old_pos.toPoint())
             self._view.translate(delta.x(), delta.y())
@@ -291,3 +345,17 @@ class _ViewPan(QObject):
     @staticmethod
     def event_pos(event: QMouseEvent):
         return event.position()
+
+    def _reset(self):
+        self._old_pos = None
+        self._view.viewport().unsetCursor()
+
+    def _set_cursor(self, cursor_shape: Qt.CursorShape):
+        self._view.viewport().setCursor(cursor_shape)
+
+    def _update_cursor(self):
+        if self._view.is_scrollable:
+            cursor_shape = Qt.ClosedHandCursor if self.is_panning else Qt.OpenHandCursor
+        else:
+            cursor_shape = Qt.ArrowCursor
+        self._set_cursor(cursor_shape)

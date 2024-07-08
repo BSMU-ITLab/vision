@@ -539,6 +539,12 @@ class LayeredImageViewer(DataViewer):
     def remove_graphics_item(self, item: QGraphicsItem):
         self.graphics_scene.removeItem(item)
 
+    def enable_panning(self):
+        self.graphics_view.enable_panning()
+
+    def disable_panning(self):
+        self.graphics_view.disable_panning()
+
     def _on_data_changing(self):
         if self.data is None:
             return

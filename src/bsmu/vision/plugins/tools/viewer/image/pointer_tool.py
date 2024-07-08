@@ -19,7 +19,11 @@ if TYPE_CHECKING:
 
 
 class PointerImageViewerTool(ViewerTool):
-    ...
+    def activate(self):
+        pass
+
+    def deactivate(self):
+        pass
 
 
 class PointerImageViewerToolSettings(ViewerToolSettings):

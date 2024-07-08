@@ -1,11 +1,12 @@
 <!--
 To generate a *.py file use the next command in the terminal:
-..\vision\vision-plugins\src\bsmu\vision\plugins\tools\images> pyside6-rcc icons.qrc -o icons_rc.py
+..\vision\src\bsmu\vision\plugins\tools\images> pyside6-rcc icons.qrc -o icons_rc.py
 -->
 
 <!DOCTYPE RCC>
 <RCC version="1.0">
 <qresource>
     <file>icons/brush.svg</file>
+    <file>icons/hand.svg</file>
 </qresource>
 </RCC>

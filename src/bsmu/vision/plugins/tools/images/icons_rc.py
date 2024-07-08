@@ -1,6 +1,6 @@
 # Resource object code (Python 3)
 # Created by: object code
-# Created by: The Resource Compiler for Qt version 6.2.3
+# Created by: The Resource Compiler for Qt version 6.7.1
 # WARNING! All changes made in this file will be lost!
 
 from PySide6 import QtCore
@@ -174,6 +174,228 @@ r:#000000\x22\x0a     \
 etypes=\x22csssssc\x22\
  /></g></g></svg\
 >\x0a\
+\x00\x00\x0d\xbf\
+<\
+?xml version=\x221.\
+0\x22 encoding=\x22UTF\
+-8\x22 standalone=\x22\
+no\x22?>\x0a<!-- Creat\
+ed with Inkscape\
+ (http://www.ink\
+scape.org/) -->\x0a\
+\x0a<svg\x0a   width=\x22\
+4.5529218mm\x22\x0a   \
+height=\x225.656842\
+2mm\x22\x0a   viewBox=\
+\x220 0 4.5529219 5\
+.6568424\x22\x0a   ver\
+sion=\x221.1\x22\x0a   id\
+=\x22svg3354\x22\x0a   in\
+kscape:version=\x22\
+1.2 (dc2aedaf03,\
+ 2022-05-15)\x22\x0a  \
+ sodipodi:docnam\
+e=\x22hand.svg\x22\x0a   \
+xml:space=\x22prese\
+rve\x22\x0a   xmlns:in\
+kscape=\x22http://w\
+ww.inkscape.org/\
+namespaces/inksc\
+ape\x22\x0a   xmlns:so\
+dipodi=\x22http://s\
+odipodi.sourcefo\
+rge.net/DTD/sodi\
+podi-0.dtd\x22\x0a   x\
+mlns=\x22http://www\
+.w3.org/2000/svg\
+\x22\x0a   xmlns:svg=\x22\
+http://www.w3.or\
+g/2000/svg\x22><sod\
+ipodi:namedview\x0a\
+     id=\x22namedvi\
+ew3356\x22\x0a     pag\
+ecolor=\x22#505050\x22\
+\x0a     bordercolo\
+r=\x22#eeeeee\x22\x0a    \
+ borderopacity=\x22\
+1\x22\x0a     inkscape\
+:showpageshadow=\
+\x220\x22\x0a     inkscap\
+e:pageopacity=\x220\
+\x22\x0a     inkscape:\
+pagecheckerboard\
+=\x220\x22\x0a     inksca\
+pe:deskcolor=\x22#5\
+05050\x22\x0a     inks\
+cape:document-un\
+its=\x22mm\x22\x0a     sh\
+owgrid=\x22false\x22\x0a \
+    inkscape:zoo\
+m=\x2222.627417\x22\x0a  \
+   inkscape:cx=\x22\
+10.363534\x22\x0a     \
+inkscape:cy=\x2211.\
+578874\x22\x0a     ink\
+scape:window-wid\
+th=\x221920\x22\x0a     i\
+nkscape:window-h\
+eight=\x221027\x22\x0a   \
+  inkscape:windo\
+w-x=\x22-8\x22\x0a     in\
+kscape:window-y=\
+\x22-8\x22\x0a     inksca\
+pe:window-maximi\
+zed=\x221\x22\x0a     ink\
+scape:current-la\
+yer=\x22layer1\x22 /><\
+defs\x0a     id=\x22de\
+fs3351\x22 /><g\x0a   \
+  inkscape:label\
+=\x22\xd0\xa1\xd0\xbb\xd0\xbe\xd0\xb9 1\x22\x0a  \
+   inkscape:grou\
+pmode=\x22layer\x22\x0a  \
+   id=\x22layer1\x22\x0a \
+    transform=\x22t\
+ranslate(-98.938\
+071,-159.63037)\x22\
+><path\x0a       st\
+yle=\x22fill:#fffff\
+f;fill-opacity:1\
+;stroke:#000000;\
+stroke-width:0.2\
+2;stroke-linecap\
+:round;stroke-li\
+nejoin:round;str\
+oke-dasharray:no\
+ne;stroke-opacit\
+y:1\x22\x0a       d=\x22m\
+ 101.14072,165.1\
+761 c 0.35558,-0\
+.003 0.71335,0.0\
+07 1.06756,-0.00\
+5 0.12868,-0.022\
+4 0.39965,-0.148\
+09 0.52292,-0.23\
+071 0.13917,-0.0\
+981 0.24586,-0.1\
+9891 0.34018,-0.\
+32199 0.13973,-0\
+.18841 0.2468,-0\
+.40178 0.29137,-\
+0.63599 0.0365,-\
+0.18399 0.002,-0\
+.37693 0.0106,-0\
+.56458 v -2.4793\
+5 c -0.033,-0.31\
+511 -0.28057,-0.\
+33848 -0.40484,-\
+0.33388 -0.23887\
+,0.009 -0.31851,\
+0.21055 -0.31851\
+,0.21055 0,0 9.7\
+e-4,-0.42527 -0.\
+006,-0.47668 -0.\
+0235,-0.17308 -0\
+.10462,-0.27486 \
+-0.26655,-0.3246\
+ -0.29974,-0.092\
+1 -0.46372,0.149\
+17 -0.46372,0.14\
+917 0,0 -0.0103,\
+-0.14551 -0.0187\
+,-0.17638 -0.040\
+3,-0.14746 -0.18\
+699,-0.24135 -0.\
+32767,-0.24592 -\
+0.21075,-0.007 -\
+0.288,0.0815 -0.\
+33757,0.16972 -0\
+.0476,0.0774 -0.\
+0649,0.15502 -0.\
+073,0.303 -0.070\
+4,-0.1455 -0.141\
+1,-0.17071 -0.20\
+022,-0.19033 -0.\
+23338,-0.0598 -0\
+.37519,0.008 -0.\
+46941,0.10221 -0\
+.0901,0.12285 -0\
+.11616,0.23201 -\
+0.11072,0.38071 \
+-0.004,0.94693 0\
+.002,1.89391 0,2\
+.84086 -0.004,0.\
+0522 -0.044,0.12\
+928 -0.1574,0.06\
+35 -0.270214,-0.\
+12702 -0.419016,\
+-0.23567 -0.6891\
+86,-0.35951 -0.1\
+74801,-0.0652 -0\
+.392685,0.0463 -\
+0.446212,0.18727\
+ -0.02938,0.052 \
+-0.07586,0.25633\
+ 0.03229,0.36214\
+ 0.46839,0.4441 \
+0.930208,0.89761\
+ 1.401988,1.3366\
+4 0.22373,0.1612\
+7 0.38144,0.2284\
+1 0.62192,0.2390\
+4 z\x22\x0a       id=\x22\
+path1216-3\x22\x0a    \
+   sodipodi:node\
+types=\x22cccccccsc\
+sscssccccccccccc\
+cc\x22 /><path\x0a    \
+   style=\x22fill:n\
+one;stroke:#0000\
+00;stroke-width:\
+0.22;stroke-line\
+cap:round;stroke\
+-linejoin:miter;\
+stroke-dasharray\
+:none;stroke-opa\
+city:1\x22\x0a       d\
+=\x22m 102.64894,16\
+0.84572 v 1.0855\
+5\x22\x0a       id=\x22pa\
+th7096-8\x22\x0a      \
+ sodipodi:nodety\
+pes=\x22cc\x22 /><path\
+\x0a       style=\x22f\
+ill:none;stroke:\
+#000000;stroke-w\
+idth:0.221165;st\
+roke-linecap:rou\
+nd;stroke-linejo\
+in:miter;stroke-\
+dasharray:none;s\
+troke-opacity:1\x22\
+\x0a       d=\x22m 101\
+.91398,160.18718\
+ v 1.74529\x22\x0a    \
+   id=\x22path7096-\
+4-5\x22\x0a       sodi\
+podi:nodetypes=\x22\
+cc\x22 /><path\x0a    \
+   style=\x22fill:n\
+one;stroke:#0000\
+00;stroke-width:\
+0.221182;stroke-\
+linecap:round;st\
+roke-linejoin:mi\
+ter;stroke-dasha\
+rray:none;stroke\
+-opacity:1\x22\x0a    \
+   d=\x22m 101.1576\
+1,160.21494 v 1.\
+71681\x22\x0a       id\
+=\x22path7096-4-6-9\
+\x22\x0a       sodipod\
+i:nodetypes=\x22cc\x22\
+ /></g></svg>\x0a\
 "
 
 qt_resource_name = b"\
@@ -185,13 +407,19 @@ qt_resource_name = b"\
 \x0c\x9b\x89\xe7\
 \x00b\
 \x00r\x00u\x00s\x00h\x00.\x00s\x00v\x00g\
+\x00\x08\
+\x08GW\x07\
+\x00h\
+\x00a\x00n\x00d\x00.\x00s\x00v\x00g\
 "
 
 qt_resource_struct = b"\
 \x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x01\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x02\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00\x02\
 \x00\x00\x00\x00\x00\x00\x00\x00\
+\x00\x00\x00(\x00\x00\x00\x00\x00\x01\x00\x00\x0aW\
+\x00\x00\x01\x90\x92\xf2l\xe4\
 \x00\x00\x00\x10\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
 \x00\x00\x01\x86oV\xce\x02\
 "

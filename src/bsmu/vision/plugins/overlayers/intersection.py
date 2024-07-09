@@ -13,26 +13,28 @@ from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
     from bsmu.vision.core.data import Data
-    from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
-    from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
-    from bsmu.vision.widgets.mdi.windows import DataViewerSubWindow
+    from bsmu.vision.plugins.post_load_converters.manager import (
+        PostLoadConversionManager, PostLoadConversionManagerPlugin
+    )
+    from bsmu.vision.plugins.loaders.manager import FileLoadingManager, FileLoadingManagerPlugin
 
 
 class ImageViewerIntersectionOverlayerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
-        'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',
+        'post_load_conversion_manager_plugin':
+            'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
         'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
     }
 
     def __init__(
             self,
-            data_visualization_manager_plugin: DataVisualizationManagerPlugin,
+            post_load_conversion_manager_plugin: PostLoadConversionManagerPlugin,
             file_loading_manager_plugin: FileLoadingManagerPlugin,
     ):
         super().__init__()
 
-        self._data_visualization_manager_plugin = data_visualization_manager_plugin
-        self._data_visualization_manager: DataVisualizationManager | None = None
+        self._post_load_conversion_manager_plugin = post_load_conversion_manager_plugin
+        self._post_load_conversion_manager: PostLoadConversionManager | None = None
 
         self._file_loading_manager_plugin = file_loading_manager_plugin
         self._file_loading_manager: FileLoadingManager | None = None
@@ -40,21 +42,20 @@ class ImageViewerIntersectionOverlayerPlugin(Plugin):
         self._overlayer: ImageViewerIntersectionOverlayer | None = None
 
     def _enable(self):
-        self._data_visualization_manager = self._data_visualization_manager_plugin.data_visualization_manager
+        self._post_load_conversion_manager = self._post_load_conversion_manager_plugin.post_load_conversion_manager
         self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
 
         self._overlayer = ImageViewerIntersectionOverlayer(
-            self._data_visualization_manager,
             self._file_loading_manager,
             self.config.value('layers'),
             self.config.value('intersection_layer'),
         )
 
-        self._data_visualization_manager.data_visualized.connect(
+        self._post_load_conversion_manager.data_converted.connect(
             self._overlayer.overlay_sibling_dirs_mask_intersection)
 
     def _disable(self):
-        self._data_visualization_manager.data_visualized.disconnect(
+        self._post_load_conversion_manager.data_converted.disconnect(
             self._overlayer.overlay_sibling_dirs_mask_intersection)
 
         self._overlayer = None
@@ -63,19 +64,17 @@ class ImageViewerIntersectionOverlayerPlugin(Plugin):
 class ImageViewerIntersectionOverlayer(QObject):
     def __init__(
             self,
-            visualization_manager: DataVisualizationManager,
-            loading_manager: FileLoadingManager,
+            file_loading_manager: FileLoadingManager,
             layers_properties: dict,
             intersection_layer_properties: dict,
     ):
         super().__init__()
 
-        self._visualization_manager = visualization_manager
-        self._loading_manager = loading_manager
+        self._file_loading_manager = file_loading_manager
         self._layers_properties = layers_properties
         self._intersection_layer_properties = intersection_layer_properties
 
-    def overlay_sibling_dirs_mask_intersection(self, data: Data, data_viewer_sub_windows: DataViewerSubWindow):
+    def overlay_sibling_dirs_mask_intersection(self, data: Data):
         if not isinstance(data, LayeredImage):
             return
 
@@ -105,7 +104,7 @@ class ImageViewerIntersectionOverlayer(QObject):
             palette_layer_index = i + 1
             color_property = layer_properties.get('color')
             intersection_palette_array[palette_layer_index] = color_property
-            new_image = self._loading_manager.load_file(new_layer_image_path)
+            new_image = self._file_loading_manager.load_file(new_layer_image_path)
             if not isinstance(new_image, Image):
                 continue
 

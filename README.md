@@ -1,10 +1,14 @@
 # Vision
+
 Application to work with images and other visual information. \
 The app contains a lot of plugins to preprocess and analyze segmentation results. Necessary plugins can be enabled/disabled using plugin manager.
 
 ## Python environment
-python 3.10 \
-`pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcontainers onnxruntime-gpu pandas nibabel pydicom slideio tifffile pytest toml cx-freeze`
+
+python 3.10
+```bash
+pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcontainers onnxruntime-gpu pandas nibabel pydicom slideio tifffile pytest toml cx-freeze
+```
 
 ### Mandatory Dependencies
 
@@ -37,3 +41,7 @@ python 3.10 \
 - **Build and Packaging**
   - **toml**: Configuration for PyPI packages.
   - **cx-freeze**: Creates standalone executables and installers.
+
+## Contributing
+
+For guidelines on contributing, please see [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,6 +1,6 @@
 # Vision
 
-Application to work with images and other visual information. \
+Application to work with images and other visual information.<br>
 The app contains a lot of plugins to preprocess and analyze segmentation results. Necessary plugins can be enabled/disabled using plugin manager.
 
 ## Python environment

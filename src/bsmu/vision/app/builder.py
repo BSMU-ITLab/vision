@@ -41,7 +41,7 @@ class AppBuilder:
         'numpy.core',
         'ruamel.yaml',
         'scipy.fftpack', 'scipy.ndimage',
-        'skimage.color', 'skimage.io', 'skimage.util', 'skimage.exposure', 'skimage.draw',
+        'skimage.color', 'skimage.io', 'skimage.util', 'skimage.exposure', 'skimage.draw', 'skimage.measure',
         # To fix an error in a frozen build: unsupported operand type(s) for | operator.
         # See the same issue in the PyInstaller: https://github.com/pyinstaller/pyinstaller/issues/7249
         'PySide6.support.deprecated',

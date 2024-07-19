@@ -15,12 +15,13 @@ from PySide6.QtWidgets import QFormLayout, QSpinBox
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.image.base import MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
-from bsmu.vision.plugins.tools.viewer.base import ViewerToolPlugin, LayeredImageViewerTool, \
-    LayeredImageViewerToolSettings, ViewerToolSettingsWidget
+from bsmu.vision.plugins.tools.viewer.base import (
+    LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget,
+)
 from bsmu.vision.plugins.undo import UndoCommand
 
 if TYPE_CHECKING:
-    from typing import Sequence, Type
+    from typing import Sequence
 
     from PySide6.QtCore import QObject, QPoint
     from PySide6.QtWidgets import QWidget
@@ -28,9 +29,9 @@ if TYPE_CHECKING:
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.core.image.base import FlatImage
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
-    from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
+    from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
     from bsmu.vision.plugins.tools.viewer.base import ViewerTool, ViewerToolSettings
-    from bsmu.vision.plugins.undo import UndoPlugin, UndoManager
+    from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
 
@@ -702,9 +703,9 @@ class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             mdi_plugin: MdiPlugin,
             undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
-            tool_cls: Type[ViewerTool] = WsiSmartBrushImageViewerTool,
-            tool_settings_cls: Type[ViewerToolSettings] = WsiSmartBrushImageViewerToolSettings,
-            tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = WsiSmartBrushImageViewerToolSettingsWidget,
+            tool_cls: type[ViewerTool] = WsiSmartBrushImageViewerTool,
+            tool_settings_cls: type[ViewerToolSettings] = WsiSmartBrushImageViewerToolSettings,
+            tool_settings_widget_cls: type[ViewerToolSettingsWidget] = WsiSmartBrushImageViewerToolSettingsWidget,
             action_name: str = 'Smart Brush (WSI)',
             action_shortcut: Qt.Key = Qt.Key_2,
     ):

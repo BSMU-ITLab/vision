@@ -22,7 +22,7 @@ from bsmu.vision.app.builder import AppBuilder
 
 if __name__ == '__main__':
     app_builder = AppBuilder(
-        file_dir=Path(__file__).parent,
+        file_dir=Path(__file__).parent.parent,
 
         app_version=app.__version__,
     )

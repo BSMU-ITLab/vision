@@ -54,8 +54,8 @@ class AppBuilder:
 
     def __init__(
             self,
-            file_dir: Path = Path(__file__).parent,
-            script_path_relative_to_file_dir: Path = Path('src/bsmu/vision/app/__main__.py'),
+            project_dir: Path,
+            script_path_relative_to_project_dir: Path = Path('src/bsmu/vision/app/__main__.py'),
             build_dir: Path | None = None,
             dist_dir: Path | None = None,
 
@@ -63,7 +63,7 @@ class AppBuilder:
             app_version: str = '1.0.0',
             app_description: str = 'Base application for image visualization and processing '
                                    'that is easily extensible with plugins.',
-            icon_path_relative_to_file_dir: Path | None = None,
+            icon_path_relative_to_project_dir: Path | None = None,
 
             add_packages: List[str] | None = None,
             packages_with_data: List[ModuleType] | None = None,
@@ -73,20 +73,20 @@ class AppBuilder:
             install_exe_options: dict | None = None,
             bdist_msi_options: dict | None = None,
     ):
-        self._file_dir = file_dir
-        self._script_path_relative_to_file_dir = script_path_relative_to_file_dir
+        self._project_dir = project_dir
+        self._script_path_relative_to_project_dir = script_path_relative_to_project_dir
         self._build_name = f'{app_name.replace(" ", "")}-{app_version}'
-        self._build_dir = self._file_dir / self._BUILD_DIR_NAME / self._build_name \
+        self._build_dir = self._project_dir / self._BUILD_DIR_NAME / self._build_name \
             if build_dir is None else build_dir
-        self._dist_dir = self._file_dir / self._DIST_DIR_NAME if dist_dir is None else dist_dir
+        self._dist_dir = self._project_dir / self._DIST_DIR_NAME if dist_dir is None else dist_dir
 
         self._app_name = app_name
         self._app_version = app_version
         self._app_description = f'{self._app_name} - {app_description}'
-        if icon_path_relative_to_file_dir is None:
+        if icon_path_relative_to_project_dir is None:
             self._icon_path = Path(__file__).parent / 'images/icons/vision.ico'
         else:
-            self._icon_path = self._file_dir / icon_path_relative_to_file_dir
+            self._icon_path = self._project_dir / icon_path_relative_to_project_dir
 
         if build_exe_options is None:
             default_packages = self._BASE_BUILD_EXE_PACKAGES
@@ -110,7 +110,7 @@ class AppBuilder:
             if bdist_msi_options is None else bdist_msi_options
 
     def build(self):
-        script = self._file_dir / self._script_path_relative_to_file_dir
+        script = self._project_dir / self._script_path_relative_to_project_dir
         target_name = self._build_name
         shortcut_name = self._app_name
         shortcut_dir = 'DesktopFolder'

@@ -9,21 +9,17 @@
 
 To build app, install all required packages using pip
 For local dev packages use:
-    pip install -e /path/to/dir/with/setup.py
-Or add them to the system path, e.g. using:
-    sys.path.append('D:\\Projects\\vision\\vision-plugins')
+    pip install -e /path/to/package
+Make sure that `/path/to/package` is the directory where pyproject.toml file is located.
 """
 
 
 from pathlib import Path
 
-import bsmu.vision.app as app
 from bsmu.vision.app.builder import AppBuilder
 
 if __name__ == '__main__':
     app_builder = AppBuilder(
         project_dir=Path(__file__).resolve().parents[1],
-
-        app_version=app.__version__,
     )
     app_builder.build()

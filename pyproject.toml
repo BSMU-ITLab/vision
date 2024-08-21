@@ -13,13 +13,13 @@ authors = [
     { name = 'Ivan Kosik', email = 'ivankosik91@gmail.com' },
 ]
 keywords = [
-    'plugin-system',
-    'image-processing',
+    'plugin system',
+    'image processing',
     'annotation',
     'masking',
-    'medical-imaging',
-    'image-analysis',
-    'computer-vision',
+    'medical imaging',
+    'image analysis',
+    'computer vision',
 ]
 classifiers = [
     'Development Status :: 3 - Alpha',

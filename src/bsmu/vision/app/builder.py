@@ -60,9 +60,8 @@ class AppBuilder:
             dist_dir: Path | None = None,
 
             app_name: str = bsmu.vision.app.__title__,
-            app_version: str = '1.0.0',
-            app_description: str = 'Base application for image visualization and processing '
-                                   'that is easily extensible with plugins.',
+            app_version: str = bsmu.vision.app.__version__,
+            app_description: str = bsmu.vision.app.__description__,
             icon_path_relative_to_project_dir: Path | None = None,
 
             add_packages: List[str] | None = None,

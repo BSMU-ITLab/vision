@@ -148,5 +148,8 @@ class Palette:
                 [int.from_bytes([rgba[3], rgba[0], rgba[1], rgba[2]], byteorder='big') for rgba in self._array]
         return self._argb_quadruplets_cache
 
-    def row_index_by_name(self, name: str) -> int:
-        return self._row_index_by_name.get(name)
+    def row_index_by_name(self, name: str, default: int = None) -> int:
+        row_index = self._row_index_by_name.get(name, default)
+        if not isinstance(row_index, int):
+            raise KeyError(f'`{name}` not found in the dictionary and no valid default integer value provided.')
+        return row_index

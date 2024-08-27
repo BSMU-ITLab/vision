@@ -25,7 +25,14 @@ def find_modules_of_package_recursively(package: ModuleType, indent: int = 0):
     print(f'{indent_str}package:', package)
     for finder, name, ispkg in iter_namespace_package_modules(package):
         # print('Try to import:', name)  # Use this print to find current package or module with errors during import
-        module_or_package = importlib.import_module(name)
+
+        # Skip modules for which some dependencies are not installed
+        try:
+            module_or_package = importlib.import_module(name)
+        except ModuleNotFoundError:
+            print(f'Cannot import `{name}`, because during import some module not found')
+            continue
+
         if ispkg:
             yield from find_modules_of_package_recursively(module_or_package, indent + 1)
         else:

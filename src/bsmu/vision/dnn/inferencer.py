@@ -82,11 +82,11 @@ class ImageModelParams(ModelParams):
             image = image[:, :, :3]
 
         if image.shape[:DEFAULT_CHANNELS_AXIS] != self.input_image_size:
-            image = image.astype(np.float_)
+            image = image.astype(np.float64)
             image = cv.resize(image, self.input_image_size, interpolation=cv.INTER_AREA)
 
         if self.normalize:
-            image = image_converter.normalized(image).astype(np.float_)
+            image = image_converter.normalized(image).astype(np.float64)
 
         mean = None
         std = None

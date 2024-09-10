@@ -161,4 +161,7 @@ class Inferencer(QObject):
                 self._inference_session = ort.InferenceSession(
                     str(self._model_params.path), providers=[CPU_PROVIDER])
 
+            used_provider = self._inference_session.get_providers()[0]
+            logging.info(f'Using ONNX `{used_provider}`')
+
             self._inference_session_being_created = False

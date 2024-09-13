@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
 
 if TYPE_CHECKING:
-    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
     from bsmu.vision.widgets.viewers.image.layered.slice import VolumeSliceImageViewer
 
 

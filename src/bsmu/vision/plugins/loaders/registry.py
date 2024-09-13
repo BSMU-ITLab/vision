@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from bsmu.vision.core.plugins.processor.registry import ProcessorRegistryPlugin, ProcessorRegistry
-from bsmu.vision.plugins.loaders.base import FileLoaderPlugin
+from bsmu.vision.plugins.loaders.file import FileLoaderPlugin
 
 
 class FileLoaderRegistryPlugin(ProcessorRegistryPlugin):

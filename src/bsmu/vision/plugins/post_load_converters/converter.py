@@ -5,7 +5,7 @@ import abc
 from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.data import Data
-from bsmu.vision.core.plugins.processor.base import ProcessorPlugin
+from bsmu.vision.core.plugins.processor import ProcessorPlugin
 
 
 class PostLoadConverterPlugin(ProcessorPlugin):

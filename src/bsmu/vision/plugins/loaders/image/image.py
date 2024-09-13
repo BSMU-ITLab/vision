@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 from typing import Type
 
-from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
+from bsmu.vision.plugins.loaders.file import FileLoaderPlugin, FileLoader
 
 
 class ImageFileLoaderPlugin(FileLoaderPlugin):

@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 import nibabel as nib
 import numpy as np
 
-from bsmu.vision.core.image.base import VolumeImage, SpatialAttrs
-from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
+from bsmu.vision.core.image import VolumeImage, SpatialAttrs
+from bsmu.vision.plugins.loaders.file import FileLoaderPlugin, FileLoader
 
 if TYPE_CHECKING:
     from pathlib import Path

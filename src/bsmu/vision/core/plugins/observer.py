@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 
 
 class ObserverPlugin(Plugin):

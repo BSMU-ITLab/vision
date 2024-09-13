@@ -1,1 +1,1 @@
-from .base import Processor, ProcessorPlugin
+from .processor import Processor, ProcessorPlugin, ProcessorClsWithSettings

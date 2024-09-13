@@ -1,1 +1,1 @@
-from .base import VisionStyle
+from .style import VisionStyle

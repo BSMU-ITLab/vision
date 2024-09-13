@@ -8,11 +8,11 @@ from PySide6.QtGui import QCursor, QPixmap, QAction, QIcon
 from PySide6.QtWidgets import QWidget, QDockWidget
 
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.tools.images import icons_rc  # noqa: F401
 from bsmu.vision.plugins.windows.main import ToolsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
-from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
+from bsmu.vision.widgets.viewers.image.layered import ImageLayerView
 
 if TYPE_CHECKING:
     import numpy as np
@@ -20,14 +20,15 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QMdiSubWindow
 
     from bsmu.vision.core.config.united import UnitedConfig
-    from bsmu.vision.core.image.base import Image, FlatImage
+    from bsmu.vision.core.image import Image, FlatImage
+    from bsmu.vision.core.image.layered import ImageLayer
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
     from bsmu.vision.plugins.undo import UndoPlugin, UndoManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
-    from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
-    from bsmu.vision.widgets.viewers.base import DataViewer
-    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayer
+    from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
+    from bsmu.vision.widgets.viewers.data import DataViewer
+    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 
 LAYER_NAME_PROPERTY_KEY = 'name'

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bsmu.vision.tools.viewer.image.layered.base import LayeredImageViewerTool
+from bsmu.vision.tools.viewer.image.layered import LayeredImageViewerTool
 
 
 class SmartBrushImageViewerTool(LayeredImageViewerTool):

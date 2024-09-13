@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
-from bsmu.vision.core.plugins.processor.base import ProcessorPlugin
-from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+from bsmu.vision.core.plugins.processor import ProcessorPlugin
+from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
 
 if TYPE_CHECKING:
     from typing import List, Type

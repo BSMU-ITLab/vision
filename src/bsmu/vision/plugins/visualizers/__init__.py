@@ -1,1 +1,1 @@
-from .base import DataVisualizer, DataVisualizerPlugin
+from .visualizer import DataVisualizer, DataVisualizerPlugin

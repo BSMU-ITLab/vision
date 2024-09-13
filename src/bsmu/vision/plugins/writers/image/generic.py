@@ -8,11 +8,11 @@ import skimage.io
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bsmu.vision.plugins.windows.main import FileMenu
-from bsmu.vision.plugins.writers.base import FileWriterPlugin, FileWriter
-from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewerHolder
+from bsmu.vision.plugins.writers.file import FileWriterPlugin, FileWriter
+from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewerHolder
 
 if TYPE_CHECKING:
-    from bsmu.vision.core.image.base import Image
+    from bsmu.vision.core.image import Image
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
 

@@ -8,7 +8,7 @@ from bsmu.vision.core.settings import Settings
 from bsmu.vision.plugins.settings import SettingsPlugin
 
 if TYPE_CHECKING:
-    from bsmu.vision.core.config.united import UnitedConfig
+    from bsmu.vision.core.config import UnitedConfig
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
 
 

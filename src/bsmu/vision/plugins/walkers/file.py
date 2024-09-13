@@ -4,19 +4,19 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt
 
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from bsmu.vision.core.image import ImageLayer
+    from bsmu.vision.core.image.layered import ImageLayer
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
-    from bsmu.vision.widgets.mdi.windows import DataViewerSubWindow
+    from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
-    from bsmu.vision.widgets.viewers.image import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 
 class MdiImageLayerFileWalkerPlugin(Plugin):

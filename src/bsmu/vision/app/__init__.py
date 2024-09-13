@@ -1,4 +1,4 @@
-from .base import App
+from .app import App
 from .version import __version__
 
 

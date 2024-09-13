@@ -1,1 +1,1 @@
-from .base import ImageVisualizer, ImageVisualizerPlugin
+from .image import ImageVisualizer, ImageVisualizerPlugin

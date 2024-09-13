@@ -16,10 +16,10 @@ from PySide6.QtWidgets import QApplication
 from bsmu.vision.app.logger import ColoredFormatter, RotatingFileHandlerWithSeparator, SimpleFormatter
 from bsmu.vision.app.plugin_manager import PluginManager
 from bsmu.vision.core.concurrent import ThreadPool
-from bsmu.vision.core.config.united import UnitedConfig
+from bsmu.vision.core.config import UnitedConfig
 from bsmu.vision.core.data_file import DataFileProvider
 from bsmu.vision.core.freeze import is_app_frozen
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.dnn.config import OnnxConfig
 
 if TYPE_CHECKING:

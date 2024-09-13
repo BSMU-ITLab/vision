@@ -4,7 +4,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSizePolicy, QFrame, QButtonGroup
 
-from bsmu.vision.widgets.styles.base import VisionStyle
+from bsmu.vision.widgets.styles import VisionStyle
 
 
 class GenderButton(QPushButton):

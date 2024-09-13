@@ -6,7 +6,7 @@ from PySide6.QtCore import QObject
 
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:

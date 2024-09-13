@@ -1,1 +1,1 @@
-from .base import Plugin
+from .plugin import Plugin

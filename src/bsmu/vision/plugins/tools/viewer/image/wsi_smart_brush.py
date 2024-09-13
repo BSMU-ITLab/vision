@@ -13,11 +13,10 @@ from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import QFormLayout, QSpinBox
 
 from bsmu.vision.core.bbox import BBox
-from bsmu.vision.core.image.base import MASK_MAX
+from bsmu.vision.core.image import MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
-from bsmu.vision.plugins.tools.viewer.base import (
-    LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget,
-)
+from bsmu.vision.plugins.tools.viewer import (
+    LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget)
 from bsmu.vision.plugins.undo import UndoCommand
 
 if TYPE_CHECKING:
@@ -27,13 +26,13 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.core.config.united import UnitedConfig
-    from bsmu.vision.core.image.base import FlatImage
+    from bsmu.vision.core.image import FlatImage
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
-    from bsmu.vision.plugins.tools.viewer.base import ViewerTool, ViewerToolSettings
+    from bsmu.vision.plugins.tools.viewer import ViewerTool, ViewerToolSettings
     from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
-    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 
 class Mode(Enum):

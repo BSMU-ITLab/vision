@@ -1,1 +1,1 @@
-from .base import ImageViewerOverlayerPlugin
+from .image import ImageViewerOverlayerPlugin

@@ -8,8 +8,8 @@ import numpy as np
 import skimage.io
 import slideio
 
-from bsmu.vision.core.image.base import FlatImage
-from bsmu.vision.plugins.loaders.image.base import ImageFileLoaderPlugin, ImageFileLoader
+from bsmu.vision.core.image import FlatImage
+from bsmu.vision.plugins.loaders.image import ImageFileLoaderPlugin, ImageFileLoader
 from pathlib import Path
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.path import is_ascii_path

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject
 
 if TYPE_CHECKING:
-    from bsmu.vision.core.config.united import UnitedConfig
+    from bsmu.vision.core.config import UnitedConfig
 
 
 class Settings(QObject):

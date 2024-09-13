@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 from bsmu.vision.core.plugins.observer import ObserverPlugin
 
 if TYPE_CHECKING:
-    from bsmu.vision.core.plugins.base import Plugin
-    from bsmu.vision.core.plugins.processor.base import Processor, ProcessorClsWithSettings
+    from bsmu.vision.core.plugins import Plugin
+    from bsmu.vision.core.plugins.processor import Processor, ProcessorClsWithSettings
     from typing import Type, Hashable
 
 

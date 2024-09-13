@@ -1,1 +1,1 @@
-from .base import NiftiFileLoader, NiftiFileLoaderPlugin
+from .nifti import NiftiFileLoader, NiftiFileLoaderPlugin

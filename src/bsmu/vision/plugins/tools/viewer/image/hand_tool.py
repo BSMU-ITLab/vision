@@ -4,10 +4,8 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QObject
 
-from bsmu.vision.plugins.tools.viewer.base import (
-    ViewerToolPlugin, ViewerToolSettingsWidget,
-    ViewerTool, ViewerToolSettings,
-)
+from bsmu.vision.plugins.tools.viewer import (
+    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerTool, ViewerToolSettings)
 
 if TYPE_CHECKING:
     from typing import Type

@@ -8,7 +8,7 @@ from PySide6.QtGui import QUndoGroup, QUndoStack, QUndoCommand, QKeySequence
 from PySide6.QtWidgets import QUndoView, QDockWidget
 
 from bsmu.vision.core.abc import QABCMeta
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.windows.main import EditMenu, WindowsMenu
 
 if TYPE_CHECKING:

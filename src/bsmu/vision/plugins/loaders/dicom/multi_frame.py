@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 import pydicom
 
-from bsmu.vision.core.image.base import VolumeImage
-from bsmu.vision.plugins.loaders.base import FileLoaderPlugin, FileLoader
+from bsmu.vision.core.image import VolumeImage
+from bsmu.vision.plugins.loaders.file import FileLoaderPlugin, FileLoader
 
 if TYPE_CHECKING:
     from pathlib import Path

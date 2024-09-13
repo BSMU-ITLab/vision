@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import partial
 from typing import List, Union
 
-from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
+from bsmu.vision.widgets.viewers.image.layered import ImageLayerView
 from bsmu.vision.widgets.visibility import VisibilityWidget
 
 

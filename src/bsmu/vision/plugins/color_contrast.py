@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PySide6.QtCore import QObject, Qt
 
-from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.core.image.base import VolumeImage
+from bsmu.vision.core.image import VolumeImage
 from bsmu.vision.core.palette import Palette
+from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
 from bsmu.vision.plugins.windows.main import AlgorithmsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow

@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PySide6.QtCore import QObject
 
-from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
+from bsmu.vision.core.plugins import Plugin
+from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
     from bsmu.vision.core.data import Data
-    from bsmu.vision.widgets.mdi.windows.base import DataViewerSubWindow
+    from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
 
 
 class MdiLayoutPlugin(Plugin):

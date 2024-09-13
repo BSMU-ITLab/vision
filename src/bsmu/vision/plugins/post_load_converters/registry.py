@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from bsmu.vision.core.plugins.processor.registry import ProcessorRegistryPlugin, ProcessorRegistry
-from bsmu.vision.plugins.post_load_converters.base import PostLoadConverterPlugin
+from bsmu.vision.plugins.post_load_converters import PostLoadConverterPlugin
 
 
 class PostLoadConverterRegistryPlugin(ProcessorRegistryPlugin):

@@ -9,11 +9,11 @@ from PySide6.QtGui import QPainter, QImage
 from PySide6.QtWidgets import QGridLayout, QGraphicsScene, QGraphicsObject, QGraphicsItem
 
 import bsmu.vision.core.converters.image as image_converter
-from bsmu.vision.core.image.base import Image, FlatImage
+from bsmu.vision.core.image import Image, FlatImage
 from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
-from bsmu.vision.core.models.base import positive_list_insert_index
+from bsmu.vision.core.models import positive_list_insert_index
 from bsmu.vision.core.settings import Settings
-from bsmu.vision.widgets.viewers.base import DataViewer
+from bsmu.vision.widgets.viewers.data import DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView, ZoomSettings, GraphicsViewSettings
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget, QStyleOptionGraphicsItem
 
     from bsmu.vision.core.bbox import BBox
-    from bsmu.vision.core.config.united import UnitedConfig
+    from bsmu.vision.core.config import UnitedConfig
     from bsmu.vision.core.palette import Palette
     from bsmu.vision.core.visibility import Visibility
 

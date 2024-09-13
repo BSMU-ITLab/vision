@@ -7,9 +7,8 @@ from PySide6.QtCore import QObject, Qt, QModelIndex
 from PySide6.QtWidgets import QTableView, QDockWidget
 
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
-from bsmu.vision.core.plugins.base import Plugin
-from bsmu.vision.widgets.viewers.image.layered.base import ImageLayerView
-from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewerHolder
+from bsmu.vision.core.plugins import Plugin
+from bsmu.vision.widgets.viewers.image.layered import ImageLayerView, LayeredImageViewerHolder
 from bsmu.vision.widgets.visibility_v2 import Visibility, VisibilityDelegate
 
 if TYPE_CHECKING:
@@ -20,7 +19,7 @@ if TYPE_CHECKING:
 
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
-    from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 
 class LayersTableViewPlugin(Plugin):

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import Type
 
-from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin, DataVisualizer
+from bsmu.vision.plugins.visualizers import DataVisualizerPlugin, DataVisualizer
 
 if TYPE_CHECKING:
     from bsmu.vision.core.settings import Settings

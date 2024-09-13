@@ -4,9 +4,9 @@ import logging
 from typing import TYPE_CHECKING
 
 from bsmu.vision.core.constants import PlaneAxis
-from bsmu.vision.core.image.base import VolumeImage
+from bsmu.vision.core.image import VolumeImage
 from bsmu.vision.core.image.layered import LayeredImage
-from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin, DataVisualizer
+from bsmu.vision.plugins.visualizers import DataVisualizerPlugin, DataVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow, LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
 from bsmu.vision.widgets.viewers.image.layered.slice import VolumeSliceImageViewer

@@ -1,1 +1,1 @@
-from .item_storage import ItemStorage
+from .item import ItemStorage

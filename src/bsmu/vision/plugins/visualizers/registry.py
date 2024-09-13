@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from bsmu.vision.core.plugins.processor.registry import ProcessorRegistryPlugin, ProcessorRegistry
-from bsmu.vision.plugins.visualizers.base import DataVisualizerPlugin
+from bsmu.vision.plugins.visualizers import DataVisualizerPlugin
 
 
 class DataVisualizerRegistryPlugin(ProcessorRegistryPlugin):

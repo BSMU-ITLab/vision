@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
-from bsmu.vision.core.config.united import UnitedConfig
+from bsmu.vision.core.config import UnitedConfig
 from bsmu.vision.core.data_file import DataFileProvider
 
 if TYPE_CHECKING:

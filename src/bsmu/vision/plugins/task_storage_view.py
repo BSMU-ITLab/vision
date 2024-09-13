@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, QModelIndex
 from PySide6.QtWidgets import QDockWidget, QTableView
 
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.core.task import Task
 from bsmu.vision.widgets.delegates.progress_delegate import ProgressDelegate
 
@@ -15,13 +15,13 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
-    from bsmu.vision.plugins.storages.task_storage import TaskStorage, TaskStoragePlugin
+    from bsmu.vision.plugins.storages.task import TaskStorage, TaskStoragePlugin
 
 
 class TaskStorageViewPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
-        'task_storage_plugin': 'bsmu.vision.plugins.storages.task_storage.TaskStoragePlugin',
+        'task_storage_plugin': 'bsmu.vision.plugins.storages.task.TaskStoragePlugin',
     }
 
     def __init__(self, main_window_plugin: MainWindowPlugin, task_storage_plugin: TaskStoragePlugin):

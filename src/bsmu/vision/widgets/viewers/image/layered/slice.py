@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from bsmu.vision.core.constants import PlaneAxis
-from bsmu.vision.core.image.base import FlatImage, SpatialAttrs, VolumeImage
-from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayerView
+from bsmu.vision.core.image import FlatImage, SpatialAttrs, VolumeImage
+from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer, ImageLayerView
 from bsmu.vision.widgets.viewers.image.layered.flat import FlatImageLayerView
 
 if TYPE_CHECKING:
-    from bsmu.vision.core.image.base import Image
+    from bsmu.vision.core.image import Image
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
-    from bsmu.vision.widgets.viewers.image.layered.base import ImageViewerSettings
+    from bsmu.vision.widgets.viewers.image.layered import ImageViewerSettings
 
 
 class VolumeSliceImageLayerView(ImageLayerView):

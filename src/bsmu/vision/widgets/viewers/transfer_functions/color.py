@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsEllipseItem, QGridLayo
 from sortedcontainers import SortedList
 
 from bsmu.vision.core.transfer_functions.color import ColorTransferFunction
-from bsmu.vision.widgets.viewers.base import DataViewer
+from bsmu.vision.widgets.viewers.data import DataViewer
 
 if TYPE_CHECKING:
     import numpy as np

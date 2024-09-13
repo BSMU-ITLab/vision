@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from typing import Type
 
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 
 if TYPE_CHECKING:
     from bsmu.vision.plugins.settings import SettingsPlugin

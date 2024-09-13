@@ -7,7 +7,7 @@ from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.data import Data
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.core.task import FnTask
 
 if TYPE_CHECKING:
@@ -15,15 +15,15 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from bsmu.vision.core.task import Task
-    from bsmu.vision.plugins.loaders.base import FileLoader
+    from bsmu.vision.plugins.loaders.file import FileLoader
     from bsmu.vision.plugins.loaders.registry import FileLoaderRegistryPlugin
-    from bsmu.vision.plugins.storages import TaskStorage, TaskStoragePlugin
+    from bsmu.vision.plugins.storages.task import TaskStorage, TaskStoragePlugin
 
 
 class FileLoadingManagerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'file_loader_registry_plugin': 'bsmu.vision.plugins.loaders.registry.FileLoaderRegistryPlugin',
-        'task_storage_plugin': 'bsmu.vision.plugins.storages.task_storage.TaskStoragePlugin',
+        'task_storage_plugin': 'bsmu.vision.plugins.storages.task.TaskStoragePlugin',
     }
 
     def __init__(self, file_loader_registry_plugin: FileLoaderRegistryPlugin, task_storage_plugin: TaskStoragePlugin):

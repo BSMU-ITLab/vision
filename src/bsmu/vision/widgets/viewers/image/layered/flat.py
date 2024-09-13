@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from bsmu.vision.widgets.viewers.image.layered.base import LayeredImageViewer, ImageLayerView
+from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer, ImageLayerView
 
 if TYPE_CHECKING:
-    from bsmu.vision.core.image.base import FlatImage
+    from bsmu.vision.core.image import FlatImage
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
-    from bsmu.vision.widgets.viewers.image.layered.base import ImageViewerSettings
+    from bsmu.vision.widgets.viewers.image.layered import ImageViewerSettings
 
 
 class FlatImageLayerView(ImageLayerView):

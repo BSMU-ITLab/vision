@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Qt, QAbstractTableModel, QModelIndex
 
 from bsmu.vision.core.abc import QABCMeta
-from bsmu.vision.core.models.base import ObjectParameter, ObjectRecord
+from bsmu.vision.core.models import ObjectParameter, ObjectRecord
 
 if TYPE_CHECKING:
     from typing import Type, List, Tuple, Any, Sequence

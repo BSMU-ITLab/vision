@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 import cv2 as cv
 import numpy as np
 
-from bsmu.vision.core.image.base import FlatImage
-from bsmu.vision.plugins.loaders.image.base import ImageFileLoaderPlugin, ImageFileLoader
+from bsmu.vision.core.image import FlatImage
+from bsmu.vision.plugins.loaders.image import ImageFileLoaderPlugin, ImageFileLoader
 
 if TYPE_CHECKING:
     from pathlib import Path

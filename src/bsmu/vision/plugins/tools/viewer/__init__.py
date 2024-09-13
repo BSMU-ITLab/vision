@@ -1,4 +1,4 @@
-from .base import (
+from .viewer import (
     LayeredImageViewerTool,
     LayeredImageViewerToolSettings,
     MdiViewerTool,

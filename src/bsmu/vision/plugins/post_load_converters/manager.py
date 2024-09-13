@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
-from bsmu.vision.core.plugins.base import Plugin
 from bsmu.vision.core.data import Data
+from bsmu.vision.core.plugins import Plugin
 
 if TYPE_CHECKING:
-    from bsmu.vision.plugins.post_load_converters.registry import PostLoadConverterRegistryPlugin, \
-        PostLoadConverterRegistry
+    from bsmu.vision.plugins.post_load_converters.registry import (
+        PostLoadConverterRegistryPlugin, PostLoadConverterRegistry)
 
 
 class PostLoadConversionManagerPlugin(Plugin):

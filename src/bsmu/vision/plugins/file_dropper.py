@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QEvent
 
-from bsmu.vision.core.plugins.base import Plugin
+from bsmu.vision.core.plugins import Plugin
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QDragEnterEvent, QDropEvent
@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
     from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
-    from bsmu.vision.plugins.post_load_converters.manager import PostLoadConversionManagerPlugin, \
-        PostLoadConversionManager
+    from bsmu.vision.plugins.post_load_converters.manager import (
+        PostLoadConversionManagerPlugin, PostLoadConversionManager)
 
 
 class FileDropperPlugin(Plugin):

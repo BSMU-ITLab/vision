@@ -1,5 +1,4 @@
-from bsmu.vision.app import __title__, __version__
-from bsmu.vision.app.base import App
+from bsmu.vision.app import App, __title__, __version__
 
 
 def run_app():

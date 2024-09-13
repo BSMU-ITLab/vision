@@ -3,12 +3,12 @@ plugins:
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.loaders.image.simple.SimpleImageFileLoaderPlugin
 #  - bsmu.vision.plugins.loaders.image.wsi.WholeSlideImageFileLoaderPlugin
-#  - bsmu.vision.plugins.loaders.nifti.base.NiftiFileLoaderPlugin
+#  - bsmu.vision.plugins.loaders.nifti.NiftiFileLoaderPlugin
   - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
   - bsmu.vision.plugins.visualizers.image.flat.FlatImageVisualizerPlugin
 #  - bsmu.vision.plugins.visualizers.image.volume.VolumeImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin
-  - bsmu.vision.plugins.overlayers.image.base.ImageViewerOverlayerPlugin
+  - bsmu.vision.plugins.overlayers.image.ImageViewerOverlayerPlugin
   - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
 #  - bsmu.vision.plugins.overlayers.intersection.ImageViewerIntersectionOverlayerPlugin
   - bsmu.vision.plugins.writers.image.generic.GenericImageFileWriterPlugin

@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from bsmu.vision.core.config import Config
-from bsmu.vision.core.image import FlatImage, VolumeImage, LayeredImage
+from bsmu.vision.core.image import FlatImage, VolumeImage
+from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.visibility import Visibility
 from bsmu.vision.plugins.post_load_converters import PostLoadConverter, PostLoadConverterPlugin
 

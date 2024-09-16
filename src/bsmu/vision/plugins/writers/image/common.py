@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
 
 
-class GenericImageFileWriterPlugin(FileWriterPlugin):
+class CommonImageFileWriterPlugin(FileWriterPlugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
@@ -28,7 +28,7 @@ class GenericImageFileWriterPlugin(FileWriterPlugin):
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
     ):
-        super().__init__(GenericImageFileWriter)
+        super().__init__(CommonImageFileWriter)
 
         self._main_window_plugin = main_window_plugin
         self._main_window: MainWindow | None = None
@@ -114,12 +114,12 @@ class GenericImageFileWriterPlugin(FileWriterPlugin):
             return False
 
 
-class GenericImageFileWriter(FileWriter):
+class CommonImageFileWriter(FileWriter):
     _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tif', 'tiff')
 
     def _write_to_file(self, data: Image, path: Path, **kwargs):
         # TODO: move the logging into base class
-        logging.info(f'Write Generic Image: {path}')
+        logging.info(f'Write Common Image: {path}')
 
         # TODO: use OpenCV to save the image (compare performance and size of the resulting files)
         skimage.io.imsave(str(path), data.pixels, check_contrast=False)

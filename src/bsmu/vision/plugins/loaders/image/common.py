@@ -13,16 +13,16 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class SimpleImageFileLoaderPlugin(ImageFileLoaderPlugin):
+class CommonImageFileLoaderPlugin(ImageFileLoaderPlugin):
     def __init__(self):
-        super().__init__(SimpleImageFileLoader)
+        super().__init__(CommonImageFileLoader)
 
 
-class SimpleImageFileLoader(ImageFileLoader):
+class CommonImageFileLoader(ImageFileLoader):
     _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif')
 
     def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
-        logging.info('Load Simple Image')
+        logging.info('Load Common Image')
 
         # Do not use skimage, because:
         # a) OpenCV works a little faster

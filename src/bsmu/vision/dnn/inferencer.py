@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import time
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from typing import TYPE_CHECKING
 
 import cv2 as cv
@@ -15,7 +15,7 @@ import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.dnn.config import OnnxConfig, CPU_PROVIDER
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from typing import ClassVar, Sequence
     from pathlib import Path
 
 
@@ -28,7 +28,7 @@ class ModelParams:
 
     @classmethod
     def from_config(cls, config_data: dict, model_dir: Path) -> ModelParams:
-        field_names = {field.name for field in fields(cls)}
+        field_names = {f.name for f in fields(cls)}
         SENTINEL = object()
         field_name_to_config_value = \
             {field_name: config_value for field_name in field_names
@@ -54,6 +54,16 @@ class ImageModelParams(ModelParams):
     normalize: bool = True
     preprocessing_mode: str = 'image-net-torch'
     mask_binarization_threshold: float = 0.5
+    input_type: np.dtype = np.float32
+
+    _input_image_size_cache: tuple = field(default=None, init=False, repr=False, compare=False)
+
+    IMAGENET_MEAN: ClassVar[np.array] = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    IMAGENET_STD: ClassVar[np.array] = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+    # The following constants are used for minor optimization
+    IMAGENET_MEAN_x_255: ClassVar[np.array] = IMAGENET_MEAN * 255
+    IMAGENET_STD_x_255: ClassVar[np.array] = IMAGENET_STD * 255
 
     def copy_but_change_name(self, new_name: str) -> ImageModelParams:
         model_params_copy = copy.deepcopy(self)
@@ -61,10 +71,12 @@ class ImageModelParams(ModelParams):
         return model_params_copy
 
     @property
-    def input_image_size(self) -> Sequence:
-        input_size_list = list(self.input_size)
-        del input_size_list[self.channels_axis]
-        return input_size_list
+    def input_image_size(self) -> tuple:
+        if self._input_image_size_cache is None:
+            input_size_list = list(self.input_size)
+            del input_size_list[self.channels_axis]
+            self._input_image_size_cache = tuple(input_size_list)
+        return self._input_image_size_cache
 
     @property
     def input_channels_count(self) -> int:
@@ -81,33 +93,32 @@ class ImageModelParams(ModelParams):
             # Remove alpha-channel
             image = image[:, :, :3]
 
+        image = image.astype(self.input_type, copy=False)
         if image.shape[:DEFAULT_CHANNELS_AXIS] != self.input_image_size:
-            image = image.astype(np.float64)
             image = cv.resize(image, self.input_image_size, interpolation=cv.INTER_AREA)
 
         if self.normalize:
-            image = image_converter.normalized(image).astype(np.float64)
+            image = image_converter.normalized(image)
 
-        mean = None
-        std = None
         if self.preprocessing_mode == 'image-net-torch':
-            if not self.normalize:
-                image = image / 255
-            # Normalize each channel with respect to the ImageNet dataset
-            mean = [0.485, 0.456, 0.406]
-            std = [0.229, 0.224, 0.225]
+            # Standardize the image using ImageNet mean and standard deviation
+            if self.normalize:
+                image -= self.IMAGENET_MEAN
+                image /= self.IMAGENET_STD
+            else:
+                image -= self.IMAGENET_MEAN_x_255
+                image /= self.IMAGENET_STD_x_255
+
+                # The above code is a slightly optimized version of:
+                # image /= 255
+                # image -= self.IMAGENET_MEAN
+                # image /= self.IMAGENET_STD
         elif self.preprocessing_mode == 'image-net-tf':
             if not self.normalize:
-                image = image / 255
+                image /= 255
             # Scale pixels between -1 and 1, sample-wise
             image *= 2
             image -= 1
-
-        if mean is not None:
-            image -= mean
-
-        if std is not None:
-            image /= std
 
         if self.channels_order == 'bgr':
             image = image[..., ::-1]

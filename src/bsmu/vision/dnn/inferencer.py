@@ -15,8 +15,9 @@ import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.dnn.config import OnnxConfig, CPU_PROVIDER
 
 if TYPE_CHECKING:
-    from typing import ClassVar, Sequence
+    from collections.abc import Sequence
     from pathlib import Path
+    from typing import ClassVar
 
 
 @dataclass
@@ -25,6 +26,7 @@ class ModelParams:
     output_object_name: str = 'Object'
     output_object_short_name: str = 'Obj'
     preload: bool = False
+    batch_size: int = 1
 
     @classmethod
     def from_config(cls, config_data: dict, model_dir: Path) -> ModelParams:
@@ -48,7 +50,7 @@ class ModelParams:
 
 @dataclass
 class ImageModelParams(ModelParams):
-    input_size: Sequence = (256, 256, 3)
+    input_size: Sequence[int] = (256, 256, 3)
     channels_axis: int = 2
     channels_order: str = 'rgb'
     normalize: bool = True
@@ -71,7 +73,7 @@ class ImageModelParams(ModelParams):
         return model_params_copy
 
     @property
-    def input_image_size(self) -> tuple:
+    def input_image_size(self) -> tuple[int, ...]:
         if self._input_image_size_cache is None:
             input_size_list = list(self.input_size)
             del input_size_list[self.channels_axis]

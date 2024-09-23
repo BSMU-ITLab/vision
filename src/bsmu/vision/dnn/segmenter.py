@@ -21,7 +21,7 @@ def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.
     """
     Find a connected component with the largest area (exclude background label, which is 0)
     :param mask: mask to find connected components
-    :return: Tuple[largest connected component label, labeled mask, largest connected component bbox]
+    :return: Tuple[the largest connected component label, labeled mask, largest connected component bbox]
     If all pixels are background (zeros), then return None as the largest connected component label
     """
 
@@ -51,8 +51,8 @@ def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.
 
 
 class Segmenter(Inferencer):
-    def _segment_batch_without_postresize(self, images: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
-        input_image_batch = self._model_params.preprocessed_input_batch(images)
+    def segment_batch_without_postresize(self, image_batch: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
+        input_image_batch = self._model_params.preprocessed_input_batch(image_batch)
 
         self._create_inference_session()
         model_inputs: List[ort.NodeArg] = self._inference_session.get_inputs()
@@ -69,7 +69,7 @@ class Segmenter(Inferencer):
         return output_mask_batch
 
     def _segment_without_postresize(self, image: np.ndarray) -> np.ndarray:
-        return self._segment_batch_without_postresize([image])[0]
+        return self.segment_batch_without_postresize([image])[0]
 
     def segment(
             self,
@@ -160,7 +160,7 @@ class Segmenter(Inferencer):
         # Split image into tiles
         image_tiles = tile_splitter.split_image_into_tiles(image, tile_grid_shape, border_size=border_size)
         # Get mask predictions for tiles
-        tile_masks = self._segment_batch_without_postresize(image_tiles)
+        tile_masks = self.segment_batch_without_postresize(image_tiles)
         # Merge tiles
         mask = tile_splitter.merge_tiles_into_image_with_blending(tile_masks, tile_grid_shape, border_size=border_size)
 

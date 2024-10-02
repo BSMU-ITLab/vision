@@ -1,6 +1,6 @@
 <!--
-To generate a *.py file use the next command in the terminal:
-..\vision\vision-widgets\src\bsmu\vision\widgets\images> pyside6-rcc icons.qrc -o icons_rc.py
+To generate a *.py file, run the following command in the terminal from the directory where this file is located:
+pyside6-rcc icons.qrc -o icons_rc.py
 -->
 
 <!DOCTYPE RCC>

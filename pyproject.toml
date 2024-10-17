@@ -76,4 +76,4 @@ version = { attr = 'bsmu.vision.app.version.__version__' }
 where = [ 'src' ]
 
 [tool.setuptools.package-data]
-'*' = [ '*.conf.yaml' ]
+'*' = [ '**/*.conf.yaml' ]

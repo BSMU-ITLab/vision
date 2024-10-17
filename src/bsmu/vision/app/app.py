@@ -8,7 +8,6 @@ import sys
 import traceback
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal, QCoreApplication
 from PySide6.QtWidgets import QApplication
@@ -21,9 +20,6 @@ from bsmu.vision.core.data_file import DataFileProvider
 from bsmu.vision.core.freeze import is_app_frozen
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.dnn.config import OnnxConfig
-
-if TYPE_CHECKING:
-    from typing import List
 
 
 class App(QObject, DataFileProvider):
@@ -50,6 +46,8 @@ class App(QObject, DataFileProvider):
         # Set to users preferred locale to output correct decimal point (comma or point):
         locale.setlocale(locale.LC_NUMERIC, '')
 
+        # Pass base apps into config, because UnitedConfig of plugins need this info too
+        UnitedConfig.configure_app_hierarchy(type(self), App)
         self._config = UnitedConfig(type(self), App)
 
         self._gui_enabled = self._config.value('enable-gui')
@@ -81,7 +79,7 @@ class App(QObject, DataFileProvider):
     def gui_enabled(self) -> bool:
         return self._gui_enabled
 
-    def enabled_plugins(self) -> List[Plugin]:
+    def enabled_plugins(self) -> list[Plugin]:
         return self._plugin_manager.enabled_plugins
 
     def run(self):

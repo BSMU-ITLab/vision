@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from bsmu.vision.core.freeze import is_app_frozen
+from bsmu.vision.core.utils.package import PackageUtils
+
+if TYPE_CHECKING:
+    from bsmu.vision.core.utils.package import PackageInfo
 
 
 class DataFileProvider:
@@ -11,6 +16,28 @@ class DataFileProvider:
     _DATA_DIRS = ()
 
     _FROZEN_DATA_DIR_NAME = 'data'
+
+    _FIRST_REGULAR_PACKAGE_INFO: PackageInfo | None = None
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Initialize `cls._FIRST_REGULAR_PACKAGE_INFO` to None for each subclass
+        # to ensure each one has its own attribute that can be set independently.
+        cls._FIRST_REGULAR_PACKAGE_INFO = None
+
+    @classmethod
+    def first_regular_package_info(cls) -> PackageInfo:
+        if cls._FIRST_REGULAR_PACKAGE_INFO is None:
+            try:
+                cls._FIRST_REGULAR_PACKAGE_INFO = PackageUtils.first_regular_package_info(cls)
+            except RuntimeError as e:
+                raise RuntimeError(
+                    f'Error in {cls.__name__}. '
+                    f'DataFileProvider classes should not be placed in the "__main__" module. '
+                    f'Please move it to a module other than "__main__".'
+                ) from e
+        return cls._FIRST_REGULAR_PACKAGE_INFO
 
     @classmethod
     def frozen_data_dir_name(cls) -> str:

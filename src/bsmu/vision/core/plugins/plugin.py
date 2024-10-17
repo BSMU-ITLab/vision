@@ -23,7 +23,7 @@ class Plugin(QObject, DataFileProvider):
     def __init__(self):
         super().__init__()
 
-        self.config = UnitedConfig(type(self), Plugin)
+        self.config = UnitedConfig(type(self), Plugin, False)
         # TODO: plugin can contain |config_path| field (if some plugin use different place or name for config file)
 
         self._dependency_plugin_by_key: dict = {}

@@ -6,7 +6,6 @@ import inspect
 import pkgutil
 import sys
 from types import ModuleType
-from typing import List
 
 from bsmu.vision.core.data_file import DataFileProvider
 
@@ -41,21 +40,21 @@ def find_modules_of_package_recursively(package: ModuleType, indent: int = 0):
             yield module_or_package
 
 
-def find_modules_of_packages_recursively(packages: List[ModuleType], indent: int = 0):
+def find_modules_of_packages_recursively(packages: list[ModuleType], indent: int = 0):
     for package in packages:
         yield from find_modules_of_package_recursively(package, indent)
 
 
-def generate_list_of_data_file_tuples(packages_with_data: List[ModuleType]) -> list[tuple[str, str]]:
+def generate_list_of_data_file_tuples(packages_with_data: list[ModuleType]) -> list[tuple[str, str]]:
     """
     :param packages_with_data: packages to search DataFileProvider classes
     :return: e.g. list of such tuples:
-    ('full-path/vision-app/bsmu/vision/app/App.conf.yaml', 'data/bsmu.vision.app/configs/App.conf.yaml')
+    ('full-path/vision/src/bsmu/vision/plugins/dnn-models', 'data/resources/bsmu.vision.plugins/dnn-models')
     full signature is:
     [('full path to the data file or dir', 'relative path to the data file or dir in the build folder'), ...]
     """
     # Use dictionary to remove duplicate values
-    destination_data_path_by_absolute = {}
+    unfrozen_to_frozen_rel_data_path = {}
     for module in find_modules_of_packages_recursively(packages_with_data):
         class_name_value_pairs = inspect.getmembers(module, inspect.isclass)
         for cls_name, cls in class_name_value_pairs:
@@ -66,15 +65,17 @@ def generate_list_of_data_file_tuples(packages_with_data: List[ModuleType]) -> l
             if not issubclass(cls, DataFileProvider):
                 continue
 
-            for absolute_data_dir, frozen_rel_data_dir in cls.frozen_rel_data_dir_by_absolute().items():
-                destination_data_path_by_absolute[absolute_data_dir] = frozen_rel_data_dir
+            for unfrozen_data_path, frozen_rel_data_path in cls.unfrozen_to_frozen_rel_data_path().items():
+                unfrozen_to_frozen_rel_data_path[unfrozen_data_path] = frozen_rel_data_path
 
-    # Convert |destination_data_path_by_absolute| dict to list of tuples
-    data_file_absolute_path_and_destination_tuples = \
-        [(str(absolute_data_path), str(frozen_rel_data_path))
-         for absolute_data_path, frozen_rel_data_path in destination_data_path_by_absolute.items()]
+    # Convert `unfrozen_to_frozen_rel_data_path` dict to list of tuples
+    unfrozen_and_frozen_rel_data_path_tuples = [
+        (str(unfrozen_data_path), str(frozen_rel_data_path))
+        for unfrozen_data_path, frozen_rel_data_path in
+        unfrozen_to_frozen_rel_data_path.items()
+    ]
 
-    return data_file_absolute_path_and_destination_tuples
+    return unfrozen_and_frozen_rel_data_path_tuples
 
 
 def main():

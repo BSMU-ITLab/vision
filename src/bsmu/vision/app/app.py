@@ -8,10 +8,12 @@ import sys
 import traceback
 import warnings
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal, QCoreApplication
 from PySide6.QtWidgets import QApplication
 
+from bsmu.vision import __title__, __version__, __description__
 from bsmu.vision.app.logger import ColoredFormatter, RotatingFileHandlerWithSeparator, SimpleFormatter
 from bsmu.vision.app.plugin_manager import PluginManager
 from bsmu.vision.core.concurrent import ThreadPool
@@ -19,17 +21,44 @@ from bsmu.vision.core.config import UnitedConfig
 from bsmu.vision.core.data_file import DataFileProvider
 from bsmu.vision.core.freeze import is_app_frozen
 from bsmu.vision.core.plugins import Plugin
+from bsmu.vision.core.utils.hierarchy import HierarchyUtils
 from bsmu.vision.dnn.config import OnnxConfig
+
+if TYPE_CHECKING:
+    from typing import Sequence
 
 
 class App(QObject, DataFileProvider):
+    TITLE: str = __title__
+    VERSION: str = __version__
+    DESCRIPTION: str = __description__
+
+    # Keeps the sequence of classes from the most derived to the base App class
+    _BASE_APP_CLASSES: Sequence[type[App]] | None = None
+
     plugin_enabled = Signal(Plugin)
     plugin_disabled = Signal(Plugin)
 
-    def __init__(self, name: str, version: str):
-        name_version = f'{name} {version}'
+    @classmethod
+    def __init_subclass__(cls, title: str = '', version: str = '', description: str = '', **kwargs):
+        super().__init_subclass__(**kwargs)
 
-        arg_parser = argparse.ArgumentParser(prog=name_version)
+        # TODO: The `title`, `version`, and `description` parameters are unused because App inherits from QObject.
+        #  And if a derived class passes additional arguments (e.g., class DerivedApp(App, title='Derived')),
+        #  PySide 6.7.2 raises a TypeError: sbktype() takes at most 3 arguments (4 given).
+        #  Once this issue is resolved, `title` and `version` will be mandatory (no default values),
+        #  and all method arguments will be used.
+        # cls.TITLE = title
+        # cls.VERSION = version
+        # cls.DESCRIPTION = description
+
+        # Initialize `cls._BASE_APP_CLASSES` to None for each subclass
+        # to ensure each one has its own attribute that can be set independently.
+        cls._BASE_APP_CLASSES = None
+
+    def __init__(self):
+        title_version = f'{self.TITLE} {self.VERSION}'
+        arg_parser = argparse.ArgumentParser(prog=title_version)
         arg_parser.add_argument('-l', '--log-level', default=logging.getLevelName(logging.INFO))
         self._args = arg_parser.parse_args()
 
@@ -38,7 +67,7 @@ class App(QObject, DataFileProvider):
         # Call the base method after the logging initialization
         super().__init__()
 
-        logging.info(name_version)
+        logging.info(title_version)
         if not is_app_frozen():
             logging.info(f'Prefix: {sys.prefix}')
         logging.info(f'Executable: {sys.executable}')
@@ -46,14 +75,14 @@ class App(QObject, DataFileProvider):
         # Set to users preferred locale to output correct decimal point (comma or point):
         locale.setlocale(locale.LC_NUMERIC, '')
 
-        # Pass base apps into config, because UnitedConfig of plugins need this info too
-        UnitedConfig.configure_app_hierarchy(type(self), App)
+        # Pass app class into the config, because we need access to `App.base_app_classes()`
+        UnitedConfig.configure_app_class(type(self))
         self._config = UnitedConfig(type(self), App)
 
         self._gui_enabled = self._config.value('enable-gui')
         self._qApp = QApplication(sys.argv) if self._gui_enabled else QCoreApplication(sys.argv)
-        self._qApp.setApplicationName(name)
-        self._qApp.setApplicationVersion(version)
+        self._qApp.setApplicationName(self.TITLE)
+        self._qApp.setApplicationVersion(self.VERSION)
 
         ThreadPool.create_instance(
             self._config.value('max_general_thread_count'),
@@ -75,6 +104,28 @@ class App(QObject, DataFileProvider):
         if configured_plugins is not None:
             self._plugin_manager.enable_plugins(configured_plugins)
 
+    @classmethod
+    def base_app_classes(cls) -> Sequence[type[App]]:
+        if cls._BASE_APP_CLASSES is None:
+            cls._BASE_APP_CLASSES = HierarchyUtils.inheritance_hierarchy(cls, App)
+        return cls._BASE_APP_CLASSES
+
+    @classmethod
+    def config_dir(cls) -> Path:
+        return cls.frozen_absolute_config_dir() if is_app_frozen() else cls.unfrozen_config_dir()
+
+    @classmethod
+    def unfrozen_config_dir(cls) -> Path:
+        return cls.first_regular_package_info().path / UnitedConfig.DIR_NAME
+
+    @classmethod
+    def frozen_rel_config_dir(cls) -> Path:
+        return cls.frozen_rel_data_dir() / UnitedConfig.DIR_NAME
+
+    @classmethod
+    def frozen_absolute_config_dir(cls) -> Path:
+        return cls.frozen_exe_dir() / cls.frozen_rel_config_dir()
+
     @property
     def gui_enabled(self) -> bool:
         return self._gui_enabled
@@ -93,13 +144,13 @@ class App(QObject, DataFileProvider):
 
         handlers = []
         if is_app_frozen():
-            log_path = Path('logs')
+            log_path = self.frozen_absolute_data_dir() / 'logs'
             try:
                 log_path.mkdir(exist_ok=True)
             except:
                 # Create log files without common directory
                 # if the application has no rights to create the directory
-                log_path = Path('.')
+                log_path = self.frozen_exe_dir()
             file_handler = RotatingFileHandlerWithSeparator(
                 filename=log_path / f'log-{log_level_str.lower()}.log',
                 maxBytes=2_097_152,  # 2 MB

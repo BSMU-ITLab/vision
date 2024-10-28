@@ -70,7 +70,7 @@ test = [ 'pytest' ]
 build = [ 'cx-Freeze' ]
 
 [tool.setuptools.dynamic]
-version = { attr = 'bsmu.vision.app.version.__version__' }
+version = { attr = 'bsmu.vision.__version__' }
 
 [tool.setuptools.packages.find]
 where = [ 'src' ]

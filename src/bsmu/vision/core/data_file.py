@@ -12,10 +12,10 @@ if TYPE_CHECKING:
 
 
 class DataFileProvider:
-    _BASE_DATA_DIRS = ('configs',)
-    _DATA_DIRS = ()
+    _DATA_DIRS: tuple[str] = ()
 
-    _FROZEN_DATA_DIR_NAME = 'data'
+    _FROZEN_DATA_DIR_NAME: str = 'data'
+    _FROZEN_RESOURCES_DIR_NAME: str = 'resources'
 
     _FIRST_REGULAR_PACKAGE_INFO: PackageInfo | None = None
 
@@ -25,6 +25,10 @@ class DataFileProvider:
         # Initialize `cls._FIRST_REGULAR_PACKAGE_INFO` to None for each subclass
         # to ensure each one has its own attribute that can be set independently.
         cls._FIRST_REGULAR_PACKAGE_INFO = None
+
+    @classmethod
+    def data_dirs(cls) -> tuple[str]:
+        return cls._DATA_DIRS
 
     @classmethod
     def first_regular_package_info(cls) -> PackageInfo:
@@ -40,12 +44,24 @@ class DataFileProvider:
         return cls._FIRST_REGULAR_PACKAGE_INFO
 
     @classmethod
-    def frozen_data_dir_name(cls) -> str:
-        return cls._FROZEN_DATA_DIR_NAME
+    def frozen_rel_data_dir(cls) -> Path:
+        return Path(cls._FROZEN_DATA_DIR_NAME)
 
     @classmethod
-    def data_dirs(cls) -> tuple:
-        return tuple(set(cls._BASE_DATA_DIRS).union(set(cls._DATA_DIRS)))
+    def frozen_rel_resources_dir(cls) -> Path:
+        return cls.frozen_rel_data_dir() / cls._FROZEN_RESOURCES_DIR_NAME
+
+    @classmethod
+    def frozen_exe_dir(cls) -> Path:
+        return Path(sys.executable).parent.resolve()
+
+    @classmethod
+    def frozen_absolute_data_dir(cls) -> Path:
+        return cls.frozen_exe_dir() / cls.frozen_rel_data_dir()
+
+    @classmethod
+    def frozen_absolute_resources_dir(cls) -> Path:
+        return cls.frozen_exe_dir() / cls.frozen_rel_resources_dir()
 
     @classmethod
     def module_dir(cls) -> Path:
@@ -55,40 +71,40 @@ class DataFileProvider:
         return Path(module.__file__).parent.resolve()
 
     @classmethod
-    def frozen_rel_data_path(cls, *rel_path_parts) -> Path:
+    def frozen_rel_resources_path(cls, *rel_path_parts) -> Path:
         """Returns path relative to *.exe."""
         module = sys.modules.get(cls.__module__)
         assert module is not None, \
             f'{cls.__module__} module is not found in sys.modules. ' \
-            f'Cannot get frozen relative data path for {rel_path_parts}.'
+            f'Cannot get frozen relative resources path for {rel_path_parts}.'
         package = module.__package__
         assert package is not None, \
-            f'{module} has no package. Cannot get frozen relative data path for {rel_path_parts}.'
-        return cls._FROZEN_DATA_DIR_NAME / Path(package).joinpath(*rel_path_parts)
+            f'{module} has no package. Cannot get frozen relative resources path for {rel_path_parts}.'
+        return (cls.frozen_rel_resources_dir() / package).joinpath(*rel_path_parts)
 
     @classmethod
-    def frozen_absolute_data_path(cls, *rel_path_parts) -> Path:
-        return Path(sys.executable).parent.resolve().joinpath(cls.frozen_rel_data_path(*rel_path_parts))
+    def frozen_absolute_resources_path(cls, *rel_path_parts) -> Path:
+        return cls.frozen_exe_dir().joinpath(cls.frozen_rel_resources_path(*rel_path_parts))
 
     @classmethod
-    def absolute_data_path(cls, *rel_path_parts) -> Path:
+    def unfrozen_data_path(cls, *rel_path_parts) -> Path:
         return cls.module_dir().joinpath(*rel_path_parts)
 
     @classmethod
     def data_path(cls, *rel_path_parts) -> Path:
         if is_app_frozen():
-            return cls.frozen_absolute_data_path(*rel_path_parts)
+            return cls.frozen_absolute_resources_path(*rel_path_parts)
         else:
-            return cls.absolute_data_path(*rel_path_parts)
+            return cls.unfrozen_data_path(*rel_path_parts)
 
     @classmethod
-    def frozen_rel_data_dir_by_absolute(cls) -> dict[Path, Path]:
-        frozen_rel_data_dir_by_absolute = {}
+    def unfrozen_to_frozen_rel_data_path(cls) -> dict[Path, Path]:
+        unfrozen_to_frozen_rel_data_path = {}
         for data_dir in cls.data_dirs():
-            absolute_data_dir = cls.absolute_data_path(data_dir)
-            if not absolute_data_dir.exists():
+            unfrozen_data_path = cls.unfrozen_data_path(data_dir)
+            if not unfrozen_data_path.exists():
                 continue
 
-            frozen_rel_data_dir = cls.frozen_rel_data_path(data_dir)
-            frozen_rel_data_dir_by_absolute[absolute_data_dir] = frozen_rel_data_dir
-        return frozen_rel_data_dir_by_absolute
+            frozen_rel_data_path = cls.frozen_rel_resources_path(data_dir)
+            unfrozen_to_frozen_rel_data_path[unfrozen_data_path] = frozen_rel_data_path
+        return unfrozen_to_frozen_rel_data_path

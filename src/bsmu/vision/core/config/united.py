@@ -89,6 +89,13 @@ class UnitedConfig:
         return self._priority_config_paths
 
     @property
+    def exists(self) -> bool:
+        for config_path in self.priority_config_paths:
+            if config_path.exists():
+                return True
+        return False
+
+    @property
     def base_united_classes(self) -> Sequence[type[DataFileProvider]]:
         if self._base_united_classes is None:
             # Get list of base classes up to the `self._last_base_cls_to_unite` (optionally including)

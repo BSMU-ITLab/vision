@@ -78,6 +78,11 @@ class App(QObject, DataFileProvider):
         # Pass app class into the config, because we need access to `App.base_app_classes()`
         UnitedConfig.configure_app_class(type(self))
         self._config = UnitedConfig(type(self), App)
+        if not self._config.exists:
+            logging.error(f'No application configuration file found. The application will terminate.\n'
+                          f'Tried to locate configuration files at the following paths: '
+                          f'{self._config.priority_config_paths}')
+            sys.exit(1)
 
         self._gui_enabled = self._config.value('enable-gui')
         self._qApp = QApplication(sys.argv) if self._gui_enabled else QCoreApplication(sys.argv)

@@ -19,7 +19,7 @@ dependencies:
   - pip:
       - colorama==0.4.6
       - coloredlogs==15.0.1
-      - cx-freeze==7.1.0.post0
+      - cx-freeze==7.2.3
       - cx-logging==3.2.0
       - exceptiongroup==1.2.1
       - flatbuffers==24.3.25

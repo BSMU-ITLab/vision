@@ -71,7 +71,7 @@ class AppBuilder:
             extra_files: Sequence[ExtraFile] | None = (
                 ExtraFile(
                     Path('scripts/run-debug.bat'),
-                    'https://github.com/BSMU-ITLab/vision/blob/main/scripts/run-debug.bat',
+                    'https://raw.githubusercontent.com/BSMU-ITLab/vision/refs/heads/main/scripts/run-debug.bat',
                 ),
             ),
 

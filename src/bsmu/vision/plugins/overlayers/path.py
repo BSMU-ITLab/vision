@@ -11,10 +11,11 @@ from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
     from bsmu.vision.core.data import Data
+    from bsmu.vision.plugins.loaders.manager import FileLoadingManager, FileLoadingManagerPlugin
+    from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
     from bsmu.vision.plugins.post_load_converters.manager import (
         PostLoadConversionManagerPlugin, PostLoadConversionManager
     )
-    from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
 
 
 class ImageViewerPathOverlayerPlugin(Plugin):
@@ -22,12 +23,14 @@ class ImageViewerPathOverlayerPlugin(Plugin):
         'post_load_conversion_manager_plugin':
             'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
         'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+        'palette_pack_settings_plugin': 'bsmu.vision.plugins.palette.settings.PalettePackSettingsPlugin',
     }
 
     def __init__(
             self,
             post_load_conversion_manager_plugin: PostLoadConversionManagerPlugin,
             file_loading_manager_plugin: FileLoadingManagerPlugin,
+            palette_pack_settings_plugin: PalettePackSettingsPlugin,
     ):
         super().__init__()
 
@@ -37,13 +40,18 @@ class ImageViewerPathOverlayerPlugin(Plugin):
         self._file_loading_manager_plugin = file_loading_manager_plugin
         self._file_loading_manager: FileLoadingManager | None = None
 
+        self._palette_pack_settings_plugin = palette_pack_settings_plugin
+        self._palette_pack_settings: PalettePackSettings | None = None
+
         self._overlayer: ImageViewerPathOverlayer | None = None
 
     def _enable(self):
         self._post_load_conversion_manager = self._post_load_conversion_manager_plugin.post_load_conversion_manager
         self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+        self._palette_pack_settings = self._palette_pack_settings_plugin.settings
 
-        self._overlayer = ImageViewerPathOverlayer(self._file_loading_manager, self.config.value('layers'))
+        self._overlayer = ImageViewerPathOverlayer(
+            self._file_loading_manager, self.config.value('layers'), self._palette_pack_settings)
 
         self._post_load_conversion_manager.data_converted.connect(self._overlayer.overlay_sibling_dirs_images)
 
@@ -58,11 +66,13 @@ class ImageViewerPathOverlayer(QObject):
             self,
             file_loading_manager: FileLoadingManager,
             layers_config_data: dict,
+            palette_pack_settings: PalettePackSettings,
     ):
         super().__init__()
 
         self._file_loading_manager = file_loading_manager
         self._layers_config_data = layers_config_data
+        self._palette_pack_settings = palette_pack_settings
 
     def overlay_sibling_dirs_images(self, data: Data):
         if not isinstance(data, LayeredImage):
@@ -86,7 +96,7 @@ class ImageViewerPathOverlayer(QObject):
                 continue
 
             palette_prop = layer_props.get('palette')
-            palette = Palette.from_config(palette_prop)
+            palette = Palette.from_config(palette_prop) or self._palette_pack_settings.main_palette
 
             layer_opacity = layer_props.get('opacity')
             layer_visibility = Visibility(opacity=layer_opacity) if layer_opacity is not None else None

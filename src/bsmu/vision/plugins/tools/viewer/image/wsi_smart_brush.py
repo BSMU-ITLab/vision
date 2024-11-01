@@ -457,12 +457,12 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         super().deactivate()
 
     def eventFilter(self, watched_obj: QObject, event: QEvent):
-        if event.type() == QEvent.Leave:
+        if event.type() == QEvent.Enter or event.type() == QEvent.Leave:
             self.draw_brush_event(event)
             return False
-        if event.type() == QEvent.MouseButtonPress or event.type() == QEvent.MouseButtonRelease:
+        elif event.type() == QEvent.MouseButtonPress or event.type() == QEvent.MouseButtonRelease:
             self.draw_brush_event(event)
-            return True
+            return False
         elif event.type() == QEvent.MouseMove:
             self.draw_brush_event(event)
             return False
@@ -500,7 +500,8 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         # if not self.viewer.has_image():
         #     return
 
-        self.update_mode(event)
+        if event.type() != QEvent.MouseMove:
+            self.update_mode(event)
 
         # Erase old tool mask
         if self._brush_bbox is not None:

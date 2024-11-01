@@ -328,7 +328,7 @@ class _ViewPan(QObject):
         if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
             self._old_pos = self.event_pos(event)
             self._update_cursor()
-            return True
+            return False
         elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton and self.is_panning:
             self._old_pos = None
             self._update_cursor()
@@ -338,7 +338,7 @@ class _ViewPan(QObject):
             delta = self._view.mapToScene(new_pos.toPoint()) - self._view.mapToScene(self._old_pos.toPoint())
             self._view.translate(delta.x(), delta.y())
             self._old_pos = new_pos
-            return True
+            return False
         else:
             return super().eventFilter(watched_obj, event)
 

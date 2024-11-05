@@ -10,7 +10,7 @@ import skimage.draw
 import skimage.measure
 from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QCursor
-from PySide6.QtWidgets import QFormLayout, QSpinBox
+from PySide6.QtWidgets import QCheckBox, QFormLayout, QSpinBox
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.image import MASK_MAX
@@ -51,6 +51,7 @@ DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE = 100
 class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
     radius_changed = Signal(float)
     smart_mode_enabled_changed = Signal(bool)
+    repainting_enabled_changed = Signal(bool)
     mask_foreground_class_changed = Signal(int)
 
     def __init__(
@@ -63,6 +64,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             radius_zoom_factor: float,
             max_radius_without_downscale: float,
             smart_mode_enabled: bool,
+            repainting_enabled: bool,
             number_of_clusters: int,
             paint_central_pixel_cluster: bool,
             paint_dark_cluster: bool,
@@ -78,6 +80,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._radius_zoom_factor = radius_zoom_factor
         self._max_radius_without_downscale = max_radius_without_downscale
         self._smart_mode_enabled = smart_mode_enabled
+        self._repainting_enabled = repainting_enabled
         self._number_of_clusters = number_of_clusters
         self._paint_central_pixel_cluster = paint_central_pixel_cluster
         self._paint_dark_cluster = paint_dark_cluster
@@ -91,6 +94,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._tool_foreground_class = self._tool_mask_palette.row_index_by_name('foreground')
         self._tool_eraser_class = self._tool_mask_palette.row_index_by_name('eraser')
         self._tool_unconnected_component_class = self._tool_mask_palette.row_index_by_name('unconnected_component')
+        self._tool_no_paint_class = self._tool_mask_palette.row_index_by_name('no_paint')
 
     @property
     def radius(self) -> float:
@@ -127,6 +131,16 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         if self._smart_mode_enabled != value:
             self._smart_mode_enabled = value
             self.smart_mode_enabled_changed.emit(self._smart_mode_enabled)
+
+    @property
+    def repainting_enabled(self) -> bool:
+        return self._repainting_enabled
+
+    @repainting_enabled.setter
+    def repainting_enabled(self, value: bool):
+        if self._repainting_enabled != value:
+            self._repainting_enabled = value
+            self.repainting_enabled_changed.emit(self._repainting_enabled)
 
     @property
     def number_of_clusters(self) -> int:
@@ -178,6 +192,10 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
     def tool_unconnected_component_class(self) -> int:
         return self._tool_unconnected_component_class
 
+    @property
+    def tool_no_paint_class(self) -> int:
+        return self._tool_no_paint_class
+
     @classmethod
     def from_config(
             cls,
@@ -193,6 +211,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             config.value('radius_zoom_factor', 1),
             config.value('max_radius_without_downscale', DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE),
             config.value('smart_mode_enabled', True),
+            config.value('repainting_enabled', True),
             config.value('number_of_clusters', 2),
             config.value('paint_central_pixel_cluster', True),
             config.value('paint_dark_cluster', False),
@@ -215,7 +234,13 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
         self._mask_foreground_class_spin_box.setValue(tool_settings.mask_foreground_class)
         self._mask_foreground_class_spin_box.valueChanged.connect(self._on_mask_foreground_class_spin_box_value_changed)
         tool_settings.mask_foreground_class_changed.connect(self._on_tool_settings_mask_foreground_class_changed)
-        layout.addRow('&Mask Foreground:', self._mask_foreground_class_spin_box)
+        layout.addRow(self.tr('&Mask Foreground:'), self._mask_foreground_class_spin_box)
+
+        self._enable_repainting_check_box = QCheckBox()
+        self._enable_repainting_check_box.setChecked(tool_settings.repainting_enabled)
+        self._enable_repainting_check_box.checkStateChanged.connect(self._on_enable_repainting_check_state_changed)
+        tool_settings.repainting_enabled_changed.connect(self._on_tool_settings_repainting_enabled_changed)
+        layout.addRow(self.tr('Enable Repainting:'), self._enable_repainting_check_box)
 
         self.setLayout(layout)
 
@@ -224,6 +249,12 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
 
     def _on_tool_settings_mask_foreground_class_changed(self, value: int):
         self._mask_foreground_class_spin_box.setValue(value)
+
+    def _on_enable_repainting_check_state_changed(self, state: Qt.CheckState):
+        self.tool_settings.repainting_enabled = state == Qt.Checked
+
+    def _on_tool_settings_repainting_enabled_changed(self, repainting_enabled: bool):
+        self._enable_repainting_check_box.setChecked(repainting_enabled)
 
 
 class ModifyMaskCommand(UndoCommand):
@@ -563,17 +594,26 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 self._brush_bbox.size,
                 self.settings.tool_background_class,
                 tool_class)
-            modified_pixels = tool_mask_in_brush_bbox == temp_tool_class
+            pixels_under_brush = tool_mask_in_brush_bbox == temp_tool_class
 
-            self.tool_mask.bboxed_pixels(self._brush_bbox)[modified_pixels] = tool_class
+            under_brush_tool_class = tool_class if self._mode == Mode.ERASE else self.settings.tool_no_paint_class
+            self.tool_mask.bboxed_pixels(self._brush_bbox)[pixels_under_brush] = under_brush_tool_class
+            mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
+            if self.settings.repainting_enabled or self._mode == Mode.ERASE:
+                modified_mask_pixels = mask_in_brush_bbox != mask_class
+            else:
+                modified_mask_pixels = mask_in_brush_bbox == self.settings.mask_background_class
+            modified_mask_pixels_under_brush = pixels_under_brush & modified_mask_pixels
+            if self._mode == Mode.SHOW:
+                self.tool_mask.bboxed_pixels(self._brush_bbox)[modified_mask_pixels_under_brush] = tool_class
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
-            if self._mode in [Mode.ERASE, Mode.DRAW]:
+            if self._mode in [Mode.ERASE, Mode.DRAW] and modified_mask_pixels_under_brush.any():
                 command_text = f'{self._brush_stroke_text}: Erase' \
                     if self._mode == Mode.ERASE \
                     else f'{self._brush_stroke_text}: Draw Class {mask_class}'
                 modify_mask_command = ModifyMaskCommand(
-                    self.mask, self._brush_bbox, modified_pixels, mask_class, text=command_text)
+                    self.mask, self._brush_bbox, modified_mask_pixels_under_brush, mask_class, text=command_text)
                 self._undo_manager.push(modify_mask_command)
 
             return

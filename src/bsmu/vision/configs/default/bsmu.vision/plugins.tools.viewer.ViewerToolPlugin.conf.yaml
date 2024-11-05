@@ -17,7 +17,9 @@ layers:
     palette:
       row-by-name:
         background: [ 0, 0, 0, 0, 0 ]
-        foreground: [ 1, 130, 210, 50, 255 ]
-        eraser: [ 2, 210, 60, 40, 255 ]
-        unconnected_component: [ 3, 210, 130, 50, 255 ]
+        foreground: [ 1, 130, 210, 50, 255 ]  # tool region, where mask will be painted, if tool is used
+        eraser: [ 2, 210, 60, 40, 255 ]  # tool region, where mask will be erased, if tool is used
+        unconnected_component: [ 3, 210, 130, 50, 255 ]  # tool region, where mask will not be painted if tool is used,
+        # because it is an isolated region
+        no_paint: [ 4, 0, 0, 0, 63 ]  # tool region, where mask will not be painted, if tool is used
     opacity: 0.5

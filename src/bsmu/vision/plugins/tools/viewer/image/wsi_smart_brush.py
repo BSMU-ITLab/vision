@@ -289,7 +289,7 @@ class ModifyMaskCommand(UndoCommand):
         self._modified_bbox = modified_bbox
         self._modified_bbox_pixels = modified_bbox_pixels
         self._compressed_modified_bbox_pixels = None
-        if type(new_modified_bbox_pixels) != int:
+        if not isinstance(new_modified_bbox_pixels, int):
             raise NotImplementedError()
         self._new_modified_bbox_pixels = new_modified_bbox_pixels
         self._rle_compressed_old_modified_bbox_pixels = None  # after command compression we get
@@ -345,8 +345,8 @@ class ModifyMaskCommand(UndoCommand):
             self._compress_data()
             return True
 
-        if type(self._new_modified_bbox_pixels) == int \
-                and self._new_modified_bbox_pixels != other._new_modified_bbox_pixels:
+        if (isinstance(self._new_modified_bbox_pixels, int)
+                and self._new_modified_bbox_pixels != other._new_modified_bbox_pixels):
             logging.warning(f'You forgot to use {FinishModifyMaskCommand.__name__} to compress the command '
                             f'as early as possible')
             self._compress_data()
@@ -453,6 +453,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         self._mode = None
         self._brush_bbox = None
         self._is_stroke_finished = True
+        self._is_mask_modified_during_stroke = False
 
     @property
     def mode(self) -> Mode:
@@ -464,6 +465,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self._mode = value
             if self._mode == Mode.DRAW or self._mode == Mode.ERASE:
                 self._is_stroke_finished = False
+                self._is_mask_modified_during_stroke = False
                 WsiSmartBrushImageViewerTool._STROKE_ID += 1
             else:
                 self._finish_stroke()
@@ -609,12 +611,12 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
             if self._mode in [Mode.ERASE, Mode.DRAW] and modified_mask_pixels_under_brush.any():
-                command_text = f'{self._brush_stroke_text}: Erase' \
-                    if self._mode == Mode.ERASE \
+                command_text = (
+                    f'{self._brush_stroke_text}: Erase'
+                    if self._mode == Mode.ERASE
                     else f'{self._brush_stroke_text}: Draw Class {mask_class}'
-                modify_mask_command = ModifyMaskCommand(
-                    self.mask, self._brush_bbox, modified_mask_pixels_under_brush, mask_class, text=command_text)
-                self._undo_manager.push(modify_mask_command)
+                )
+                self._create_and_push_modify_mask_command(modified_mask_pixels_under_brush, mask_class, command_text)
 
             return
 
@@ -690,13 +692,18 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 self.settings.tool_foreground_class)
             drawn_pixels = tool_mask_in_brush_bbox == temp_tool_foreground_class
 
-            modify_mask_command = ModifyMaskCommand(
-                self.mask, self._brush_bbox, drawn_pixels, self.settings.mask_foreground_class,
-                text=f'{self._brush_stroke_text}: Draw Class {self.settings.mask_foreground_class}')
-            self._undo_manager.push(modify_mask_command)
+            command_text = f'{self._brush_stroke_text}: Draw Class {self.settings.mask_foreground_class}'
+            self._create_and_push_modify_mask_command(drawn_pixels, self.settings.mask_foreground_class, command_text)
 
         self.tool_mask.emit_pixels_modified(self._brush_bbox)
         return
+
+    def _create_and_push_modify_mask_command(
+            self, modified_bbox_pixels: np.ndarray, new_modified_bbox_pixels: int | np.ndarray, text: str):
+        modify_mask_command = ModifyMaskCommand(
+            self.mask, self._brush_bbox, modified_bbox_pixels, new_modified_bbox_pixels, text=text)
+        self._undo_manager.push(modify_mask_command)
+        self._is_mask_modified_during_stroke = True
 
     def _preprocess_downscaled_image_in_brush_bbox(self, image: np.ndarray):
         return image
@@ -705,8 +712,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         if self._is_stroke_finished:
             return
 
-        finish_stroke_command = FinishModifyMaskCommand()
-        self._undo_manager.push(finish_stroke_command)
+        if self._is_mask_modified_during_stroke:
+            finish_stroke_command = FinishModifyMaskCommand()
+            self._undo_manager.push(finish_stroke_command)
         self._is_stroke_finished = True
 
     @staticmethod

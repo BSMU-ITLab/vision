@@ -17,9 +17,12 @@ layers:
     palette:
       row-by-name:
         background: [ 0, 0, 0, 0, 0 ]
-        foreground: [ 1, 130, 210, 50, 255 ]  # tool region, where mask will be painted, if tool is used
-        eraser: [ 2, 210, 60, 40, 255 ]  # tool region, where mask will be erased, if tool is used
-        unconnected_component: [ 3, 210, 130, 50, 255 ]  # tool region, where mask will not be painted if tool is used,
-        # because it is an isolated region
-        no_paint: [ 4, 0, 0, 0, 63 ]  # tool region, where mask will not be painted, if tool is used
+        foreground: [ 1, 158, 255, 61, 255 ]  # tool region, where mask will be painted, if the tool is used
+        eraser: [ 2, 210, 60, 40, 255 ]  # tool region, where mask will be erased, if the tool is used
+        fixed: [3, 55, 89, 21, 255 ]  # tool region, where mask will not be painted, if the tool is used
+          # because it is already painted with the current tool class
+          # (or another one and Enable Repainting set to False)
+        unconnected_component: [ 4, 89, 55, 21, 255 ]  # tool region, where mask will not be painted,
+          # if the tool is used, because it is an isolated region
+        no_paint: [ 5, 0, 0, 0, 31 ]  # tool region, where mask will not be painted, if the tool is used
     opacity: 0.5

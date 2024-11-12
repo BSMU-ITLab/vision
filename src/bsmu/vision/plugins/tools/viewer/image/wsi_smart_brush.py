@@ -13,13 +13,14 @@ from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import QCheckBox, QFormLayout, QSpinBox
 
 from bsmu.vision.core.bbox import BBox
-from bsmu.vision.core.image import MASK_MAX
+from bsmu.vision.core.image import MASK_TYPE, MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
 from bsmu.vision.plugins.tools.viewer import (
     LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget)
 from bsmu.vision.plugins.undo import UndoCommand
 
 if TYPE_CHECKING:
+    import numpy.typing as npt
     from typing import Sequence
 
     from PySide6.QtCore import QObject, QPoint
@@ -93,6 +94,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._tool_background_class = self._tool_mask_palette.row_index_by_name('background')
         self._tool_foreground_class = self._tool_mask_palette.row_index_by_name('foreground')
         self._tool_eraser_class = self._tool_mask_palette.row_index_by_name('eraser')
+        self._tool_fixed_class = self._tool_mask_palette.row_index_by_name('fixed')
         self._tool_unconnected_component_class = self._tool_mask_palette.row_index_by_name('unconnected_component')
         self._tool_no_paint_class = self._tool_mask_palette.row_index_by_name('no_paint')
 
@@ -187,6 +189,10 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
     @property
     def tool_eraser_class(self) -> int:
         return self._tool_eraser_class
+
+    @property
+    def tool_fixed_class(self) -> int:
+        return self._tool_fixed_class
 
     @property
     def tool_unconnected_component_class(self) -> int:
@@ -582,8 +588,8 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             *downscaled_brush_center_f, row_downscaled_radius, col_downscaled_radius,
             shape=downscaled_brush_shape)  # try with downscaled_brush_shape_f
 
-        downscaled_tool_mask_in_brush_bbox = \
-            np.full(shape=downscaled_brush_shape, fill_value=self.settings.tool_background_class)
+        downscaled_tool_mask_in_brush_bbox = (
+            np.full(shape=downscaled_brush_shape, fill_value=self.settings.tool_background_class, dtype=MASK_TYPE))
 
         if not self.settings.smart_mode_enabled or self._mode == Mode.ERASE:
             tool_class, mask_class = (self.settings.tool_eraser_class, self.settings.mask_background_class) \
@@ -598,14 +604,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 tool_class)
             pixels_under_brush = tool_mask_in_brush_bbox == temp_tool_class
 
-            under_brush_tool_class = tool_class if self._mode == Mode.ERASE else self.settings.tool_no_paint_class
+            under_brush_tool_class = tool_class if self._mode == Mode.ERASE else self.settings.tool_fixed_class
             self.tool_mask.bboxed_pixels(self._brush_bbox)[pixels_under_brush] = under_brush_tool_class
-            mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
-            if self.settings.repainting_enabled or self._mode == Mode.ERASE:
-                modified_mask_pixels = mask_in_brush_bbox != mask_class
-            else:
-                modified_mask_pixels = mask_in_brush_bbox == self.settings.mask_background_class
-            modified_mask_pixels_under_brush = pixels_under_brush & modified_mask_pixels
+            modified_mask_pixels_under_brush = pixels_under_brush & self.modifiable_mask_pixels(mask_class)
             if self._mode == Mode.SHOW:
                 self.tool_mask.bboxed_pixels(self._brush_bbox)[modified_mask_pixels_under_brush] = tool_class
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
@@ -633,17 +634,19 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             return
 
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-        ret, label, centers = cv2.kmeans(
+        ret, labels, centers = cv2.kmeans(
             samples, self.settings.number_of_clusters, None, criteria, 10, cv2.KMEANS_PP_CENTERS)
-        label = label.ravel()  # 2D array (one column) to 1D array without copy
+        labels = labels.ravel()  # 2D array (one column) to 1D array without copy
         centers = centers.ravel()
 
+        downscaled_brush_center_row, downscaled_brush_center_col = downscaled_brush_center
         if self.settings.paint_central_pixel_cluster:
-            center_pixel_indexes = np.where((rr == downscaled_brush_center[0]) & (cc == downscaled_brush_center[1]))[0]
+            center_pixel_indexes = np.where(
+                (rr == downscaled_brush_center_row) & (cc == downscaled_brush_center_col))[0]
             if center_pixel_indexes.size != 1:  # there are situations, when the center pixel is out of image
                 return
             center_pixel_index = center_pixel_indexes[0]
-            painted_cluster_label = label[center_pixel_index]
+            painted_cluster_label = labels[center_pixel_index]
         else:
             # Label of light cluster
             painted_cluster_label = 0 if centers[0] > centers[1] else 1
@@ -651,52 +654,80 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 # Swapping 1 with 0 and 0 with 1
                 painted_cluster_label = 1 - painted_cluster_label
 
-        tool_mask_circle_pixels = downscaled_tool_mask_in_brush_bbox[rr, cc]
-        tool_mask_circle_pixels[label == painted_cluster_label] = self.settings.tool_foreground_class
+        tool_mask_circle_pixels = np.full_like(labels, fill_value=self.settings.tool_no_paint_class, dtype=MASK_TYPE)
+        tool_mask_circle_pixels[labels == painted_cluster_label] = self.settings.tool_foreground_class
         downscaled_tool_mask_in_brush_bbox[rr, cc] = tool_mask_circle_pixels
 
         if self.settings.paint_connected_component:
-            if 0 <= downscaled_brush_center[0] < downscaled_tool_mask_in_brush_bbox.shape[0] and \
-                    0 <= downscaled_brush_center[1] < downscaled_tool_mask_in_brush_bbox.shape[1]:
+            if (0 <= downscaled_brush_center_row < downscaled_tool_mask_in_brush_bbox.shape[0]
+                    and 0 <= downscaled_brush_center_col < downscaled_tool_mask_in_brush_bbox.shape[1]):
 
                 labeled_tool_mask_in_brush_bbox = skimage.measure.label(
                     downscaled_tool_mask_in_brush_bbox, background=self.settings.tool_background_class)
                 label_under_mouse = labeled_tool_mask_in_brush_bbox[
-                    downscaled_brush_center[0], downscaled_brush_center[1]]
+                    downscaled_brush_center_row, downscaled_brush_center_col]
                 downscaled_tool_mask_in_brush_bbox[
                     (downscaled_tool_mask_in_brush_bbox == self.settings.tool_foreground_class) &
-                    (labeled_tool_mask_in_brush_bbox != label_under_mouse)] = \
-                    self.settings.tool_unconnected_component_class
+                    (labeled_tool_mask_in_brush_bbox != label_under_mouse)
+                ] = self.settings.tool_unconnected_component_class
             else:
                 downscaled_tool_mask_in_brush_bbox[
-                    downscaled_tool_mask_in_brush_bbox == self.settings.tool_foreground_class] = \
-                    self.settings.tool_unconnected_component_class
+                    downscaled_tool_mask_in_brush_bbox == self.settings.tool_foreground_class
+                ] = self.settings.tool_unconnected_component_class
 
-        tool_mask_in_brush_bbox = cv2.resize(
+        # Downscaled tool mask contains multiple indexes.
+        # Resize with INTER_LINEAR_EXACT cannot be used for indexed images with more than two indexes.
+        # Therefore, we resize twice.
+        # First quick resize: Remove the foreground class and use INTER_NEAREST to resize all other unimportant classes.
+        downscaled_tool_mask_foreground_pixels = (
+                downscaled_tool_mask_in_brush_bbox == self.settings.tool_foreground_class)
+        downscaled_tool_mask_without_foreground = downscaled_tool_mask_in_brush_bbox.copy()
+        downscaled_tool_mask_without_foreground[
+            downscaled_tool_mask_foreground_pixels] = self.settings.tool_no_paint_class
+        tool_mask_in_brush_bbox_without_foreground = cv2.resize(
+            downscaled_tool_mask_without_foreground,
+            self._brush_bbox.size,
+            interpolation=cv2.INTER_NEAREST)
+
+        # Second resize: Use INTER_LINEAR_EXACT for accurate resizing of the foreground class.
+        # Remove all values from the tool mask except background and foreground.
+        downscaled_tool_mask_in_brush_bbox[
+            ~downscaled_tool_mask_foreground_pixels] = self.settings.tool_background_class
+        tool_mask_in_brush_bbox, temp_tool_foreground_class = self.resize_indexed_binary_image(
             downscaled_tool_mask_in_brush_bbox,
             self._brush_bbox.size,
-            # cv2.INTER_LINEAR_EXACT cannot be used for indexed image with more then two indexes
-            interpolation=cv2.INTER_NEAREST)
-        self.tool_mask.bboxed_pixels(self._brush_bbox)[...] = tool_mask_in_brush_bbox
+            self.settings.tool_background_class,
+            self.settings.tool_foreground_class)
+        tool_mask_temp_foreground_pixels = tool_mask_in_brush_bbox == temp_tool_foreground_class
+        tool_mask_foreground_class = (
+            self.settings.tool_foreground_class if self.mode == Mode.SHOW else self.settings.tool_fixed_class)
+        # Combine foreground and other classes from two resized tool masks.
+        self.tool_mask.bboxed_pixels(self._brush_bbox)[...] = np.where(
+            tool_mask_temp_foreground_pixels,
+            tool_mask_foreground_class,
+            tool_mask_in_brush_bbox_without_foreground)
+
+        modifiable_mask_pixels = self.modifiable_mask_pixels(self.settings.mask_foreground_class)
+
+        if self.mode == Mode.SHOW:
+            fixed_mask_pixels = tool_mask_temp_foreground_pixels & ~modifiable_mask_pixels
+            self.tool_mask.bboxed_pixels(self._brush_bbox)[fixed_mask_pixels] = self.settings.tool_fixed_class
 
         if self._mode == Mode.DRAW:
-            # We can use cv2.INTER_LINEAR_EXACT interpolation for draw mode
-            # For that we have to remove all values from tool mask, except background and foreground
-            downscaled_tool_mask_in_brush_bbox[
-                downscaled_tool_mask_in_brush_bbox != self.settings.tool_foreground_class] = \
-                self.settings.tool_background_class
-            tool_mask_in_brush_bbox, temp_tool_foreground_class = self.resize_indexed_binary_image(
-                downscaled_tool_mask_in_brush_bbox,
-                self._brush_bbox.size,
-                self.settings.tool_background_class,
-                self.settings.tool_foreground_class)
-            drawn_pixels = tool_mask_in_brush_bbox == temp_tool_foreground_class
-
-            command_text = f'{self._brush_stroke_text}: Draw Class {self.settings.mask_foreground_class}'
-            self._create_and_push_modify_mask_command(drawn_pixels, self.settings.mask_foreground_class, command_text)
+            modified_mask_pixels = tool_mask_temp_foreground_pixels & modifiable_mask_pixels
+            if modified_mask_pixels.any():
+                command_text = f'{self._brush_stroke_text}: Draw Class {self.settings.mask_foreground_class}'
+                self._create_and_push_modify_mask_command(
+                    modified_mask_pixels, self.settings.mask_foreground_class, command_text)
 
         self.tool_mask.emit_pixels_modified(self._brush_bbox)
-        return
+
+    def modifiable_mask_pixels(self, mask_class: int) -> npt.NDArray[bool]:
+        mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
+        if self.settings.repainting_enabled or self._mode == Mode.ERASE:
+            return mask_in_brush_bbox != mask_class
+        else:
+            return mask_in_brush_bbox == self.settings.mask_background_class
 
     def _create_and_push_modify_mask_command(
             self, modified_bbox_pixels: np.ndarray, new_modified_bbox_pixels: int | np.ndarray, text: str):

@@ -268,8 +268,8 @@ class ModifyMaskCommand(UndoCommand):
             self,
             mask: FlatImage,
             modified_bbox: BBox,
-            modified_bbox_pixels: np.ndarray,
-            new_modified_bbox_pixels: int | np.ndarray,
+            modified_bbox_pixels: npt.NDArray[bool],
+            new_modified_bbox_pixels: int | npt.NDArray[MASK_TYPE],
             is_last_to_merge: bool = False,
             text: str = 'Modify Mask',
             parent: UndoCommand = None,
@@ -277,7 +277,7 @@ class ModifyMaskCommand(UndoCommand):
         """
         :param modified_bbox: bbox of modified pixels
         :param modified_bbox_pixels: boolean array with True on modified pixels
-        :param new_modified_bbox_pixels: if has type int, then all modified pixels will have such value.
+        :param new_modified_bbox_pixels: if it has type int, then all modified pixels will have such value.
         Else it is flat (one-dimensional) array with values of new pixels, which were modified
         :param is_last_to_merge: the last command to be merged.
         We need it to compress command data only after full merge, because compression can be slow
@@ -592,9 +592,11 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             np.full(shape=downscaled_brush_shape, fill_value=self.settings.tool_background_class, dtype=MASK_TYPE))
 
         if not self.settings.smart_mode_enabled or self._mode == Mode.ERASE:
-            tool_class, mask_class = (self.settings.tool_eraser_class, self.settings.mask_background_class) \
-                if self._mode == Mode.ERASE \
-                else (self.settings.tool_foreground_class, self.settings.mask_foreground_class)
+            tool_class, mask_class = (
+                (self.settings.tool_eraser_class, self.settings.mask_background_class)
+                if self._mode == Mode.ERASE
+                else (self.settings.tool_fixed_class, self.settings.mask_foreground_class)
+            )
 
             downscaled_tool_mask_in_brush_bbox[rr, cc] = tool_class
             tool_mask_in_brush_bbox, temp_tool_class = self.resize_indexed_binary_image(
@@ -604,11 +606,15 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 tool_class)
             pixels_under_brush = tool_mask_in_brush_bbox == temp_tool_class
 
-            under_brush_tool_class = tool_class if self._mode == Mode.ERASE else self.settings.tool_fixed_class
-            self.tool_mask.bboxed_pixels(self._brush_bbox)[pixels_under_brush] = under_brush_tool_class
+            if tool_class == temp_tool_class:
+                self.tool_mask.bboxed_pixels(self._brush_bbox)[...] = tool_mask_in_brush_bbox
+            else:
+                self.tool_mask.bboxed_pixels(self._brush_bbox)[pixels_under_brush] = tool_class
+
             modified_mask_pixels_under_brush = pixels_under_brush & self.modifiable_mask_pixels(mask_class)
             if self._mode == Mode.SHOW:
-                self.tool_mask.bboxed_pixels(self._brush_bbox)[modified_mask_pixels_under_brush] = tool_class
+                self.tool_mask.bboxed_pixels(self._brush_bbox)[modified_mask_pixels_under_brush] = (
+                    self.settings.tool_foreground_class)
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
             if self._mode in [Mode.ERASE, Mode.DRAW] and modified_mask_pixels_under_brush.any():
@@ -750,7 +756,8 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
     @staticmethod
     def resize_indexed_binary_image(
-            image: np.ndarray, size: Sequence[int], background_index, foreground_index) -> tuple[np.ndarray, int]:
+            image: np.ndarray, size: Sequence[int], background_index: int, foreground_index: int
+    ) -> tuple[np.ndarray, int]:
         """Resize indexed image, which has only two indexes: background and foreground.
         Foreground indexes of resized image can be replaced by |temp_foreground_index|
         :param image: image can be modified (foreground indexes can be replaced by |temp_foreground_index|)
@@ -759,12 +766,12 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         :param foreground_index:
         :return: tuples[resized image, temp foreground index]
         """
-        # Background and foreground indexes have to be nearest integers (e.g. 0 and 1, or 5 and 6)
+        # Background and foreground indexes have to be the nearest integers (e.g., 0 and 1, or 5 and 6)
         # to use cv2.INTER_LINEAR_EXACT interpolation for resize.
         if abs(foreground_index - background_index) != 1:
-            # Index has to be in uint8 range (0 <= index <= 255)
+            # Index has to be in MASK_TYPE range (0 <= index <= MASK_MAX)
             temp_foreground_index = background_index - 1 \
-                if background_index == 255 \
+                if background_index == MASK_MAX \
                 else background_index + 1
 
             image[image == foreground_index] = temp_foreground_index

@@ -67,8 +67,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             smart_mode_enabled: bool,
             repainting_enabled: bool,
             number_of_clusters: int,
-            paint_central_pixel_cluster: bool,
-            paint_dark_cluster: bool,
+            painted_cluster: str | int,
             paint_connected_component: bool,
             draw_on_mouse_move: bool,
             icon_file_name: str = ':/icons/brush.svg',
@@ -83,10 +82,11 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._smart_mode_enabled = smart_mode_enabled
         self._repainting_enabled = repainting_enabled
         self._number_of_clusters = number_of_clusters
-        self._paint_central_pixel_cluster = paint_central_pixel_cluster
-        self._paint_dark_cluster = paint_dark_cluster
+        self._painted_cluster = painted_cluster
         self._paint_connected_component = paint_connected_component
         self._draw_on_mouse_move = draw_on_mouse_move
+
+        self._painted_cluster_brightness_index: int | None = self._cluster_brightness_index()
 
         self._mask_background_class = self.mask_palette.row_index_by_name('background')
         self._mask_foreground_class = self.mask_palette.row_index_by_name('foreground')
@@ -97,6 +97,32 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._tool_fixed_class = self._tool_mask_palette.row_index_by_name('fixed')
         self._tool_unconnected_component_class = self._tool_mask_palette.row_index_by_name('unconnected_component')
         self._tool_no_paint_class = self._tool_mask_palette.row_index_by_name('no_paint')
+
+    def _cluster_brightness_index(self) -> int | None:
+        """
+        Clusters are sorted by average brightness, with index 0 being the darkest and
+        (number_of_clusters - 1) being the lightest.
+
+        :return:
+            - Index of the cluster to be painted in the sorted clusters array by average brightness
+            - None to paint the central cluster (under mouse pointer)
+        """
+        central_cluster_index = None
+        match self._painted_cluster:
+            case 'dark':
+                return 0
+            case 'medium':
+                return self._number_of_clusters // 2
+            case 'light':
+                return self._number_of_clusters - 1
+            case 'central':
+                return central_cluster_index
+            case int() as index if 0 <= index < self.number_of_clusters:
+                return index
+            case _:
+                logging.warning(f'Invalid `painted_cluster` value: {self._painted_cluster} '
+                                f'(type: {type(self._painted_cluster).__name__}). Using central cluster instead.')
+                return central_cluster_index
 
     @property
     def radius(self) -> float:
@@ -149,12 +175,8 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         return self._number_of_clusters
 
     @property
-    def paint_central_pixel_cluster(self) -> bool:
-        return self._paint_central_pixel_cluster
-
-    @property
-    def paint_dark_cluster(self) -> bool:
-        return self._paint_dark_cluster
+    def painted_cluster_brightness_index(self) -> int | None:
+        return self._painted_cluster_brightness_index
 
     @property
     def paint_connected_component(self) -> bool:
@@ -219,8 +241,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             config.value('smart_mode_enabled', True),
             config.value('repainting_enabled', True),
             config.value('number_of_clusters', 2),
-            config.value('paint_central_pixel_cluster', True),
-            config.value('paint_dark_cluster', False),
+            config.value('painted_cluster', 'central'),
             config.value('paint_connected_component', True),
             config.value('draw_on_mouse_move', True),
         )
@@ -460,6 +481,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         self._brush_bbox = None
         self._is_stroke_finished = True
         self._is_mask_modified_during_stroke = False
+        self._stroke_central_cluster_brightness_index: int | None = None  # Index of the central cluster
+        # (under mouse pointer) in the sorted array by brightness. Determined at the start of a brush stroke
+        # and remains constant until the stroke is finished.
 
     @property
     def mode(self) -> Mode:
@@ -645,20 +669,29 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         labels = labels.ravel()  # 2D array (one column) to 1D array without copy
         centers = centers.ravel()
 
+        if ((painted_cluster_brightness_index := self.settings.painted_cluster_brightness_index) is None
+                and self._mode == Mode.DRAW):
+            painted_cluster_brightness_index = self._stroke_central_cluster_brightness_index
         downscaled_brush_center_row, downscaled_brush_center_col = downscaled_brush_center
-        if self.settings.paint_central_pixel_cluster:
+        if painted_cluster_brightness_index is None:
+            # Need to find the central (under mouse pointer) cluster brightness index
             center_pixel_indexes = np.where(
                 (rr == downscaled_brush_center_row) & (cc == downscaled_brush_center_col))[0]
-            if center_pixel_indexes.size != 1:  # there are situations, when the center pixel is out of image
+            if center_pixel_indexes.size != 1:  # Handle cases where the center pixel is out of the image
                 return
             center_pixel_index = center_pixel_indexes[0]
             painted_cluster_label = labels[center_pixel_index]
+
+            if self._mode == Mode.DRAW:
+                # Sort clusters by brightness and find the index of the painted cluster in the sorted array
+                sorted_indices = np.argsort(centers, axis=0).ravel()
+                self._stroke_central_cluster_brightness_index = np.where(
+                    sorted_indices == painted_cluster_label)[0][0]
         else:
-            # Label of light cluster
-            painted_cluster_label = 0 if centers[0] > centers[1] else 1
-            if self.settings.paint_dark_cluster:
-                # Swapping 1 with 0 and 0 with 1
-                painted_cluster_label = 1 - painted_cluster_label
+            # Sort clusters by brightness and get the sorted indices
+            sorted_indices = np.argsort(centers, axis=0).ravel()
+            # Find the original index of the cluster at the given brightness index
+            painted_cluster_label = sorted_indices[painted_cluster_brightness_index]
 
         tool_mask_circle_pixels = np.full_like(labels, fill_value=self.settings.tool_no_paint_class, dtype=MASK_TYPE)
         tool_mask_circle_pixels[labels == painted_cluster_label] = self.settings.tool_foreground_class
@@ -748,6 +781,8 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
     def _finish_stroke(self):
         if self._is_stroke_finished:
             return
+
+        self._stroke_central_cluster_brightness_index = None
 
         if self._is_mask_modified_during_stroke:
             finish_stroke_command = FinishModifyMaskCommand()

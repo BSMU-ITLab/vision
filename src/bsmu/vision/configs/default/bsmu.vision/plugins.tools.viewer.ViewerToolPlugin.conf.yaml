@@ -15,7 +15,7 @@ layers:
     name: 'tool-mask'
     # Next properties will be used, if we have to create new tool mask
     palette:
-      row-by-name:
+      row_by_name:
         background: [ 0, 0, 0, 0, 0 ]
         foreground: [ 1, 158, 255, 61, 255 ]  # tool region, where mask will be painted, if the tool is used
         eraser: [ 2, 210, 60, 40, 255 ]  # tool region, where mask will be erased, if the tool is used

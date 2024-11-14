@@ -23,12 +23,12 @@ plugins:
   - bsmu.vision.plugins.layers_view.LayersTableViewPlugin
   - bsmu.vision.plugins.task_storage_view.TaskStorageViewPlugin
 
-enable-gui: true
+enable_gui: true
 
 max_general_thread_count: null  # If null, then `QThread.idealThreadCount() - max_dnn_thread_count` will be used
 max_dnn_thread_count: 1
 
-warn-with-traceback: false
+warn_with_traceback: false
 
 onnx_providers:
   - CUDAExecutionProvider

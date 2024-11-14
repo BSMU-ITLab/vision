@@ -84,7 +84,7 @@ class App(QObject, DataFileProvider):
                           f'{self._config.priority_config_paths}')
             sys.exit(1)
 
-        self._gui_enabled = self._config.value('enable-gui')
+        self._gui_enabled = self._config.value('enable_gui')
         self._qApp = QApplication(sys.argv) if self._gui_enabled else QCoreApplication(sys.argv)
         self._qApp.setApplicationName(self.TITLE)
         self._qApp.setApplicationVersion(self.VERSION)
@@ -93,7 +93,7 @@ class App(QObject, DataFileProvider):
             self._config.value('max_general_thread_count'),
             self._config.value('max_dnn_thread_count'))
 
-        if self._config.value('warn-with-traceback'):
+        if self._config.value('warn_with_traceback'):
             warnings.showwarning = warn_with_traceback
             warnings.simplefilter('always')
 

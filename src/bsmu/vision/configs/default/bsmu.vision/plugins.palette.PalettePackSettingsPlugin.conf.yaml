@@ -1,4 +1,4 @@
 main_palette:
-  row-by-name:
+  row_by_name:
     background: [ 0, 0, 0, 0, 0 ]
     foreground: [ 1, 50, 170, 230, 255 ]

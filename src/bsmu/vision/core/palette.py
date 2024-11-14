@@ -64,27 +64,27 @@ class Palette:
           - [5, 255, 0, 0, 255]
 
         # 2) custom palette with added names for each row. The format is
-        # row-by-name:
+        # row_by_name:
         #   name: [index, R, G, B, A]
         palette:
-          row-by-name:
+          row_by_name:
             background: [0, 0, 0, 0, 0]
             foreground: [1, 50, 170, 230, 255]
 
-        # 3) palette will be generated using 'rgb-color' property and optional 'foreground-value' property.
-        # If only 'rgb-color' property is specified, then will be created soft palette
-        # from transparent 'rgb-color' to opaque. The format of the 'rgb-color' property is: [R, G, B]
+        # 3) palette will be generated using 'rgb_color' property and optional 'foreground_value' property.
+        # If only 'rgb_color' property is specified, then will be created soft palette
+        # from transparent 'rgb_color' to opaque. The format of the 'rgb_color' property is: [R, G, B]
         palette:
-          rgb-color: [0, 255, 0]
+          rgb_color: [0, 255, 0]
 
-        # 4) If both 'rgb-color' and 'foreground-value' properties are specified, then binary palette will be created.
+        # 4) If both 'rgb_color' and 'foreground_value' properties are specified, then binary palette will be created.
         # It's the same as:
         # palette:
         #   - [0, 0, 0, 0, 0]
-        #   - [foreground-value, r, g, b, 255]
+        #   - [foreground_value, r, g, b, 255]
         palette:
-          rgb-color: [0, 255, 0]
-          foreground-value: 1
+          rgb_color: [0, 255, 0]
+          foreground_value: 1
         """
         if palette_config_data is None:
             return None
@@ -93,17 +93,17 @@ class Palette:
             return Palette.from_sparse_index_list(palette_config_data)
 
         if isinstance(palette_config_data, dict):
-            row_by_name_prop = palette_config_data.get('row-by-name')
-            rgb_color_prop = palette_config_data.get('rgb-color')
+            row_by_name_prop = palette_config_data.get('row_by_name')
+            rgb_color_prop = palette_config_data.get('rgb_color')
             if not (row_by_name_prop is None or rgb_color_prop is None):
-                warnings.warn('Palette cannot use "row-by-name" and "rgb-color" properties simultaneously')
+                warnings.warn('Palette cannot use "row_by_name" and "rgb_color" properties simultaneously')
                 return None
 
             if row_by_name_prop is not None:
                 return Palette.from_row_by_name(row_by_name_prop)
 
             if rgb_color_prop is not None:
-                foreground_value_prop = palette_config_data.get('foreground-value')
+                foreground_value_prop = palette_config_data.get('foreground_value')
                 if foreground_value_prop is None:
                     return Palette.default_soft(rgb_color_prop)
                 else:

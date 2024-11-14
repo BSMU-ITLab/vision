@@ -17,12 +17,12 @@ if TYPE_CHECKING:
     from bsmu.vision.core.task import Task
 
 
-class FileLoaderPlugin(ProcessorPlugin):
-    def __init__(self, file_loader_cls: Type[FileLoader]):
-        super().__init__(file_loader_cls)
+class FileReaderPlugin(ProcessorPlugin):
+    def __init__(self, file_reader_cls: Type[FileReader]):
+        super().__init__(file_reader_cls)
 
 
-class FileLoaderMeta(type(QObject), abc.ABCMeta):
+class FileReaderMeta(type(QObject), abc.ABCMeta):
     _FORMATS = ()
 
     def __new__(mcs, name, bases, namespace):
@@ -42,13 +42,13 @@ class FileLoaderMeta(type(QObject), abc.ABCMeta):
         return cls.formats
 
 
-class FileLoader(QObject, metaclass=FileLoaderMeta):
-    file_loaded = Signal(Data)
+class FileReader(QObject, metaclass=FileReaderMeta):
+    file_read = Signal(Data)
 
     @classmethod
-    def can_load(cls, path: Path) -> bool:
+    def can_read(cls, path: Path) -> bool:
         """
-        Returns True, if a file with the `path` can be loaded by this loader.
+        Returns True if a file with the `path` can be read by this reader.
         Start to check file extension from the biggest part after the first dot,
         e.g. for NiftiFile.nii.gz
         at first check 'nii.gz', then check 'gz'
@@ -64,18 +64,18 @@ class FileLoader(QObject, metaclass=FileLoaderMeta):
 
             file_extension = file_extension[dot_index + 1:]  # dot_index + 1 to remove dot
 
-    def load_file(self, path: Path, **kwargs) -> Data:
-        data = self._load_file(path, **kwargs)
-        self.file_loaded.emit(data)
+    def read_file(self, path: Path, **kwargs) -> Data:
+        data = self._read_file(path, **kwargs)
+        self.file_read.emit(data)
         return data
 
-    def load_file_async(self, path: Path, **kwargs) -> Task:
+    def read_file_async(self, path: Path, **kwargs) -> Task:
         return ThreadPool.call_async(
-            self.load_file,
+            self.read_file,
             path,
             **kwargs,
         )
 
     @abc.abstractmethod
-    def _load_file(self, path: Path, **kwargs) -> Data:
+    def _read_file(self, path: Path, **kwargs) -> Data:
         pass

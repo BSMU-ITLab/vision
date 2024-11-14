@@ -1,26 +1,35 @@
 plugins:
   - bsmu.vision.plugins.windows.main.MainWindowPlugin
+  - bsmu.vision.plugins.layouts.mdi.MdiLayoutPlugin
+
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
-  - bsmu.vision.plugins.loaders.image.common.CommonImageFileLoaderPlugin
-#  - bsmu.vision.plugins.loaders.image.wsi.WholeSlideImageFileLoaderPlugin
-#  - bsmu.vision.plugins.loaders.nifti.NiftiFileLoaderPlugin
-  - bsmu.vision.plugins.post_load_converters.image_to_layered.ImageToLayeredImagePostLoadConverterPlugin
+  - bsmu.vision.plugins.readers.image.common.CommonImageFileReaderPlugin
+#  - bsmu.vision.plugins.readers.image.wsi.WholeSlideImageFileReaderPlugin
+#  - bsmu.vision.plugins.readers.nifti.NiftiFileReaderPlugin
+
+  - bsmu.vision.plugins.postread.image_to_layered.ImageToLayeredImagePostReadConverterPlugin
+
   - bsmu.vision.plugins.visualizers.image.flat.FlatImageVisualizerPlugin
 #  - bsmu.vision.plugins.visualizers.image.volume.VolumeImageVisualizerPlugin
   - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin
+
   - bsmu.vision.plugins.overlayers.image.ImageViewerOverlayerPlugin
   - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
 #  - bsmu.vision.plugins.overlayers.intersection.ImageViewerIntersectionOverlayerPlugin
+
   - bsmu.vision.plugins.writers.image.common.CommonImageFileWriterPlugin
-  - bsmu.vision.plugins.layouts.mdi.MdiLayoutPlugin
-  - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
-#  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
+
   - bsmu.vision.plugins.tools.viewer.manager.ViewerToolManagerPlugin
   - bsmu.vision.plugins.tools.viewer.image.hand_tool.HandImageViewerToolPlugin
 #  - bsmu.vision.plugins.tools.viewer.image.smart_brush.SmartBrushImageViewerToolPlugin
   - bsmu.vision.plugins.tools.viewer.image.wsi_smart_brush.WsiSmartBrushImageViewerToolPlugin
+
+  - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
+#  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
+
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
   - bsmu.vision.plugins.layers_view.LayersTableViewPlugin
+
   - bsmu.vision.plugins.task_storage_view.TaskStorageViewPlugin
 
 enable_gui: true

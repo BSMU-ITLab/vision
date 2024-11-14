@@ -7,22 +7,22 @@ import nibabel as nib
 import numpy as np
 
 from bsmu.vision.core.image import VolumeImage, SpatialAttrs
-from bsmu.vision.plugins.loaders.file import FileLoaderPlugin, FileLoader
+from bsmu.vision.plugins.readers.file import FileReaderPlugin, FileReader
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class NiftiFileLoaderPlugin(FileLoaderPlugin):
+class NiftiFileReaderPlugin(FileReaderPlugin):
     def __init__(self):
-        super().__init__(NiftiFileLoader)
+        super().__init__(NiftiFileReader)
 
 
-class NiftiFileLoader(FileLoader):
+class NiftiFileReader(FileReader):
     _FORMATS = ('nii.gz',)
 
-    def _load_file(self, path: Path, palette=None, **kwargs) -> VolumeImage:
-        logging.info('Load NIfTI DICOM')
+    def _read_file(self, path: Path, palette=None, **kwargs) -> VolumeImage:
+        logging.info('Read NIfTI DICOM')
 
         nifti_image = nib.load(str(path))
 

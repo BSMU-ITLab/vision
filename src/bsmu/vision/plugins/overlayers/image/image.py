@@ -14,7 +14,7 @@ from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewerHolder
 if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
-    from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
+    from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
 
@@ -22,7 +22,7 @@ class ImageViewerOverlayerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
-        'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+        'file_reading_manager_plugin': 'bsmu.vision.plugins.readers.manager.FileReadingManagerPlugin',
         'palette_pack_settings_plugin': 'bsmu.vision.plugins.palette.settings.PalettePackSettingsPlugin',
     }
 
@@ -30,7 +30,7 @@ class ImageViewerOverlayerPlugin(Plugin):
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
-            file_loading_manager_plugin: FileLoadingManagerPlugin,
+            file_reading_manager_plugin: FileReadingManagerPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
     ):
         super().__init__()
@@ -41,8 +41,8 @@ class ImageViewerOverlayerPlugin(Plugin):
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
 
-        self._file_loading_manager_plugin = file_loading_manager_plugin
-        self._file_loading_manager: FileLoadingManager | None = None
+        self._file_reading_manager_plugin = file_reading_manager_plugin
+        self._file_reading_manager: FileReadingManager | None = None
 
         self._palette_pack_settings_plugin = palette_pack_settings_plugin
         self._palette_pack_settings: PalettePackSettings | None = None
@@ -50,7 +50,7 @@ class ImageViewerOverlayerPlugin(Plugin):
         self._last_opened_file_dir = None
 
     def _enable(self):
-        self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+        self._file_reading_manager = self._file_reading_manager_plugin.file_reading_manager
         self._palette_pack_settings = self._palette_pack_settings_plugin.settings
 
     def _enable_gui(self):
@@ -95,7 +95,7 @@ class ImageViewerOverlayerPlugin(Plugin):
         mask_palette = Palette.from_config(mask_props.get('palette'))
         if mask_palette is None:
             mask_palette = self._palette_pack_settings.main_palette
-        mask = self._file_loading_manager.load_file(Path(file_name), palette=mask_palette)
+        mask = self._file_reading_manager.read_file(Path(file_name), palette=mask_palette)
 
         mask_opacity = mask_props.get('opacity')
         mask_visibility = None if mask_opacity is None else Visibility(opacity=mask_opacity)

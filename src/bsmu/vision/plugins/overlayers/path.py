@@ -11,34 +11,34 @@ from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
     from bsmu.vision.core.data import Data
-    from bsmu.vision.plugins.loaders.manager import FileLoadingManager, FileLoadingManagerPlugin
+    from bsmu.vision.plugins.readers.manager import FileReadingManager, FileReadingManagerPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
-    from bsmu.vision.plugins.post_load_converters.manager import (
-        PostLoadConversionManagerPlugin, PostLoadConversionManager
+    from bsmu.vision.plugins.postread.manager import (
+        PostReadConversionManagerPlugin, PostReadConversionManager
     )
 
 
 class ImageViewerPathOverlayerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
-        'post_load_conversion_manager_plugin':
-            'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
-        'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+        'post_read_conversion_manager_plugin':
+            'bsmu.vision.plugins.postread.manager.PostReadConversionManagerPlugin',
+        'file_reading_manager_plugin': 'bsmu.vision.plugins.readers.manager.FileReadingManagerPlugin',
         'palette_pack_settings_plugin': 'bsmu.vision.plugins.palette.settings.PalettePackSettingsPlugin',
     }
 
     def __init__(
             self,
-            post_load_conversion_manager_plugin: PostLoadConversionManagerPlugin,
-            file_loading_manager_plugin: FileLoadingManagerPlugin,
+            post_read_conversion_manager_plugin: PostReadConversionManagerPlugin,
+            file_reading_manager_plugin: FileReadingManagerPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
     ):
         super().__init__()
 
-        self._post_load_conversion_manager_plugin = post_load_conversion_manager_plugin
-        self._post_load_conversion_manager: PostLoadConversionManager | None = None
+        self._post_read_conversion_manager_plugin = post_read_conversion_manager_plugin
+        self._post_read_conversion_manager: PostReadConversionManager | None = None
 
-        self._file_loading_manager_plugin = file_loading_manager_plugin
-        self._file_loading_manager: FileLoadingManager | None = None
+        self._file_reading_manager_plugin = file_reading_manager_plugin
+        self._file_reading_manager: FileReadingManager | None = None
 
         self._palette_pack_settings_plugin = palette_pack_settings_plugin
         self._palette_pack_settings: PalettePackSettings | None = None
@@ -46,17 +46,17 @@ class ImageViewerPathOverlayerPlugin(Plugin):
         self._overlayer: ImageViewerPathOverlayer | None = None
 
     def _enable(self):
-        self._post_load_conversion_manager = self._post_load_conversion_manager_plugin.post_load_conversion_manager
-        self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+        self._post_read_conversion_manager = self._post_read_conversion_manager_plugin.post_read_conversion_manager
+        self._file_reading_manager = self._file_reading_manager_plugin.file_reading_manager
         self._palette_pack_settings = self._palette_pack_settings_plugin.settings
 
         self._overlayer = ImageViewerPathOverlayer(
-            self._file_loading_manager, self.config.value('layers'), self._palette_pack_settings)
+            self._file_reading_manager, self.config.value('layers'), self._palette_pack_settings)
 
-        self._post_load_conversion_manager.data_converted.connect(self._overlayer.overlay_sibling_dirs_images)
+        self._post_read_conversion_manager.data_converted.connect(self._overlayer.overlay_sibling_dirs_images)
 
     def _disable(self):
-        self._post_load_conversion_manager.data_converted.disconnect(self._overlayer.overlay_sibling_dirs_images)
+        self._post_read_conversion_manager.data_converted.disconnect(self._overlayer.overlay_sibling_dirs_images)
 
         self._overlayer = None
 
@@ -64,13 +64,13 @@ class ImageViewerPathOverlayerPlugin(Plugin):
 class ImageViewerPathOverlayer(QObject):
     def __init__(
             self,
-            file_loading_manager: FileLoadingManager,
+            file_reading_manager: FileReadingManager,
             layers_config_data: dict,
             palette_pack_settings: PalettePackSettings,
     ):
         super().__init__()
 
-        self._file_loading_manager = file_loading_manager
+        self._file_reading_manager = file_reading_manager
         self._layers_config_data = layers_config_data
         self._palette_pack_settings = palette_pack_settings
 
@@ -101,5 +101,5 @@ class ImageViewerPathOverlayer(QObject):
             layer_opacity = layer_props.get('opacity')
             layer_visibility = Visibility(opacity=layer_opacity) if layer_opacity is not None else None
 
-            new_image = self._file_loading_manager.load_file(new_layer_image_path, palette=palette)
+            new_image = self._file_reading_manager.read_file(new_layer_image_path, palette=palette)
             data.add_layer_from_image(new_image, new_layer_name, new_layer_path, layer_visibility)

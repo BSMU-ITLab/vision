@@ -7,22 +7,22 @@ import cv2 as cv
 import numpy as np
 
 from bsmu.vision.core.image import FlatImage
-from bsmu.vision.plugins.loaders.image import ImageFileLoaderPlugin, ImageFileLoader
+from bsmu.vision.plugins.readers.image import ImageFileReaderPlugin, ImageFileReader
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class CommonImageFileLoaderPlugin(ImageFileLoaderPlugin):
+class CommonImageFileReaderPlugin(ImageFileReaderPlugin):
     def __init__(self):
-        super().__init__(CommonImageFileLoader)
+        super().__init__(CommonImageFileReader)
 
 
-class CommonImageFileLoader(ImageFileLoader):
+class CommonImageFileReader(ImageFileReader):
     _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif')
 
-    def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs):
-        logging.info('Load Common Image')
+    def _read_file(self, path: Path, palette=None, as_gray=False, **kwargs):
+        logging.info('Read Common Image')
 
         # Do not use skimage, because:
         # a) OpenCV works a little faster

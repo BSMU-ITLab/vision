@@ -8,12 +8,12 @@ from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins.processor import ProcessorPlugin
 
 
-class PostLoadConverterPlugin(ProcessorPlugin):
-    def __init__(self, post_load_converter_cls):
-        super().__init__(post_load_converter_cls)
+class PostReadConverterPlugin(ProcessorPlugin):
+    def __init__(self, post_read_converter_cls):
+        super().__init__(post_read_converter_cls)
 
 
-class PostLoadConverterMeta(type(QObject), abc.ABCMeta):
+class PostReadConverterMeta(type(QObject), abc.ABCMeta):
     _DATA_TYPES = ()
 
     @property
@@ -25,7 +25,7 @@ class PostLoadConverterMeta(type(QObject), abc.ABCMeta):
         return cls.data_types
 
 
-class PostLoadConverter(QObject, metaclass=PostLoadConverterMeta):
+class PostReadConverter(QObject, metaclass=PostReadConverterMeta):
     data_converted = Signal(Data)
 
     def __init__(self):

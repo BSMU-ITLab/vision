@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
     from bsmu.vision.core.image.layered import ImageLayer
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
-    from bsmu.vision.plugins.loaders.manager import FileLoadingManagerPlugin, FileLoadingManager
+    from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
     from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
@@ -23,14 +23,14 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
-        'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+        'file_reading_manager_plugin': 'bsmu.vision.plugins.readers.manager.FileReadingManagerPlugin',
     }
 
     def __init__(
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
-            file_loading_manager_plugin: FileLoadingManagerPlugin,
+            file_reading_manager_plugin: FileReadingManagerPlugin,
     ):
         super().__init__()
 
@@ -40,8 +40,8 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
         self._mdi_plugin = mdi_plugin
         self._mdi: Mdi | None = None
 
-        self._file_loading_manager_plugin = file_loading_manager_plugin
-        self._file_loading_manager: FileLoadingManager | None = None
+        self._file_reading_manager_plugin = file_reading_manager_plugin
+        self._file_reading_manager: FileReadingManager | None = None
 
         self._mdi_image_layer_file_walker: MdiImageLayerFileWalker | None = None
 
@@ -52,11 +52,11 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
     def _enable_gui(self):
         self._main_window = self._main_window_plugin.main_window
         self._mdi = self._mdi_plugin.mdi
-        self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+        self._file_reading_manager = self._file_reading_manager_plugin.file_reading_manager
 
         self._mdi_image_layer_file_walker = MdiImageLayerFileWalker(
             self._mdi,
-            self._file_loading_manager,
+            self._file_reading_manager,
             self.config_value('extensions'),
         )
 
@@ -76,11 +76,11 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
 
 
 class MdiImageLayerFileWalker(QObject):
-    def __init__(self, mdi: Mdi, file_loading_manager: FileLoadingManager, allowed_extensions: list[str] | None):
+    def __init__(self, mdi: Mdi, file_reading_manager: FileReadingManager, allowed_extensions: list[str] | None):
         super().__init__()
 
         self._mdi = mdi
-        self._file_loading_manager = file_loading_manager
+        self._file_reading_manager = file_reading_manager
         self._allowed_extensions = allowed_extensions
 
         self._window_to_walker: dict[DataViewerSubWindow, ImageLayerFileWalker] = {}
@@ -103,7 +103,7 @@ class MdiImageLayerFileWalker(QObject):
         image_layer_file_walker = self._window_to_walker.get(active_sub_window)
         if image_layer_file_walker is None:
             image_layer_file_walker = ImageLayerFileWalker(
-                active_sub_window.viewer, self._file_loading_manager, self._allowed_extensions)
+                active_sub_window.viewer, self._file_reading_manager, self._allowed_extensions)
             self._window_to_walker[active_sub_window] = image_layer_file_walker
         return image_layer_file_walker
 
@@ -112,13 +112,13 @@ class ImageLayerFileWalker(QObject):
     def __init__(
             self,
             image_viewer: LayeredImageViewer,
-            file_loading_manager: FileLoadingManager,
+            file_reading_manager: FileReadingManager,
             allowed_extensions: list[str] | None,
     ):
         super().__init__()
 
         self._image_viewer = image_viewer
-        self._file_loading_manager = file_loading_manager
+        self._file_reading_manager = file_reading_manager
         self._allowed_extensions = allowed_extensions
 
         self._main_layer_dir: Path | None = None
@@ -175,8 +175,8 @@ class ImageLayerFileWalker(QObject):
             if layer.path is None:
                 continue
 
-            # Load new image, but use palette of old image (so, if palette is not None, image will be loaded as gray)
+            # Read new image, but use palette of old image (so, if palette is not None, image will be read as gray)
             file_path = layer.path / requested_file_relative_path
             if layer != self._image_viewer.active_layer and layer.extension is not None:
                 file_path = file_path.with_suffix(layer.extension)
-            layer.image = self._file_loading_manager.load_file(file_path, palette=layer.palette)
+            layer.image = self._file_reading_manager.read_file(file_path, palette=layer.palette)

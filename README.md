@@ -30,9 +30,9 @@ pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcon
 
 - **Data Analysis and File Format Handling**
   - **pandas**: Data analysis tool.
-  - **nibabel**: Loads NIfTI files.
-  - **pydicom**: Loads DICOM files.
-  - **slideio**: Loads high-resolution medical slides (Whole Slide Imaging).
+  - **nibabel**: Reads NIfTI files.
+  - **pydicom**: Reads DICOM files.
+  - **slideio**: Reads high-resolution medical slides (Whole Slide Imaging).
   - **tifffile**: Manages tiled multi-resolution (pyramid) TIFF files.
 
 - **Testing**

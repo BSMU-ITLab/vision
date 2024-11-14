@@ -6,22 +6,22 @@ from typing import TYPE_CHECKING
 import pydicom
 
 from bsmu.vision.core.image import VolumeImage
-from bsmu.vision.plugins.loaders.file import FileLoaderPlugin, FileLoader
+from bsmu.vision.plugins.readers.file import FileReaderPlugin, FileReader
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class MultiFrameDicomFileLoaderPlugin(FileLoaderPlugin):
+class MultiFrameDicomFileReaderPlugin(FileReaderPlugin):
     def __init__(self):
-        super().__init__(MultiFrameDicomFileLoader)
+        super().__init__(MultiFrameDicomFileReader)
 
 
-class MultiFrameDicomFileLoader(FileLoader):
+class MultiFrameDicomFileReader(FileReader):
     _FORMATS = ('dcm',)
 
-    def _load_file(self, path: Path, **kwargs) -> VolumeImage:
-        logging.info('Load Multi-frame DICOM')
+    def _read_file(self, path: Path, **kwargs) -> VolumeImage:
+        logging.info('Read Multi-frame DICOM')
 
         dataset = pydicom.dcmread(str(path))
         return VolumeImage(dataset.pixel_array, path=path)

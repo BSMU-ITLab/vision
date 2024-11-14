@@ -9,7 +9,7 @@ from bsmu.vision.core.config import Config
 from bsmu.vision.core.image import FlatImage, VolumeImage
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.visibility import Visibility
-from bsmu.vision.plugins.post_load_converters import PostLoadConverter, PostLoadConverterPlugin
+from bsmu.vision.plugins.postread import PostReadConverter, PostReadConverterPlugin
 
 if TYPE_CHECKING:
     from bsmu.vision.core.data import Data
@@ -59,19 +59,19 @@ class ImageLayerConfig(Config):
         return layer_name, layer_path
 
 
-class ImageToLayeredImagePostLoadConverterPlugin(PostLoadConverterPlugin):
+class ImageToLayeredImagePostReadConverterPlugin(PostReadConverterPlugin):
     def __init__(self):
-        super().__init__(ImageToLayeredImagePostLoadConverter)
+        super().__init__(ImageToLayeredImagePostReadConverter)
 
     def _enable(self):
         image_layer_config = ImageLayerConfig.from_dict(self.config_value('created_layer'))
 
         # TODO: it's a temporary workaround to pass the config into converter class.
         #  Remove this, when config will be passed into all processor classes
-        ImageToLayeredImagePostLoadConverter.config = image_layer_config
+        ImageToLayeredImagePostReadConverter.config = image_layer_config
 
 
-class ImageToLayeredImagePostLoadConverter(PostLoadConverter):
+class ImageToLayeredImagePostReadConverter(PostReadConverter):
     _DATA_TYPES = (FlatImage, VolumeImage)
 
     def _convert_data(self, data: Data) -> Data:

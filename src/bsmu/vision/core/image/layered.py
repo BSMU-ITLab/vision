@@ -214,7 +214,7 @@ class LayerImageDependencyController(QObject):
 
     def corresponding_layer_image(self, slave_layer: ImageLayer):
         file_path = layer.path / next_file_name
-        layer.image = self.file_loading_manager.load_file(file_path, palette=layer.palette)
+        layer.image = self.file_reading_manager.read_file(file_path, palette=layer.palette)
 
     def _update_slave_layer_image(self, slave_layer: ImageLayer):
 

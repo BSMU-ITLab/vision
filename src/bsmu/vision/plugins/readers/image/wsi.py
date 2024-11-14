@@ -9,7 +9,7 @@ import skimage.io
 import slideio
 
 from bsmu.vision.core.image import FlatImage
-from bsmu.vision.plugins.loaders.image import ImageFileLoaderPlugin, ImageFileLoader
+from bsmu.vision.plugins.readers.image import ImageFileReaderPlugin, ImageFileReader
 from pathlib import Path
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.path import is_ascii_path
@@ -18,12 +18,12 @@ from bsmu.vision.core.path import is_ascii_path
 #     from pathlib import Path
 
 
-class WholeSlideImageFileLoaderPlugin(ImageFileLoaderPlugin):
+class WholeSlideImageFileReaderPlugin(ImageFileReaderPlugin):
     def __init__(self):
-        super().__init__(WholeSlideImageFileLoader)
+        super().__init__(WholeSlideImageFileReader)
 
 
-class WholeSlideImageFileLoader(ImageFileLoader):
+class WholeSlideImageFileReader(ImageFileReader):
     _FORMATS = ('svs', 'afi', 'scn', 'czi', 'zvi', 'ndpi', 'tiff', 'tif')
 
     def __init__(self):
@@ -40,8 +40,8 @@ class WholeSlideImageFileLoader(ImageFileLoader):
             '.tif': 'GDAL',
         }
 
-    def _load_file(self, path: Path, palette=None, as_gray=False, **kwargs) -> Data:
-        logging.info('Load Whole-Slide Image')
+    def _read_file(self, path: Path, palette=None, as_gray=False, **kwargs) -> Data:
+        logging.info('Read Whole-Slide Image')
 
         # multi_image_level = 1
         # pixels = skimage.io.MultiImage(

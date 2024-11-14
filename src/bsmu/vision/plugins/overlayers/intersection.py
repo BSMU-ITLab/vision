@@ -14,49 +14,49 @@ from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
     from bsmu.vision.core.data import Data
-    from bsmu.vision.plugins.post_load_converters.manager import (
-        PostLoadConversionManager, PostLoadConversionManagerPlugin
+    from bsmu.vision.plugins.postread.manager import (
+        PostReadConversionManager, PostReadConversionManagerPlugin
     )
-    from bsmu.vision.plugins.loaders.manager import FileLoadingManager, FileLoadingManagerPlugin
+    from bsmu.vision.plugins.readers.manager import FileReadingManager, FileReadingManagerPlugin
 
 
 class ImageViewerIntersectionOverlayerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
-        'post_load_conversion_manager_plugin':
-            'bsmu.vision.plugins.post_load_converters.manager.PostLoadConversionManagerPlugin',
-        'file_loading_manager_plugin': 'bsmu.vision.plugins.loaders.manager.FileLoadingManagerPlugin',
+        'post_read_conversion_manager_plugin':
+            'bsmu.vision.plugins.postread.manager.PostReadConversionManagerPlugin',
+        'file_reading_manager_plugin': 'bsmu.vision.plugins.readers.manager.FileReadingManagerPlugin',
     }
 
     def __init__(
             self,
-            post_load_conversion_manager_plugin: PostLoadConversionManagerPlugin,
-            file_loading_manager_plugin: FileLoadingManagerPlugin,
+            post_read_conversion_manager_plugin: PostReadConversionManagerPlugin,
+            file_reading_manager_plugin: FileReadingManagerPlugin,
     ):
         super().__init__()
 
-        self._post_load_conversion_manager_plugin = post_load_conversion_manager_plugin
-        self._post_load_conversion_manager: PostLoadConversionManager | None = None
+        self._post_read_conversion_manager_plugin = post_read_conversion_manager_plugin
+        self._post_read_conversion_manager: PostReadConversionManager | None = None
 
-        self._file_loading_manager_plugin = file_loading_manager_plugin
-        self._file_loading_manager: FileLoadingManager | None = None
+        self._file_reading_manager_plugin = file_reading_manager_plugin
+        self._file_reading_manager: FileReadingManager | None = None
 
         self._overlayer: ImageViewerIntersectionOverlayer | None = None
 
     def _enable(self):
-        self._post_load_conversion_manager = self._post_load_conversion_manager_plugin.post_load_conversion_manager
-        self._file_loading_manager = self._file_loading_manager_plugin.file_loading_manager
+        self._post_read_conversion_manager = self._post_read_conversion_manager_plugin.post_read_conversion_manager
+        self._file_reading_manager = self._file_reading_manager_plugin.file_reading_manager
 
         self._overlayer = ImageViewerIntersectionOverlayer(
-            self._file_loading_manager,
+            self._file_reading_manager,
             self.config.value('layers'),
             self.config.value('intersection_layer'),
         )
 
-        self._post_load_conversion_manager.data_converted.connect(
+        self._post_read_conversion_manager.data_converted.connect(
             self._overlayer.overlay_sibling_dirs_mask_intersection)
 
     def _disable(self):
-        self._post_load_conversion_manager.data_converted.disconnect(
+        self._post_read_conversion_manager.data_converted.disconnect(
             self._overlayer.overlay_sibling_dirs_mask_intersection)
 
         self._overlayer = None
@@ -65,13 +65,13 @@ class ImageViewerIntersectionOverlayerPlugin(Plugin):
 class ImageViewerIntersectionOverlayer(QObject):
     def __init__(
             self,
-            file_loading_manager: FileLoadingManager,
+            file_reading_manager: FileReadingManager,
             layers_properties: dict,
             intersection_layer_properties: dict,
     ):
         super().__init__()
 
-        self._file_loading_manager = file_loading_manager
+        self._file_reading_manager = file_reading_manager
         self._layers_properties = layers_properties
         self._intersection_layer_properties = intersection_layer_properties
 
@@ -105,7 +105,7 @@ class ImageViewerIntersectionOverlayer(QObject):
             palette_layer_index = i + 1
             color_property = layer_properties.get('color')
             intersection_palette_array[palette_layer_index] = color_property
-            new_image = self._file_loading_manager.load_file(new_layer_image_path)
+            new_image = self._file_reading_manager.read_file(new_layer_image_path)
             if not isinstance(new_image, Image):
                 continue
 

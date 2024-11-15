@@ -452,8 +452,8 @@ class LayeredImageViewer(DataViewer):
     data_name_changed = Signal(str)
 
     def __init__(self, data: LayeredImage = None, settings: ImageViewerSettings = None):
-        super().__init__()  # do not pass |data| as parameter, cause we need at first create _LayeredImageGraphicsObject
-        # Thus, |data| is assigned later, when _LayeredImageGraphicsObject will be created
+        super().__init__()  # Do not pass `data` as parameter, because we need at first create
+        # _LayeredImageGraphicsObject. Thus, `data` is assigned later, when _LayeredImageGraphicsObject will be created.
 
         self._settings = settings
 
@@ -514,8 +514,9 @@ class LayeredImageViewer(DataViewer):
         self.add_layer(layer)
         return layer
 
-    def add_layer_or_modify_image(self, name: str, image: Image, visibility: Visibility = None) -> ImageLayer:
-        return self.data.add_layer_or_modify_image(name, image, visibility)
+    def add_layer_or_modify_image(
+            self, name: str, image: Image, path: Path = None, visibility: Visibility = None) -> ImageLayer:
+        return self.data.add_layer_or_modify_image(name, image, path, visibility)
 
     def add_layer_or_modify_pixels(
             self,
@@ -523,9 +524,10 @@ class LayeredImageViewer(DataViewer):
             pixels: np.array,
             image_type: Type[Image],
             palette: Palette = None,
+            path: Path = None,
             visibility: Visibility = None
     ) -> ImageLayer:
-        return self.data.add_layer_or_modify_pixels(name, pixels, image_type, palette, visibility)
+        return self.data.add_layer_or_modify_pixels(name, pixels, image_type, palette, path, visibility)
 
     def remove_layer(self, layer: ImageLayer):
         self.data.remove_layer(layer)

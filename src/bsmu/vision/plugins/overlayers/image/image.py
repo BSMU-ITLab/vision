@@ -99,4 +99,4 @@ class ImageViewerOverlayerPlugin(Plugin):
 
         mask_opacity = mask_props.get('opacity')
         mask_visibility = None if mask_opacity is None else Visibility(opacity=mask_opacity)
-        layered_image_viewer.add_layer_or_modify_image(layer_name, mask, mask_visibility)
+        layered_image_viewer.add_layer_or_modify_image(layer_name, mask, visibility=mask_visibility)

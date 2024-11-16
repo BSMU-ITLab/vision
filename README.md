@@ -5,9 +5,9 @@ The app contains a lot of plugins to preprocess and analyze segmentation results
 
 ## Python environment
 
-python 3.10
+python 3.11
 ```bash
-pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcontainers onnxruntime-gpu pandas nibabel pydicom slideio tifffile pytest toml cx-freeze
+pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcontainers onnxruntime-gpu pandas nibabel pydicom slideio tifffile pytest cx-freeze
 ```
 
 ### Mandatory Dependencies
@@ -39,7 +39,6 @@ pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcon
   - **pytest**: Testing framework.
 
 - **Build and Packaging**
-  - **toml**: Configuration for PyPI packages.
   - **cx-freeze**: Creates standalone executables and installers.
 
 ## Contributing

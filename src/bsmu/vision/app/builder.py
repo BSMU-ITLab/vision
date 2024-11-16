@@ -178,10 +178,6 @@ class AppBuilder:
             include_files += self._get_or_download_extra_files()
         print('include_files: ', include_files)
 
-        # TODO: Currently, only modules of the base app (bsmu.vision) are being excluded by cx_Freeze.
-        #  Investigate why data modules and config dirs of derived apps (e.g., bsmu.biocell) are not being excluded.
-        #  This issue might be related to namespace packages.
-        #  Check the behavior with other non-namespace derived apps.
         config_modules_to_exclude = self._generate_config_modules_to_exclude()
         frozen_rel_data_paths = [data_file_tuple[1] for data_file_tuple in list_of_data_file_tuples]
         data_modules_to_exclude = self._generate_data_modules_to_exclude(frozen_rel_data_paths)

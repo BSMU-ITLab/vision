@@ -4,7 +4,7 @@ import copy
 import logging
 import time
 from dataclasses import dataclass, field, fields
-from typing import TYPE_CHECKING
+from typing import ClassVar, TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
@@ -17,7 +17,6 @@ from bsmu.vision.dnn.config import OnnxConfig, CPU_PROVIDER
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
-    from typing import ClassVar
 
 
 @dataclass
@@ -60,12 +59,12 @@ class ImageModelParams(ModelParams):
 
     _input_image_size_cache: tuple = field(default=None, init=False, repr=False, compare=False)
 
-    IMAGENET_MEAN: ClassVar[np.array] = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-    IMAGENET_STD: ClassVar[np.array] = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    IMAGENET_MEAN: ClassVar[np.ndarray] = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    IMAGENET_STD: ClassVar[np.ndarray] = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
     # The following constants are used for minor optimization
-    IMAGENET_MEAN_x_255: ClassVar[np.array] = IMAGENET_MEAN * 255
-    IMAGENET_STD_x_255: ClassVar[np.array] = IMAGENET_STD * 255
+    IMAGENET_MEAN_x_255: ClassVar[np.ndarray] = IMAGENET_MEAN * 255
+    IMAGENET_STD_x_255: ClassVar[np.ndarray] = IMAGENET_STD * 255
 
     def copy_but_change_name(self, new_name: str) -> ImageModelParams:
         model_params_copy = copy.deepcopy(self)

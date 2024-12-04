@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import cv2 as cv
@@ -199,3 +200,23 @@ class VolumeImage(Image):
 
     def center_slice_number(self, plane_axis: PlaneAxis):
         return math.floor(self.array.shape[plane_axis] / 2)
+
+
+class MaskDrawMode(Enum):
+    REDRAW_ALL = 1, "Completely replace the existing mask with the new mask."
+    OVERLAY_FOREGROUND = 2, (
+        "Apply the new mask only where its own pixels are equal to foreground value, "
+        "preserving the existing mask elsewhere."
+    )
+    FILL_BACKGROUND = 3, (
+        "Apply the new mask only on the background pixels of the existing mask, "
+        "leaving other pixels unchanged."
+    )
+
+    def __init__(self, value: int, description: str):
+        super().__init__(value)
+        self._description = description
+
+    @property
+    def description(self) -> str:
+        return self._description

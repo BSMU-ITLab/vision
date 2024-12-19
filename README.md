@@ -1,9 +1,10 @@
 # Vision
 
-Application to work with images and other visual information.<br>
-The app contains a lot of plugins to preprocess and analyze segmentation results. Necessary plugins can be enabled/disabled using plugin manager.
+Application to work with images and other visual information.  
+The app contains a lot of plugins to preprocess and analyze segmentation results.
+Necessary plugins can be enabled/disabled using plugin manager.
 
-## Python environment
+## Python Environment
 
 python 3.11
 ```bash
@@ -25,6 +26,7 @@ pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcon
 - **sortedcontainers**: Sorted collections library.
 
 ### Specialized Dependencies
+
 - **Neural Network Inference**
   - **onnxruntime-gpu**: Infers neural network models on GPUs and CPUs.
 
@@ -40,6 +42,41 @@ pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcon
 
 - **Build and Packaging**
   - **cx-freeze**: Creates standalone executables and installers.
+
+## Running the Application from Source
+
+To run the application, configure your IDE to recognize the `src` directory as the source root.  
+Then run `bsmu/vision/app/main.py`:
+
+### PyCharm
+
+1. Right-click on the `src` folder.
+2. Select **Mark Directory as** -> **Sources Root**.
+3. Right-click on `bsmu/vision/app/main.py` and select **Run**.
+
+### VS Code
+
+Use predefined configurations in the `launch.json` file, located in the `.vscode` folder:
+1. Open the **Run and Debug** view by clicking on the **Run and Debug** icon in the **Activity Bar**
+(or use the shortcut `Ctrl+Shift+D`).
+2. In the dropdown menu at the top of the **Run and Debug** view, select the configuration: `Python: Run main.py`.
+3. Click the green play button (**Start Debugging**) next to the dropdown menu to run the selected configuration.
+If you want to run without debugging, use the shortcut `Ctrl+F5`.
+
+## Building the .exe
+
+Run the `scripts/build.py` script with the argument `build`:
+
+### PyCharm
+
+1. Right-click on the `scripts/build.py` script and select **Modify Run Configuration...**.
+2. In the **Script parameters** field, enter: `build`.
+3. Right-click on the `scripts/build.py` script again and select **Run**.
+
+### VS Code
+
+1. In the **Run and Debug** view, select the configuration: `Python: Run build.py`.
+2. Run the selected configuration (`Ctrl+F5` - without debugging; `F5` - with debugging).
 
 ## Contributing
 

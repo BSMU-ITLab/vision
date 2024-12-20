@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.plugins.processor.registry import ProcessorRegistry
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.visualizers.registry import DataVisualizerRegistryPlugin
+    from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
 
 
 class DataVisualizationManagerPlugin(Plugin):
@@ -60,7 +61,7 @@ class DataVisualizationManager(QObject):
     def can_visualize_data(self, data: Data) -> bool:
         return self.data_visualizer_registry.contains(type(data))
 
-    def visualize_data(self, data: Data):
+    def visualize_data(self, data: Data) -> list[DataViewerSubWindow]:
         logging.info(f'Visualize data: {type(data)}')
         visualizer_cls_with_settings = self.data_visualizer_registry.processor_cls_with_settings(type(data))
         if visualizer_cls_with_settings is not None:
@@ -68,3 +69,4 @@ class DataVisualizationManager(QObject):
                 self.mdi, visualizer_cls_with_settings.processor_settings)
             data_viewer_sub_windows = visualizer.visualize_data(data)
             self.data_visualized.emit(data, data_viewer_sub_windows)
+            return data_viewer_sub_windows

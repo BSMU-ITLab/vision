@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
+import logging
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -37,11 +39,19 @@ def generate_list_of_data_file_tuples_in_subprocess(packages_with_data: list[Mod
     """
     package_names = [package.__name__ for package in packages_with_data]
     kwargs = {'package_names': package_names}
-    out = subprocess.check_output(
-        ['python', Path(__file__).parent / 'builder_helper.py', str(kwargs)])
-    out = out.decode('utf-8')
+    try:
+        completed_subprocess = subprocess.run(
+            [sys.executable, Path(__file__).parent / 'builder_helper.py', str(kwargs)],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        logging.error(f'Subprocess execution failed with error:\n{e.stderr}')
+        sys.exit(1)
+
     # Filter out empty strings after split
-    last_printed_output_str = list(filter(None, out.split('\n')))[-1]
+    last_printed_output_str = list(filter(None, completed_subprocess.stdout.split('\n')))[-1]
     last_printed_output_dict = ast.literal_eval(last_printed_output_str)
     list_of_data_file_tuples = last_printed_output_dict['list_of_data_file_tuples']
     return list_of_data_file_tuples

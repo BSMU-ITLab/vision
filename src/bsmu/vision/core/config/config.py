@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
+from enum import Enum
 from pathlib import Path
 from types import UnionType
-from typing import get_type_hints, TypeVar, TYPE_CHECKING
+from typing import get_type_hints, TYPE_CHECKING
 
 import numpy as np
 from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
-    from typing import Any, Type
-
-Self = TypeVar('Self', bound='Config')  # Use `from typing import Self` in Python 3.11
+    from typing import Any, Self, Type
 
 
 _SENTINEL: object = object()
@@ -70,6 +69,13 @@ class Config:
         # then recursively call from_dict to create a nested Config object.
         if isinstance(value, dict) and issubclass(type_, Config):
             return type_.from_dict(value), True
+        elif isinstance(value, (str, int)) and issubclass(type_, Enum):
+            try:
+                if isinstance(value, str):
+                    return type_[value.upper()], True
+                return type_(value), True
+            except (ValueError, KeyError):
+                return value, False
         else:
             # Try to cast `value` to `type_` according to the `_TARGET_CASTING_TO_SOURCE_TYPES`.
             for target_type, source_type in _TARGET_CASTING_TO_SOURCE_TYPES.items():

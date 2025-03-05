@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from typing import TYPE_CHECKING
 
 import cv2
@@ -10,9 +12,10 @@ import skimage.draw
 import skimage.measure
 from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QCursor
-from PySide6.QtWidgets import QCheckBox, QFormLayout, QSpinBox
+from PySide6.QtWidgets import QGroupBox, QFormLayout, QHBoxLayout, QRadioButton, QSpinBox, QVBoxLayout
 
 from bsmu.vision.core.bbox import BBox
+from bsmu.vision.core.config import Config
 from bsmu.vision.core.image import MASK_TYPE, MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
 from bsmu.vision.plugins.tools.viewer import (
@@ -49,10 +52,24 @@ DEFAULT_MAX_RADIUS = 2200
 DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE = 100
 
 
+class RepaintingMode(Enum):
+    ALL = 1     # Repaint all classes
+    CUSTOM = 2  # Repaint custom class
+
+
+@dataclass
+class RepaintingConfig(Config):
+    enabled: bool = True
+    mode: RepaintingMode = RepaintingMode.ALL
+    custom_class: int = 1
+
+
 class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
     radius_changed = Signal(float)
     smart_mode_enabled_changed = Signal(bool)
     repainting_enabled_changed = Signal(bool)
+    repainting_mode_changed = Signal(RepaintingMode)
+    repainted_class_changed = Signal(int)
     mask_foreground_class_changed = Signal(int)
 
     def __init__(
@@ -65,7 +82,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             radius_zoom_factor: float,
             max_radius_without_downscale: float,
             smart_mode_enabled: bool,
-            repainting_enabled: bool,
+            repainting: RepaintingConfig,
             number_of_clusters: int,
             painted_cluster: str | int,
             paint_connected_component: bool,
@@ -80,7 +97,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         self._radius_zoom_factor = radius_zoom_factor
         self._max_radius_without_downscale = max_radius_without_downscale
         self._smart_mode_enabled = smart_mode_enabled
-        self._repainting_enabled = repainting_enabled
+        self._repainting = repainting
         self._number_of_clusters = number_of_clusters
         self._painted_cluster = painted_cluster
         self._paint_connected_component = paint_connected_component
@@ -162,13 +179,33 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
 
     @property
     def repainting_enabled(self) -> bool:
-        return self._repainting_enabled
+        return self._repainting.enabled
 
     @repainting_enabled.setter
     def repainting_enabled(self, value: bool):
-        if self._repainting_enabled != value:
-            self._repainting_enabled = value
-            self.repainting_enabled_changed.emit(self._repainting_enabled)
+        if self._repainting.enabled != value:
+            self._repainting.enabled = value
+            self.repainting_enabled_changed.emit(self._repainting.enabled)
+
+    @property
+    def repainting_mode(self) -> RepaintingMode:
+        return self._repainting.mode
+
+    @repainting_mode.setter
+    def repainting_mode(self, value: RepaintingMode):
+        if self._repainting.mode != value:
+            self._repainting.mode = value
+            self.repainting_mode_changed.emit(self._repainting.mode)
+
+    @property
+    def repainted_class(self) -> int:
+        return self._repainting.custom_class
+
+    @repainted_class.setter
+    def repainted_class(self, value: int):
+        if self._repainting.custom_class != value:
+            self._repainting.custom_class = value
+            self.repainted_class_changed.emit(self._repainting.custom_class)
 
     @property
     def number_of_clusters(self) -> int:
@@ -239,7 +276,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             config.value('radius_zoom_factor', 1),
             config.value('max_radius_without_downscale', DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE),
             config.value('smart_mode_enabled', True),
-            config.value('repainting_enabled', True),
+            RepaintingConfig.from_dict(config.value('repainting')),
             config.value('number_of_clusters', 2),
             config.value('painted_cluster', 'central'),
             config.value('paint_connected_component', True),
@@ -251,37 +288,79 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
     def __init__(self, tool_settings: WsiSmartBrushImageViewerToolSettings, parent: QWidget = None):
         super().__init__(tool_settings, parent)
 
-        layout = QFormLayout()
+        form_layout = QFormLayout()
 
         # self._mask_layer_combo_box = QComboBox()
-        # layout.addRow('&Mask Layer:', self._mask_layer_combo_box)
+        # form_layout.addRow('&Mask Layer:', self._mask_layer_combo_box)
 
         self._mask_foreground_class_spin_box = QSpinBox()
         self._mask_foreground_class_spin_box.setMaximum(MASK_MAX)
         self._mask_foreground_class_spin_box.setValue(tool_settings.mask_foreground_class)
         self._mask_foreground_class_spin_box.valueChanged.connect(self._on_mask_foreground_class_spin_box_value_changed)
-        tool_settings.mask_foreground_class_changed.connect(self._on_tool_settings_mask_foreground_class_changed)
-        layout.addRow(self.tr('&Mask Foreground:'), self._mask_foreground_class_spin_box)
+        tool_settings.mask_foreground_class_changed.connect(self._mask_foreground_class_spin_box.setValue)
+        form_layout.addRow(self.tr('&Mask Foreground:'), self._mask_foreground_class_spin_box)
 
-        self._enable_repainting_check_box = QCheckBox()
-        self._enable_repainting_check_box.setChecked(tool_settings.repainting_enabled)
-        self._enable_repainting_check_box.checkStateChanged.connect(self._on_enable_repainting_check_state_changed)
-        tool_settings.repainting_enabled_changed.connect(self._on_tool_settings_repainting_enabled_changed)
-        layout.addRow(self.tr('Enable Repainting:'), self._enable_repainting_check_box)
+        self._repainting_group_box = QGroupBox(self.tr('Enable Repainting'))
+        self._repainting_group_box.setCheckable(True)
+        self._repainting_group_box.setChecked(tool_settings.repainting_enabled)
+        self._repainting_group_box.toggled.connect(self._on_repainting_enabled_group_box_toggled)
+        tool_settings.repainting_enabled_changed.connect(self._repainting_group_box.setChecked)
+
+        self._repainting_mode_to_radio_button = {}
+        self._radio_button_to_repainting_mode = {}
+        self._repaint_all_classes_radio_button = (
+            self._create_repainting_mode_radio_button(self.tr('Repaint All Classes'), RepaintingMode.ALL))
+        self._repaint_custom_class_radio_button = (
+            self._create_repainting_mode_radio_button(self.tr('Repaint Custom Class'), RepaintingMode.CUSTOM))
+        tool_settings.repainting_mode_changed.connect(self._on_tool_settings_repainting_mode_changed)
+
+        self._repaint_custom_class_spin_box = QSpinBox()
+        self._repaint_custom_class_spin_box.setMaximum(MASK_MAX)
+        self._repaint_custom_class_spin_box.setValue(tool_settings.repainted_class)
+        self._repaint_custom_class_spin_box.setEnabled(self._repaint_custom_class_radio_button.isChecked())
+        self._repaint_custom_class_radio_button.toggled.connect(self._repaint_custom_class_spin_box.setEnabled)
+        self._repaint_custom_class_spin_box.valueChanged.connect(self._on_repaint_custom_class_spin_box_value_changed)
+        tool_settings.repainted_class_changed.connect(self._repaint_custom_class_spin_box.setValue)
+
+        repaint_custom_class_layout = QHBoxLayout()
+        repaint_custom_class_layout.addWidget(self._repaint_custom_class_radio_button)
+        repaint_custom_class_layout.addWidget(self._repaint_custom_class_spin_box)
+
+        repainting_group_box_layout = QVBoxLayout()
+        repainting_group_box_layout.addWidget(self._repaint_all_classes_radio_button)
+        repainting_group_box_layout.addLayout(repaint_custom_class_layout)
+
+        self._repainting_group_box.setLayout(repainting_group_box_layout)
+
+        layout = QVBoxLayout()
+        layout.addLayout(form_layout)
+        layout.addWidget(self._repainting_group_box)
 
         self.setLayout(layout)
 
     def _on_mask_foreground_class_spin_box_value_changed(self, value: int):
         self.tool_settings.mask_foreground_class = value
 
-    def _on_tool_settings_mask_foreground_class_changed(self, value: int):
-        self._mask_foreground_class_spin_box.setValue(value)
+    def _on_repainting_enabled_group_box_toggled(self, checked: bool):
+        self.tool_settings.repainting_enabled = checked
 
-    def _on_enable_repainting_check_state_changed(self, state: Qt.CheckState):
-        self.tool_settings.repainting_enabled = state == Qt.Checked
+    def _create_repainting_mode_radio_button(self, text: str, mode: RepaintingMode) -> QRadioButton:
+        radio_button = QRadioButton(text)
+        radio_button.setChecked(self.tool_settings.repainting_mode is mode)
+        radio_button.toggled.connect(partial(self._on_repaint_mode_radio_button_toggled, radio_button))
+        self._repainting_mode_to_radio_button[mode] = radio_button
+        self._radio_button_to_repainting_mode[radio_button] = mode
+        return radio_button
 
-    def _on_tool_settings_repainting_enabled_changed(self, repainting_enabled: bool):
-        self._enable_repainting_check_box.setChecked(repainting_enabled)
+    def _on_repaint_mode_radio_button_toggled(self, radio_button: QRadioButton, checked: bool):
+        if checked:
+            self.tool_settings.repainting_mode = self._radio_button_to_repainting_mode[radio_button]
+
+    def _on_tool_settings_repainting_mode_changed(self, mode: RepaintingMode):
+        self._repainting_mode_to_radio_button[mode].setChecked(True)
+
+    def _on_repaint_custom_class_spin_box_value_changed(self, value: int):
+        self.tool_settings.repainted_class = value
 
 
 class ModifyMaskCommand(UndoCommand):
@@ -763,10 +842,18 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
     def modifiable_mask_pixels(self, mask_class: int) -> npt.NDArray[bool]:
         mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
-        if self.settings.repainting_enabled or self._mode == Mode.ERASE:
-            return mask_in_brush_bbox != mask_class
+        if self.settings.repainting_enabled:
+            if self.settings.repainting_mode == RepaintingMode.ALL or self._mode == Mode.ERASE:
+                return mask_in_brush_bbox != mask_class
+
+            repainted_class = self.settings.repainted_class
         else:
-            return mask_in_brush_bbox == self.settings.mask_background_class
+            repainted_class = self.settings.mask_background_class
+
+        if mask_class == repainted_class:
+            return np.zeros_like(mask_in_brush_bbox, dtype=bool)
+
+        return mask_in_brush_bbox == repainted_class
 
     def _create_and_push_modify_mask_command(
             self, modified_bbox_pixels: np.ndarray, new_modified_bbox_pixels: int | np.ndarray, text: str):

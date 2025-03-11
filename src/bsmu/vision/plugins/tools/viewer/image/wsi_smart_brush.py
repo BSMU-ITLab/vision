@@ -54,8 +54,9 @@ DEFAULT_MAX_RADIUS_WITHOUT_DOWNSCALE = 100
 
 
 class RepaintingMode(Enum):
-    ALL = 1     # Repaint all classes
-    CUSTOM = 2  # Repaint custom class
+    ALL = 1      # Repaint all classes
+    POINTER = 2  # Repaint the class under the mouse pointer
+    CUSTOM = 3   # Repaint a custom class
 
 
 @dataclass
@@ -314,6 +315,13 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
         self._radio_button_to_repainting_mode = {}
         self._repaint_all_classes_radio_button = (
             self._create_repainting_mode_radio_button(self.tr('Repaint All Classes'), RepaintingMode.ALL))
+        self._repaint_pointer_class_radio_button = (
+            self._create_repainting_mode_radio_button(
+                self.tr('Repaint Pointer Class'),
+                RepaintingMode.POINTER,
+                self.tr('Repaint the class captured at brush stroke start under the mouse pointer.'),
+            )
+        )
         self._repaint_custom_class_radio_button = (
             self._create_repainting_mode_radio_button(self.tr('Repaint Custom Class'), RepaintingMode.CUSTOM))
         tool_settings.repainting_mode_changed.connect(self._on_tool_settings_repainting_mode_changed)
@@ -332,6 +340,7 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
 
         repainting_group_box_layout = QVBoxLayout()
         repainting_group_box_layout.addWidget(self._repaint_all_classes_radio_button)
+        repainting_group_box_layout.addWidget(self._repaint_pointer_class_radio_button)
         repainting_group_box_layout.addLayout(repaint_custom_class_layout)
 
         self._repainting_group_box.setLayout(repainting_group_box_layout)
@@ -348,8 +357,9 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
     def _on_repainting_enabled_group_box_toggled(self, checked: bool):
         self.tool_settings.repainting_enabled = checked
 
-    def _create_repainting_mode_radio_button(self, text: str, mode: RepaintingMode) -> QRadioButton:
+    def _create_repainting_mode_radio_button(self, text: str, mode: RepaintingMode, tooltip: str = '') -> QRadioButton:
         radio_button = QRadioButton(text)
+        radio_button.setToolTip(tooltip)
         radio_button.setChecked(self.tool_settings.repainting_mode is mode)
         radio_button.toggled.connect(partial(self._on_repaint_mode_radio_button_toggled, radio_button))
         self._repainting_mode_to_radio_button[mode] = radio_button
@@ -565,8 +575,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         self._is_stroke_finished = True
         self._is_mask_modified_during_stroke = False
         self._stroke_central_cluster_brightness_index: int | None = None  # Index of the central cluster
-        # (under mouse pointer) in the sorted array by brightness. Determined at the start of a brush stroke
-        # and remains constant until the stroke is finished.
+        # (under mouse pointer) in the sorted array by brightness. Set at the start of a brush stroke
+        # and remains constant throughout the stroke.
+        self._stroke_repainted_mask_class: int | MASK_TYPE | None = None  # Mask class under the mouse pointer,
+        # set at the start of a brush stroke and remains constant throughout the stroke.
 
     @property
     def mode(self) -> Mode:
@@ -576,10 +588,8 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
     def mode(self, value: Mode):
         if self._mode != value:
             self._mode = value
-            if self._mode == Mode.DRAW or self._mode == Mode.ERASE:
-                self._is_stroke_finished = False
-                self._is_mask_modified_during_stroke = False
-                WsiSmartBrushImageViewerTool._STROKE_ID += 1
+            if self._mode is Mode.DRAW or self._mode is Mode.ERASE:
+                self._start_stroke()
             else:
                 self._finish_stroke()
 
@@ -690,10 +700,17 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                     pos = self.viewer.viewport.mapFromGlobal(QCursor.pos())
                 self._draw_brush_in_pos(pos)
 
-    def _pick_mask_class_in_pos(self, pos: QPoint):
+    def _mask_class_in_pos(self, pos: QPoint) -> int:
         pixel_indexes = self.pos_to_image_pixel_indexes_rounded(pos, self.mask)
         # Convert from numpy type (e.g. np.uint8) to int
-        self.settings.mask_foreground_class = int(self.mask.pixels[*pixel_indexes])
+        return int(self.mask.pixels[*pixel_indexes])
+
+    def _pick_mask_class_in_pos(self, pos: QPoint):
+        self.settings.mask_foreground_class = self._mask_class_in_pos(pos)
+
+    def _mask_class_under_mouse_pointer(self) -> int:
+        viewport_pos = self.viewer.viewport.mapFromGlobal(QCursor.pos())
+        return self._mask_class_in_pos(viewport_pos)
 
     def _erase_brush(self):
         if self._brush_bbox is not None:
@@ -741,10 +758,10 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         downscaled_tool_mask_in_brush_bbox = (
             np.full(shape=downscaled_brush_shape, fill_value=self.settings.tool_background_class, dtype=MASK_TYPE))
 
-        if not self.settings.smart_mode_enabled or self._mode == Mode.ERASE:
+        if not self.settings.smart_mode_enabled or self._mode is Mode.ERASE:
             tool_class, mask_class = (
                 (self.settings.tool_eraser_class, self.settings.mask_background_class)
-                if self._mode == Mode.ERASE
+                if self._mode is Mode.ERASE
                 else (self.settings.tool_fixed_class, self.settings.mask_foreground_class)
             )
 
@@ -762,7 +779,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 self.tool_mask.bboxed_pixels(self._brush_bbox)[pixels_under_brush] = tool_class
 
             modified_mask_pixels_under_brush = pixels_under_brush & self.modifiable_mask_pixels(mask_class)
-            if self._mode == Mode.SHOW:
+            if self._mode is Mode.SHOW:
                 self.tool_mask.bboxed_pixels(self._brush_bbox)[modified_mask_pixels_under_brush] = (
                     self.settings.tool_foreground_class)
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
@@ -770,7 +787,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             if self._mode in [Mode.ERASE, Mode.DRAW] and modified_mask_pixels_under_brush.any():
                 command_text = (
                     f'{self._brush_stroke_text}: Erase'
-                    if self._mode == Mode.ERASE
+                    if self._mode is Mode.ERASE
                     else f'{self._brush_stroke_text}: Draw Class {mask_class}'
                 )
                 self._create_and_push_modify_mask_command(modified_mask_pixels_under_brush, mask_class, command_text)
@@ -796,7 +813,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         centers = centers.ravel()
 
         if ((painted_cluster_brightness_index := self.settings.painted_cluster_brightness_index) is None
-                and self._mode == Mode.DRAW):
+                and self._mode is Mode.DRAW):
             painted_cluster_brightness_index = self._stroke_central_cluster_brightness_index
         downscaled_brush_center_row, downscaled_brush_center_col = downscaled_brush_center
         if painted_cluster_brightness_index is None:
@@ -808,7 +825,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             center_pixel_index = center_pixel_indexes[0]
             painted_cluster_label = labels[center_pixel_index]
 
-            if self._mode == Mode.DRAW:
+            if self._mode is Mode.DRAW:
                 # Sort clusters by brightness and find the index of the painted cluster in the sorted array
                 sorted_indices = np.argsort(centers, axis=0).ravel()
                 self._stroke_central_cluster_brightness_index = np.where(
@@ -865,7 +882,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.settings.tool_foreground_class)
         tool_mask_temp_foreground_pixels = tool_mask_in_brush_bbox == temp_tool_foreground_class
         tool_mask_foreground_class = (
-            self.settings.tool_foreground_class if self.mode == Mode.SHOW else self.settings.tool_fixed_class)
+            self.settings.tool_foreground_class if self.mode is Mode.SHOW else self.settings.tool_fixed_class)
         # Combine foreground and other classes from two resized tool masks.
         self.tool_mask.bboxed_pixels(self._brush_bbox)[...] = np.where(
             tool_mask_temp_foreground_pixels,
@@ -874,11 +891,11 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
         modifiable_mask_pixels = self.modifiable_mask_pixels(self.settings.mask_foreground_class)
 
-        if self.mode == Mode.SHOW:
+        if self.mode is Mode.SHOW:
             fixed_mask_pixels = tool_mask_temp_foreground_pixels & ~modifiable_mask_pixels
             self.tool_mask.bboxed_pixels(self._brush_bbox)[fixed_mask_pixels] = self.settings.tool_fixed_class
 
-        if self._mode == Mode.DRAW:
+        if self._mode is Mode.DRAW:
             modified_mask_pixels = tool_mask_temp_foreground_pixels & modifiable_mask_pixels
             if modified_mask_pixels.any():
                 command_text = f'{self._brush_stroke_text}: Draw Class {self.settings.mask_foreground_class}'
@@ -889,11 +906,16 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
     def modifiable_mask_pixels(self, mask_class: int) -> npt.NDArray[bool]:
         mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
-        if self.settings.repainting_enabled or self._mode == Mode.ERASE:
-            if self.settings.repainting_mode == RepaintingMode.ALL or self._mode == Mode.ERASE:
+        if self.settings.repainting_enabled or self._mode is Mode.ERASE:
+            if self.settings.repainting_mode is RepaintingMode.ALL or self._mode is Mode.ERASE:
                 return mask_in_brush_bbox != mask_class
-
-            repainted_class = self.settings.repainted_class
+            elif self.settings.repainting_mode is RepaintingMode.POINTER:
+                if self._stroke_repainted_mask_class is None:
+                    repainted_class = self._mask_class_under_mouse_pointer()
+                else:
+                    repainted_class = self._stroke_repainted_mask_class
+            else:
+                repainted_class = self.settings.repainted_class
         else:
             repainted_class = self.settings.mask_background_class
 
@@ -912,11 +934,19 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
     def _preprocess_downscaled_image_in_brush_bbox(self, image: np.ndarray):
         return image
 
+    def _start_stroke(self):
+        self._is_stroke_finished = False
+        self._is_mask_modified_during_stroke = False
+        WsiSmartBrushImageViewerTool._STROKE_ID += 1
+
+        self._stroke_repainted_mask_class = self._mask_class_under_mouse_pointer()
+
     def _finish_stroke(self):
         if self._is_stroke_finished:
             return
 
         self._stroke_central_cluster_brightness_index = None
+        self._stroke_repainted_mask_class = None
 
         if self._is_mask_modified_during_stroke:
             finish_stroke_command = FinishModifyMaskCommand()

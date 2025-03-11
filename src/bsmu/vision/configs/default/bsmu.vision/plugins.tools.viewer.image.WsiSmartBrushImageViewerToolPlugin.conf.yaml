@@ -9,7 +9,10 @@ smart_mode_enabled: true
 
 repainting:
   enabled: true
-  mode: 'all'  # Options: 'all' (repaint all classes), 'custom' (repaint custom class)
+  mode: 'all'  # Options:
+               # 'all' (repaint all classes),
+               # 'pointer' (repaint the class under the mouse pointer),
+               # 'custom' (repaint a custom class)
   custom_class: 1  # Only relevant if mode is 'custom'
 
 number_of_clusters: 2

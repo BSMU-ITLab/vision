@@ -293,6 +293,8 @@ class ViewerTool(QObject):
         self._undo_manager = undo_manager
         self._settings = settings
 
+        self._original_focus_proxy = None
+
     @property
     def settings(self) -> ViewerToolSettings:
         return self._settings
@@ -300,10 +302,18 @@ class ViewerTool(QObject):
     def activate(self):
         if self._settings.cursor is not None:
             self.viewer.viewport.setCursor(self._settings.cursor)
+
+        # Save the current focus proxy and set it to None temporarily
+        # to allow key events to be processed in the event filter.
+        # Ref: https://stackoverflow.com/questions/2445997/qgraphicsview-and-eventfilter
+        self._original_focus_proxy = self.viewer.viewport.focusProxy()
+        self.viewer.viewport.setFocusProxy(None)
+
         self.viewer.viewport.installEventFilter(self)
 
     def deactivate(self):
         self.viewer.viewport.removeEventFilter(self)
+        self.viewer.viewport.setFocusProxy(self._original_focus_proxy)
         self.viewer.viewport.unsetCursor()
 
 

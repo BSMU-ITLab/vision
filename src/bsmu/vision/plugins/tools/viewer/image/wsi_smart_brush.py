@@ -4,14 +4,14 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import cv2
 import numpy as np
 import skimage.draw
 import skimage.measure
 from PySide6.QtCore import Qt, Signal, QEvent
-from PySide6.QtGui import QCursor
+from PySide6.QtGui import QCursor, QKeyEvent, QMouseEvent, QWheelEvent
 from PySide6.QtWidgets import QGroupBox, QFormLayout, QHBoxLayout, QRadioButton, QSpinBox, QVBoxLayout
 
 from bsmu.vision.core.bbox import BBox
@@ -44,6 +44,7 @@ class Mode(Enum):
     HIDE = 2
     DRAW = 3
     ERASE = 4
+    PICK = 5
 
 
 DEFAULT_RADIUS = 600
@@ -296,6 +297,9 @@ class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
         self._mask_foreground_class_spin_box = QSpinBox()
         self._mask_foreground_class_spin_box.setMaximum(MASK_MAX)
         self._mask_foreground_class_spin_box.setValue(tool_settings.mask_foreground_class)
+        self._mask_foreground_class_spin_box.setToolTip(
+            self.tr('Use Ctrl + Left Mouse Button click '
+                    'to set the mask class under the cursor as the mask foreground class.'))
         self._mask_foreground_class_spin_box.valueChanged.connect(self._on_mask_foreground_class_spin_box_value_changed)
         tool_settings.mask_foreground_class_changed.connect(self._mask_foreground_class_spin_box.setValue)
         form_layout.addRow(self.tr('&Mask Foreground:'), self._mask_foreground_class_spin_box)
@@ -395,7 +399,7 @@ class ModifyMaskCommand(UndoCommand):
         self._modified_bbox = modified_bbox
         self._modified_bbox_pixels = modified_bbox_pixels
         self._compressed_modified_bbox_pixels = None
-        if not isinstance(new_modified_bbox_pixels, int):
+        if not isinstance(new_modified_bbox_pixels, (int, MASK_TYPE)):
             raise NotImplementedError()
         self._new_modified_bbox_pixels = new_modified_bbox_pixels
         self._rle_compressed_old_modified_bbox_pixels = None  # after command compression we get
@@ -599,59 +603,102 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         super().deactivate()
 
     def eventFilter(self, watched_obj: QObject, event: QEvent):
-        if event.type() == QEvent.Enter or event.type() == QEvent.Leave:
-            self.draw_brush_event(event)
-            return False
-        elif event.type() == QEvent.MouseButtonPress or event.type() == QEvent.MouseButtonRelease:
-            self.draw_brush_event(event)
-            return False
-        elif event.type() == QEvent.MouseMove:
-            self.draw_brush_event(event)
-            return False
-        elif event.type() == QEvent.Wheel:
-            angle_in_degrees = event.angleDelta().y() / 8
-            zoom_factor = 1 + angle_in_degrees / 65 * self.settings.radius_zoom_factor
-            self.settings.radius = \
-                min(max(self.settings.min_radius, self.settings.radius * zoom_factor), self.settings.max_radius)
-            self.draw_brush_event(event)
-            return True
-        else:
-            return super().eventFilter(watched_obj, event)
+        event_type = event.type()
 
-    def update_mode(self, event: QEvent):
-        if event.type() == QEvent.Leave:
-            self.mode = Mode.HIDE
-        elif event.buttons() == Qt.LeftButton and (self.settings.draw_on_mouse_move or event.type() != QEvent.MouseMove):
-            if event.type() != QEvent.Wheel:  # This condition is used only to fix strange bug
-                # after a mouse click on the app title bar, try to change brush radius (using Ctrl + mouse wheel)
-                # event.buttons() shows, that LeftButton is pressed (but it is not pressed)
-                # that leads to draw mode, but we want only change brush radius (in show mode)
-                self.mode = Mode.DRAW
-        elif event.buttons() == Qt.RightButton:
-            self.mode = Mode.ERASE
-        elif event.type() == QEvent.MouseButtonPress and event.buttons() == Qt.MiddleButton:
-            self.settings.smart_mode_enabled = not self.settings.smart_mode_enabled
-        else:
-            self.mode = Mode.SHOW
+        match event_type:
+            case QEvent.Type.MouseMove:
+                mouse_event = cast(QMouseEvent, event)
+                if mouse_event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                    self.mode = Mode.PICK
+                elif self._mode is Mode.PICK or (self._mode is Mode.DRAW and not self.settings.draw_on_mouse_move):
+                    self.mode = Mode.SHOW
+                self._handle_mode_event(event)
+
+            case QEvent.Type.MouseButtonPress:
+                mouse_event = cast(QMouseEvent, event)
+                match mouse_event.buttons():
+                    case Qt.MouseButton.LeftButton:
+                        self._change_mode_except_pick(Mode.DRAW)
+                    case Qt.MouseButton.RightButton:
+                        self._change_mode_except_pick(Mode.ERASE)
+                    case Qt.MouseButton.MiddleButton:
+                        self.settings.smart_mode_enabled = not self.settings.smart_mode_enabled
+                self._handle_mode_event(event)
+
+            case QEvent.Type.MouseButtonRelease:
+                self._change_mode_except_pick(Mode.SHOW)
+                self._handle_mode_event(event)
+
+            case QEvent.Type.Wheel:
+                self._process_wheel_event(cast(QWheelEvent, event))
+                self._handle_mode_event(event)
+                return True
+
+            case QEvent.Type.KeyPress | QEvent.Type.KeyRelease:
+                key_event = cast(QKeyEvent, event)
+                if key_event.key() == Qt.Key.Key_Control:
+                    if key_event.type() is QEvent.Type.KeyPress:
+                        self.mode = Mode.PICK
+                    else:
+                        self.mode = Mode.SHOW
+                    self._handle_mode_event(event)
+
+            case QEvent.Type.Enter:
+                self.mode = Mode.SHOW
+                self._handle_mode_event(event)
+            case QEvent.Type.Leave:
+                self.mode = Mode.HIDE
+                self._handle_mode_event(event)
+
+        return super().eventFilter(watched_obj, event)
+
+    def _change_mode_except_pick(self, new_mode: Mode):
+        if self._mode is not Mode.PICK:
+            self.mode = new_mode
 
     @property
     def _brush_stroke_text(self) -> str:
         return f'Brush Stroke #{self._STROKE_ID}'
 
-    def draw_brush_event(self, event: QEvent):
+    def _process_wheel_event(self, wheel_event: QWheelEvent):
+        angle_in_degrees = wheel_event.angleDelta().y() / 8
+        zoom_factor = 1 + angle_in_degrees / 65 * self.settings.radius_zoom_factor
+        self.settings.radius = min(
+            max(self.settings.min_radius, self.settings.radius * zoom_factor),
+            self.settings.max_radius,
+        )
+
+    def _handle_mode_event(self, event: QEvent):
+        """Handle the event based on current mode"""
+
         # if not self.viewer.has_image():
         #     return
 
-        if event.type() != QEvent.MouseMove:
-            self.update_mode(event)
-
         # Erase old tool mask
+        self._erase_brush()
+
+        match self._mode:
+            case Mode.HIDE:
+                pass
+            case Mode.PICK:
+                if isinstance(event, QMouseEvent) and event.buttons() == Qt.MouseButton.LeftButton:
+                    self._pick_mask_class_in_pos(event.position().toPoint())
+            case _:
+                if isinstance(event, QMouseEvent):
+                    pos = event.position().toPoint()
+                else:
+                    pos = self.viewer.viewport.mapFromGlobal(QCursor.pos())
+                self._draw_brush_in_pos(pos)
+
+    def _pick_mask_class_in_pos(self, pos: QPoint):
+        pixel_indexes = self.pos_to_image_pixel_indexes_rounded(pos, self.mask)
+        # Convert from numpy type (e.g. np.uint8) to int
+        self.settings.mask_foreground_class = int(self.mask.pixels[*pixel_indexes])
+
+    def _erase_brush(self):
         if self._brush_bbox is not None:
             self.tool_mask.bboxed_pixels(self._brush_bbox).fill(self.settings.tool_background_class)
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
-
-        if self._mode != Mode.HIDE:
-            self._draw_brush_in_pos(event.position().toPoint())
 
     def _draw_brush_in_pos(self, pos: QPoint):
         image_pixel_indexes = self.pos_to_image_pixel_indexes(pos, self.tool_mask)
@@ -842,7 +889,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
     def modifiable_mask_pixels(self, mask_class: int) -> npt.NDArray[bool]:
         mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
-        if self.settings.repainting_enabled:
+        if self.settings.repainting_enabled or self._mode == Mode.ERASE:
             if self.settings.repainting_mode == RepaintingMode.ALL or self._mode == Mode.ERASE:
                 return mask_in_brush_bbox != mask_class
 

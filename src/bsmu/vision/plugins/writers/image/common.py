@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import skimage.io
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bsmu.vision.plugins.windows.main import FileMenu
@@ -40,8 +41,14 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
 
     def _enable_gui(self):
         self._main_window = self._main_window_plugin.main_window
-        self._main_window.add_menu_action(FileMenu, 'Save Mask', self._save_active_window_image)
-        self._main_window.add_menu_action(FileMenu, 'Save Mask As...', self._select_path_and_save_active_window_image)
+        self._main_window.add_menu_action(
+            FileMenu, self.tr('Save Mask'), self._save_active_window_image, QKeySequence.StandardKey.Save)
+        self._main_window.add_menu_action(
+            FileMenu,
+            self.tr('Save Mask As...'),
+            self._select_path_and_save_active_window_image,
+            QKeySequence.StandardKey.SaveAs,
+        )
 
         self._mdi = self._mdi_plugin.mdi
 

@@ -310,7 +310,7 @@ class ViewerTool(QObject):
         self.viewer.viewport.setFocusProxy(None)
 
         if self.viewer.viewport.underMouse():
-            # Set focus to ensure the viewport captures key events, as it loses focus after switching tools
+            # Set focus to ensure the viewport captures key events, as it loses focus after switching tools.
             self.viewer.viewport.setFocus()
 
         self.viewer.viewport.installEventFilter(self)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import cast
 
-from PySide6.QtCore import Qt, QObject, Signal
+from PySide6.QtCore import Qt, QEvent, QObject, Signal
 from PySide6.QtGui import QCursor, QPixmap, QAction, QIcon
 from PySide6.QtWidgets import QWidget, QDockWidget
 
@@ -309,12 +309,26 @@ class ViewerTool(QObject):
         self._original_focus_proxy = self.viewer.viewport.focusProxy()
         self.viewer.viewport.setFocusProxy(None)
 
+        if self.viewer.viewport.underMouse():
+            # Set focus to ensure the viewport captures key events, as it loses focus after switching tools
+            self.viewer.viewport.setFocus()
+
         self.viewer.viewport.installEventFilter(self)
 
     def deactivate(self):
         self.viewer.viewport.removeEventFilter(self)
         self.viewer.viewport.setFocusProxy(self._original_focus_proxy)
         self.viewer.viewport.unsetCursor()
+
+    def eventFilter(self, watched_obj: QObject, event: QEvent):
+        if event.type() is QEvent.Type.Enter:
+            # Set focus to ensure the viewport captures key events.
+            # Otherwise, key events will be processed by other widgets that have focus.
+            # For example, instead of switching tools using digits '1', '2', etc.,
+            # the digit will be entered into a QLineEdit if it currently has focus.
+            self.viewer.viewport.setFocus()
+
+        return super().eventFilter(watched_obj, event)
 
 
 class LayeredImageViewerToolSettings(ViewerToolSettings):

@@ -626,13 +626,16 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
 
             case QEvent.Type.MouseButtonPress:
                 mouse_event = cast(QMouseEvent, event)
-                match mouse_event.buttons():
-                    case Qt.MouseButton.LeftButton:
-                        self._change_mode_except_pick(Mode.DRAW)
-                    case Qt.MouseButton.RightButton:
-                        self._change_mode_except_pick(Mode.ERASE)
-                    case Qt.MouseButton.MiddleButton:
-                        self.settings.smart_mode_enabled = not self.settings.smart_mode_enabled
+                if mouse_event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                    self.mode = Mode.PICK
+                else:
+                    match mouse_event.buttons():
+                        case Qt.MouseButton.LeftButton:
+                            self.mode = Mode.DRAW
+                        case Qt.MouseButton.RightButton:
+                            self.mode = Mode.ERASE
+                        case Qt.MouseButton.MiddleButton:
+                            self.settings.smart_mode_enabled = not self.settings.smart_mode_enabled
                 self._handle_mode_event(event)
 
             case QEvent.Type.MouseButtonRelease:

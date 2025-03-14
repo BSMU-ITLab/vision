@@ -538,24 +538,24 @@ class LayeredImageViewer(DataViewer):
 
     def is_confirmed_repaint_duplicate_mask_layer(
             self, mask_layer_name: str, mask_draw_mode: MaskDrawMode = MaskDrawMode.REDRAW_ALL) -> bool:
-        if self.data.contains_layer(mask_layer_name):
-            draw_mode_clarification = ''
-            if mask_draw_mode != MaskDrawMode.REDRAW_ALL:
-                draw_mode_clarification = self.tr(
-                    '<br>(Next draw mode will be used: {0})').format(mask_draw_mode.description)
+        if self.data.layer_image(mask_layer_name) is None:
+            return True
 
-            reply = QMessageBox.question(
-                self,
-                self.tr('Duplicate Layer Name'),
-                self.tr(
-                    'Viewer already contains a layer with such name: <i>{0}</i>.<br>'
-                    'Repaint its content?{1}'
-                ).format(mask_layer_name, draw_mode_clarification),
-                defaultButton=QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.No:
-                return False
-        return True
+        draw_mode_clarification = ''
+        if mask_draw_mode != MaskDrawMode.REDRAW_ALL:
+            draw_mode_clarification = self.tr(
+                '<br>(Next draw mode will be used: {0})').format(mask_draw_mode.description)
+
+        reply = QMessageBox.question(
+            self,
+            self.tr('Duplicate Layer Name'),
+            self.tr(
+                'Viewer already contains a layer with such name: <i>{0}</i>.<br>'
+                'Repaint its content?{1}'
+            ).format(mask_layer_name, draw_mode_clarification),
+            defaultButton=QMessageBox.StandardButton.No,
+        )
+        return reply is QMessageBox.StandardButton.Yes
 
     def add_graphics_item(self, item: QGraphicsItem):
         self.graphics_scene.addItem(item)

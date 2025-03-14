@@ -173,9 +173,9 @@ class ImageLayerFileWalker(QObject):
         # Update images of all layers
         for layer in self._image_viewer.layers:
             if layer.path is None:
+                layer.image = None
                 continue
 
-            # Read new image, but use palette of old image (so, if palette is not None, image will be read as gray)
             file_path = layer.path / requested_file_relative_path
             if layer != self._image_viewer.active_layer and layer.extension is not None:
                 file_path = file_path.with_suffix(layer.extension)

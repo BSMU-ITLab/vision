@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from typing import List, Tuple
+    from collections.abc import Sequence
 
 
 class Palette:
@@ -19,20 +19,25 @@ class Palette:
         self._row_index_by_name = row_index_by_name
 
     @classmethod
-    def from_sparse_index_list(cls, sparse_index_list: list, row_index_by_name: dict = None) -> Palette:
-        palette_array = cls.sparse_index_list_to_palette_array(sparse_index_list)
+    def from_sparse_index_list(
+            cls,
+            sparse_index_list: list,
+            row_index_by_name: dict = None,
+            default_color: Sequence[int] | None = None,
+    ) -> Palette:
+        palette_array = cls.sparse_index_list_to_palette_array(sparse_index_list, default_color)
         return cls(palette_array, row_index_by_name)
 
     @classmethod
-    def from_row_by_name(cls, row_by_name: dict) -> Palette:
+    def from_row_by_name(cls, row_by_name: dict, default_color: Sequence[int] | None = None) -> Palette:
         row_index_by_name = {name: row[0] for name, row in row_by_name.items()}
-        return cls.from_sparse_index_list(list(row_by_name.values()), row_index_by_name)
+        return cls.from_sparse_index_list(list(row_by_name.values()), row_index_by_name, default_color)
 
     @classmethod
     def default_binary(
             cls,
             foreground_index: int = 1,
-            rgb_color: Tuple[int] | List[int] = (255, 255, 255),
+            rgb_color: tuple[int] | list[int] = (255, 255, 255),
             background_name: str = 'background',
             foreground_name: str = 'foreground',
     ) -> Palette:
@@ -44,7 +49,7 @@ class Palette:
         )
 
     @classmethod
-    def default_soft(cls, rgb_color: Tuple[int] | List[int] = (255, 255, 255)) -> Palette:
+    def default_soft(cls, rgb_color: tuple[int] | list[int] = (255, 255, 255)) -> Palette:
         # Have to specify np.uint8 type explicitly, else it will be int32 type
         rgb_color = np.array(rgb_color, dtype=np.uint8)
         rpb_palette_array = np.tile(rgb_color, (256, 1))
@@ -63,10 +68,16 @@ class Palette:
           - [1, 0, 255, 0, 255]
           - [5, 255, 0, 0, 255]
 
-        # 2) custom palette with added names for each row. The format is
-        # row_by_name:
-        #   name: [index, R, G, B, A]
+        # 2) custom palette with added names for each row.
+        # `default_color` sets the RGBA value for all undefined classes in the palette;
+        # otherwise, their RGBA values will default to zeros.
+        # The format is
+        # palette:
+        #   default_color: [R, G, B, A]
+        #   row_by_name:
+        #     name: [index, R, G, B, A]
         palette:
+          default_color: [50, 0, 50, 255]
           row_by_name:
             background: [0, 0, 0, 0, 0]
             foreground: [1, 50, 170, 230, 255]
@@ -100,7 +111,7 @@ class Palette:
                 return None
 
             if row_by_name_prop is not None:
-                return Palette.from_row_by_name(row_by_name_prop)
+                return Palette.from_row_by_name(row_by_name_prop, palette_config_data.get('default_color'))
 
             if rgb_color_prop is not None:
                 foreground_value_prop = palette_config_data.get('foreground_value')
@@ -113,9 +124,15 @@ class Palette:
         return None
 
     @staticmethod
-    def sparse_index_list_to_palette_array(sparse_index_list: list) -> np.ndarray:
+    def sparse_index_list_to_palette_array(
+            sparse_index_list: list, default_color: Sequence[int] | None = None) -> np.ndarray:
         sparse_index_array = np.array(sparse_index_list)
-        palette_array = np.zeros((256, 4), dtype=np.uint8)
+        if default_color is None:
+            # Use zeros (fully transparent black) for all rows
+            palette_array = np.zeros((256, 4), dtype=np.uint8)
+        else:
+            # Fill every row with the default color
+            palette_array = np.tile(np.array(default_color, dtype=np.uint8), (256, 1))
         palette_array[sparse_index_array[:, 0]] = sparse_index_array[:, 1:]
         return palette_array
 

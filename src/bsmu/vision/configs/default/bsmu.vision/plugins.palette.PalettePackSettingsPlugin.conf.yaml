@@ -1,4 +1,5 @@
 main_palette:
+  default_color: [ 50, 0, 50, 255 ]
   row_by_name:
     background: [   0,   0,   0,   0,   0 ]
     foreground: [   1,  50, 170, 230, 255 ]
@@ -9,9 +10,9 @@ main_palette:
     class_6:    [   6, 230, 110,  50, 255 ]
     class_7:    [   7,  50, 230, 182, 255 ]
     class_8:    [   8,  50,  62, 230, 255 ]
-    class_255:  [ 255,  50,   0,  50, 255 ]
 
 risk_palette:
+  default_color: [ 50, 0, 50, 255 ]
   row_by_name:
     background: [   0,   0,   0,   0,   0 ]
     foreground: [   1,  50, 205,  50, 255 ]  # Green
@@ -21,4 +22,3 @@ risk_palette:
     light_blue: [   5,  50, 170, 230, 255 ]
     blue:       [   6,  50,  62, 230, 255 ]
     purple:     [   7, 146,  50, 230, 255 ]
-    class_255:  [ 255,  50,   0,  50, 255 ]

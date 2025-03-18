@@ -703,15 +703,18 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                     pos = self.viewer.viewport.mapFromGlobal(QCursor.pos())
                 self._draw_brush_in_pos(pos)
 
-    def _mask_class_in_pos(self, pos: QPoint) -> int:
-        pixel_indexes = self.pos_to_image_pixel_indexes_rounded(pos, self.mask)
-        # Convert from numpy type (e.g. np.uint8) to int
-        return int(self.mask.pixels[*pixel_indexes])
+    def _mask_class_in_pos(self, pos: QPoint) -> int | None:
+        row, col = self.pos_to_image_pixel_indexes_rounded(pos, self.mask)
+        if 0 <= row < self.mask.shape[0] and 0 <= col < self.mask.shape[1]:
+            # Convert from numpy type (e.g. np.uint8) to int
+            return int(self.mask.pixels[row, col])
+        return None
 
     def _pick_mask_class_in_pos(self, pos: QPoint):
-        self.settings.mask_foreground_class = self._mask_class_in_pos(pos)
+        if (mask_class := self._mask_class_in_pos(pos)) is not None:
+            self.settings.mask_foreground_class = mask_class
 
-    def _mask_class_under_mouse_pointer(self) -> int:
+    def _mask_class_under_mouse_pointer(self) -> int | None:
         viewport_pos = self.viewer.viewport.mapFromGlobal(QCursor.pos())
         return self._mask_class_in_pos(viewport_pos)
 

@@ -39,6 +39,8 @@ class ImageLayer(QObject):
 
         self._path: Path | None = path
         self._extension: str | None = None
+        # Cache the image palette, because some images may be None,
+        # making it impossible to retrieve the palette from them.
         self.palette = None
 
         self._image = None
@@ -109,7 +111,7 @@ class ImageLayer(QObject):
 
     @property
     def is_indexed(self) -> bool:
-        return self._image.is_indexed
+        return self.palette is not None
 
     @property
     def is_image_pixels_valid(self) -> bool:

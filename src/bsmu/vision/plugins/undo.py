@@ -120,6 +120,12 @@ class UndoManager(QObject):
     def push(self, command: UndoCommand):
         self._undo_group.activeStack().push(command)
 
+    def index(self) -> int:
+        return self._undo_group.activeStack().index()
+
+    def set_index(self, idx: int):
+        self._undo_group.activeStack().setIndex(idx)
+
     def _create_undo_stack(self) -> QUndoStack:
         undo_stack = QUndoStack(self._undo_group)
         undo_stack.setUndoLimit(self._stack_limit)

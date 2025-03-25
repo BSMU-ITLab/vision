@@ -614,6 +614,13 @@ class LayeredImageViewer(DataViewer):
         scene_pos = self.graphics_view.mapToScene(viewport_pos)
         return self.layered_image_graphics_object.mapFromScene(scene_pos)
 
+    def viewport_pos_to_scene_pos(self, viewport_pos: QPoint) -> QPointF:
+        return self.graphics_view.mapToScene(viewport_pos)
+
+    def global_pos_to_scene_pos(self, global_pos: QPoint) -> QPointF:
+        viewport_pos = self.viewport.mapFromGlobal(global_pos)
+        return self.viewport_pos_to_scene_pos(viewport_pos)
+
     def pos_to_layered_image_item_pos(self, pos: QPoint) -> QPointF:
         # From viewer pos to |self.graphics_view| pos
         graphics_view_pos = self.graphics_view.mapFrom(self, pos)

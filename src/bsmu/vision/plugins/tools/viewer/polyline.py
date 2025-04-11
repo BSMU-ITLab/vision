@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, QEvent, QPointF, QLineF, QRectF, Signal
-from PySide6.QtGui import QMouseEvent, QPainterPath, QPen, QBrush, QPainter, QCursor
+from PySide6.QtGui import QMouseEvent, QPainterPath, QPen, QBrush, QPainter, QCursor, QColor
 from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsLineItem, QGraphicsEllipseItem, QGraphicsItem
 
+from bsmu.vision.core.utils.geometry import GeometryUtils
 from bsmu.vision.plugins.tools.viewer import ViewerToolPlugin, ViewerToolSettingsWidget, ViewerTool, ViewerToolSettings
 from bsmu.vision.plugins.undo import UndoCommand
 
@@ -19,6 +22,13 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.data import DataViewer
     from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+
+
+@dataclass(frozen=True)
+class ClosestPolylinePointInfo:
+    point: QPointF | None = None
+    segment_index: int | None = None
+    squared_distance: float | None = None
 
 
 class Polyline(QObject):
@@ -51,14 +61,67 @@ class Polyline(QObject):
             end_point = self._points.pop()
             self.end_point_removed.emit(end_point)
 
+    def closest_point(self, point: QPointF) -> QPointF | None:
+        """
+        Returns the closest point on the polyline to the given point.
+        Returns None if the polyline is empty.
+        """
+        return self._closest_point_info(point).point
+
+    def closest_point_info(self, point: QPointF) -> ClosestPolylinePointInfo:
+        """Returns the closest point with segment info, calculating distance if needed."""
+        partial_closest_point_info = self._closest_point_info(point)
+        if partial_closest_point_info.point is not None and partial_closest_point_info.squared_distance is None:
+            return ClosestPolylinePointInfo(
+                point=partial_closest_point_info.point,
+                segment_index=partial_closest_point_info.segment_index,
+                squared_distance=GeometryUtils.squared_distance(point, partial_closest_point_info.point),
+            )
+        return partial_closest_point_info
+
+    def _closest_point_info(self, point: QPointF) -> ClosestPolylinePointInfo:
+        """
+        Internal implementation of closest point search.
+        :return: ClosestPolylinePointInfo with:
+            - For empty polylines: all None
+            - For single-point polylines: (point, 0, None)
+            - For normal cases: full results
+        """
+        if self.is_empty:
+            return ClosestPolylinePointInfo()
+
+        if len(self._points) == 1:
+            return ClosestPolylinePointInfo(point=self.end_point, segment_index=0)
+
+        closest_point: QPointF | None = None
+        segment_index: int | None = None
+        min_squared_distance: float = math.inf
+
+        # Check each segment of the polyline
+        for i in range(len(self._points) - 1):
+            segment_start = self._points[i]
+            segment_end = self._points[i + 1]
+
+            segment_closest_point = GeometryUtils.closest_point_on_segment(segment_start, segment_end, point)
+            squared_distance = GeometryUtils.squared_distance(point, segment_closest_point)
+
+            if squared_distance < min_squared_distance:
+                min_squared_distance = squared_distance
+                closest_point = segment_closest_point
+                segment_index = i
+
+        return ClosestPolylinePointInfo(
+            point=closest_point, segment_index=segment_index, squared_distance=min_squared_distance)
+
 
 class NodeView(QGraphicsEllipseItem):
-    def __init__(self, pos: QPointF, parent: QGraphicsItem = None):
+    def __init__(self, pos: QPointF, brush: QBrush = None, parent: QGraphicsItem = None):
         super().__init__(QRectF(-5, -5, 10, 10), parent)
 
         self.setPos(pos)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
-        self.setBrush(QBrush(Qt.GlobalColor.green))
+        if brush is not None:
+            self.setBrush(brush)
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -66,17 +129,21 @@ class NodeView(QGraphicsEllipseItem):
 
 
 class PolylineView(QGraphicsPathItem):
-    def __init__(self, polyline: Polyline, parent: QGraphicsItem = None):
+    DEFAULT_FINISHED_COLOR = QColor(106, 255, 13)
+
+    def __init__(self, polyline: Polyline, finished_color: QColor = None, parent: QGraphicsItem = None):
         super().__init__(parent)
 
         self._polyline = polyline
         self._polyline.point_appended.connect(self._on_point_appended)
         self._polyline.end_point_removed.connect(self._on_end_point_removed)
 
+        self._finished_color = finished_color or self.DEFAULT_FINISHED_COLOR
+
         self._path = QPainterPath()
         self.setPath(self._path)
 
-        pen = QPen(Qt.GlobalColor.blue, 4)
+        pen = QPen(Qt.GlobalColor.blue, 3)
         pen.setCosmetic(True)
         self.setPen(pen)
 
@@ -102,7 +169,7 @@ class PolylineView(QGraphicsPathItem):
 
     def finish_drawing(self):
         pen = self.pen()
-        pen.setColor(Qt.GlobalColor.green)
+        pen.setColor(self._finished_color)
         self.setPen(pen)
 
     def _on_point_appended(self, point: QPointF):
@@ -112,7 +179,7 @@ class PolylineView(QGraphicsPathItem):
             self._path.lineTo(point)
         self.setPath(self._path)
 
-        node = NodeView(point, self)
+        node = NodeView(point, self._finished_color, self)
         self._node_views.append(node)
 
     def _on_end_point_removed(self):

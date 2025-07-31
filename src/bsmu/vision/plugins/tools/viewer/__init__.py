@@ -6,4 +6,5 @@ from .viewer import (
     ViewerToolPlugin,
     ViewerToolSettings,
     ViewerToolSettingsWidget,
+    CursorConfig,
 )

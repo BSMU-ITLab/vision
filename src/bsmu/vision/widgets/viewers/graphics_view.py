@@ -44,6 +44,8 @@ class GraphicsView(QGraphicsView):
 
         self.setScene(scene)
 
+        self._is_using_base_cursor: bool = True
+
         self._view_pan: _ViewPan | None = None
         self._is_scrollable: bool | None = None
 
@@ -86,6 +88,21 @@ class GraphicsView(QGraphicsView):
 
             self._is_scrollable = can_scroll_horizontally or can_scroll_vertically
         return self._is_scrollable
+
+    @property
+    def is_using_base_cursor(self) -> bool:
+        return self._is_using_base_cursor
+
+    @is_using_base_cursor.setter
+    def is_using_base_cursor(self, value: bool):
+        if self._is_using_base_cursor != value:
+            self._is_using_base_cursor = value
+            if self._is_using_base_cursor:
+                self._update_cursor()
+
+    def _update_cursor(self):
+        if self._view_pan.is_active:
+            self._view_pan.update_cursor()
 
     def enable_zooming(self):
         self.setTransformationAnchor(QGraphicsView.NoAnchor)
@@ -149,6 +166,9 @@ class GraphicsView(QGraphicsView):
         self.viewport().update(self._scale_text_rect.translated(dx, dy))
 
         self._update_viewport_anchors()
+
+    def set_cursor(self, cursor_shape: Qt.CursorShape):
+        self.viewport().setCursor(cursor_shape)
 
     def _reset_scrollable(self):
         if self._is_scrollable is not None:
@@ -298,7 +318,11 @@ class _ViewPan(QObject):
 
         self._is_active = False
 
-        self._view.scrollable_reset.connect(self._update_cursor)
+        self._view.scrollable_reset.connect(self.update_cursor)
+
+    @property
+    def is_active(self) -> bool:
+        return self._is_active
 
     @property
     def is_panning(self) -> bool:
@@ -309,7 +333,7 @@ class _ViewPan(QObject):
             return
 
         self._view.setTransformationAnchor(QGraphicsView.NoAnchor)
-        self._update_cursor()
+        self.update_cursor()
         self._view.viewport().installEventFilter(self)
 
         self._is_active = True
@@ -327,11 +351,11 @@ class _ViewPan(QObject):
     def eventFilter(self, watched_obj, event):
         if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
             self._old_pos = self.event_pos(event)
-            self._update_cursor()
+            self.update_cursor()
             return False
         elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton and self.is_panning:
             self._old_pos = None
-            self._update_cursor()
+            self.update_cursor()
             return False
         elif event.type() == QEvent.MouseMove and event.buttons() == Qt.LeftButton and self.is_panning:
             new_pos = self.event_pos(event)
@@ -351,9 +375,12 @@ class _ViewPan(QObject):
         self._view.viewport().unsetCursor()
 
     def _set_cursor(self, cursor_shape: Qt.CursorShape):
-        self._view.viewport().setCursor(cursor_shape)
+        self._view.set_cursor(cursor_shape)
 
-    def _update_cursor(self):
+    def update_cursor(self):
+        if not self._view.is_using_base_cursor:
+            return
+
         if self._view.is_scrollable:
             cursor_shape = Qt.ClosedHandCursor if self.is_panning else Qt.OpenHandCursor
         else:

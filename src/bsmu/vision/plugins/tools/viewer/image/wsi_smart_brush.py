@@ -19,7 +19,7 @@ from bsmu.vision.core.config import Config
 from bsmu.vision.core.image import MASK_TYPE, MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
 from bsmu.vision.plugins.tools.viewer import (
-    LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget)
+    LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget, CursorConfig)
 from bsmu.vision.plugins.undo import UndoCommand
 
 if TYPE_CHECKING:
@@ -89,9 +89,10 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             painted_cluster: str | int,
             paint_connected_component: bool,
             draw_on_mouse_move: bool,
-            icon_file_name: str = ':/icons/brush.svg',
+            cursor_config: CursorConfig = CursorConfig(':/icons/brush.svg'),
+            action_icon_file_name: str = '',
     ):
-        super().__init__(layers_props, palette_pack_settings, icon_file_name)
+        super().__init__(layers_props, palette_pack_settings, cursor_config, action_icon_file_name)
 
         self._radius = radius
         self._min_radius = min_radius

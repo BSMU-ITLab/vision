@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCore import QPointF
 
 
@@ -8,6 +10,10 @@ class GeometryUtils:
     def squared_distance(p1: QPointF, p2: QPointF) -> float:
         diff = p2 - p1
         return diff.x() ** 2 + diff.y() ** 2
+
+    @classmethod
+    def distance(cls, p1: QPointF, p2: QPointF) -> float:
+        return math.sqrt(cls.squared_distance(p1, p2))
 
     @staticmethod
     def closest_point_on_segment(segment_start: QPointF, segment_end: QPointF, query_point: QPointF) -> QPointF:

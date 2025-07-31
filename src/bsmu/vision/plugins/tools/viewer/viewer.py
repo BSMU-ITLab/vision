@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from typing import cast
 
@@ -113,7 +114,7 @@ class ViewerToolPlugin(Plugin):
             ToolsMenu, self._action_name, self._tool_action_triggered, self._action_shortcut, checkable=True)
         self._tool_action.setData(self._mdi_viewer_tool)
         self._tool_action.setAutoRepeat(False)
-        self._tool_action.setIcon(QIcon(tool_settings.icon_file_name))
+        self._tool_action.setIcon(QIcon(tool_settings.action_icon_file_name))
 
         self._mdi_viewer_tool.activation_changed.connect(self._on_mdi_viewer_tool_activation_changed)
 
@@ -215,7 +216,6 @@ class MdiViewerTool(QObject):
 
         for viewer_tool in self._viewer_tool_by_sub_window.values():
             viewer_tool.deactivate()
-        self._viewer_tool_by_sub_window.clear()
 
         self._main_window.removeDockWidget(self._tool_settings_dock_widget)
         self._tool_settings_dock_widget = None
@@ -245,13 +245,28 @@ class MdiViewerTool(QObject):
         return viewer_tool
 
 
+@dataclass
+class CursorConfig:
+    icon_file_name: str = ''
+    # Normalized hotspot coordinates (range: [0.0; 1.0]), relative to SVG width and height
+    hot_x: float = 0.0
+    hot_y: float = 0.0
+
+
 class ViewerToolSettings(QObject):
-    def __init__(self, palette_pack_settings: PalettePackSettings, icon_file_name: str = ''):
+    def __init__(
+            self,
+            palette_pack_settings: PalettePackSettings,
+            cursor_config: CursorConfig = CursorConfig(),
+            action_icon_file_name: str = ''
+    ):
         super().__init__()
 
         self._palette_pack_settings = palette_pack_settings
+        self._cursor_config = cursor_config
 
-        self._icon_file_name = icon_file_name
+        self._action_icon_file_name = action_icon_file_name or cursor_config.icon_file_name
+
         self._cursor = None
 
     @property
@@ -259,14 +274,20 @@ class ViewerToolSettings(QObject):
         return self._palette_pack_settings
 
     @property
-    def icon_file_name(self) -> str:
-        return self._icon_file_name
+    def cursor_config(self) -> CursorConfig:
+        return self._cursor_config
+
+    @property
+    def action_icon_file_name(self) -> str:
+        return self._action_icon_file_name
 
     @property
     def cursor(self) -> QCursor | None:
-        if self._cursor is None and self._icon_file_name:
-            cursor_icon = QPixmap(self._icon_file_name, format=b'svg')
-            self._cursor = QCursor(cursor_icon, hotX=0, hotY=0)
+        if self._cursor is None and self._cursor_config.icon_file_name:
+            cursor_icon = QPixmap(self._cursor_config.icon_file_name, format=b'svg')
+            hot_x = int(cursor_icon.width() * self._cursor_config.hot_x)
+            hot_y = int(cursor_icon.height() * self._cursor_config.hot_y)
+            self._cursor = QCursor(cursor_icon, hotX=hot_x, hotY=hot_y)
         return self._cursor
 
     @classmethod
@@ -300,8 +321,7 @@ class ViewerTool(QObject):
         return self._settings
 
     def activate(self):
-        if self._settings.cursor is not None:
-            self.viewer.viewport.setCursor(self._settings.cursor)
+        self._set_viewer_cursor()
 
         # Save the current focus proxy and set it to None temporarily
         # to allow key events to be processed in the event filter.
@@ -318,7 +338,7 @@ class ViewerTool(QObject):
     def deactivate(self):
         self.viewer.viewport.removeEventFilter(self)
         self.viewer.viewport.setFocusProxy(self._original_focus_proxy)
-        self.viewer.viewport.unsetCursor()
+        self._unset_viewer_cursor()
 
     def eventFilter(self, watched_obj: QObject, event: QEvent):
         if event.type() is QEvent.Type.Enter:
@@ -330,10 +350,28 @@ class ViewerTool(QObject):
 
         return super().eventFilter(watched_obj, event)
 
+    def _set_viewer_cursor(self):
+        if self._settings.cursor is not None:
+            self.viewer.cursor_owner = self
+
+            self.viewer.viewport.setCursor(self._settings.cursor)
+
+    def _unset_viewer_cursor(self):
+        if self.viewer.cursor_owner == self:
+            self.viewer.viewport.unsetCursor()
+
+            self.viewer.cursor_owner = None
+
 
 class LayeredImageViewerToolSettings(ViewerToolSettings):
-    def __init__(self, layers_props: dict, palette_pack_settings: PalettePackSettings, icon_file_name: str = ''):
-        super().__init__(palette_pack_settings, icon_file_name)
+    def __init__(
+            self,
+            layers_props: dict,
+            palette_pack_settings: PalettePackSettings,
+            cursor_config: CursorConfig = CursorConfig(),
+            action_icon_file_name: str = '',
+    ):
+        super().__init__(palette_pack_settings, cursor_config, action_icon_file_name)
 
         self._layers_props = layers_props
 
@@ -500,7 +538,9 @@ class LayeredImageViewerTool(ViewerTool):
             'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.mask_palette)
 
     def _remove_tool_mask_layer(self):
-        self.viewer.remove_layer(self._tool_mask_layer)
+        if self._tool_mask_layer is not None:
+            self.viewer.remove_layer(self._tool_mask_layer)
+            self._tool_mask_layer = None
 
     def _update_masks(self):
         if self._mask_layer.image is None:

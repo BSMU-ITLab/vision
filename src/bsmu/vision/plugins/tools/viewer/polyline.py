@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, QEvent, QPointF, QLineF, QRectF, Signal
@@ -9,7 +10,8 @@ from PySide6.QtGui import QMouseEvent, QPainterPath, QPen, QBrush, QPainter, QCu
 from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsLineItem, QGraphicsEllipseItem, QGraphicsItem
 
 from bsmu.vision.core.utils.geometry import GeometryUtils
-from bsmu.vision.plugins.tools.viewer import ViewerToolPlugin, ViewerToolSettingsWidget, ViewerTool, ViewerToolSettings
+from bsmu.vision.plugins.tools.viewer import (
+    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerTool, ViewerToolSettings, CursorConfig)
 from bsmu.vision.plugins.undo import UndoCommand
 
 if TYPE_CHECKING:
@@ -51,6 +53,16 @@ class Polyline(QObject):
     @property
     def is_empty(self) -> bool:
         return not self._points
+
+    @property
+    def length(self) -> float:
+        if len(self._points) < 2:
+            return 0.0
+
+        return sum(
+            GeometryUtils.distance(self._points[i], self._points[i + 1])
+            for i in range(len(self._points) - 1)
+        )
 
     def append_point(self, point: QPointF):
         self._points.append(point)
@@ -250,6 +262,12 @@ class PreviewSegment(QGraphicsLineItem):
         super().paint(painter, option, widget)
 
 
+class PolylineToolState(Enum):
+    IDLE = 1     # When drawing is finished or never started
+    DRAWING = 2  # When polyline drawing has started
+    PAUSED = 3   # When switched to another tool while drawing
+
+
 class PolylineViewerTool(ViewerTool):
     def __init__(self, viewer: DataViewer, undo_manager: UndoManager, settings: ViewerToolSettings):
         super().__init__(viewer, undo_manager, settings)
@@ -259,13 +277,17 @@ class PolylineViewerTool(ViewerTool):
 
         self._preview_segment: QGraphicsLineItem | None = None
 
+        self._state = PolylineToolState.IDLE
+
     def activate(self):
         super().activate()
+
+        self._resume_drawing()
 
         self.viewer.viewport.setMouseTracking(True)
 
     def deactivate(self):
-        self._finish_drawing()
+        self._pause_drawing()
 
         self.viewer.viewport.setMouseTracking(False)
 
@@ -282,63 +304,98 @@ class PolylineViewerTool(ViewerTool):
                     case Qt.MouseButton.LeftButton:
                         scene_pos = self.viewer.viewport_pos_to_scene_pos(event.position().toPoint())
                         self._add_point(scene_pos)
+                        return True
                     case Qt.MouseButton.RightButton:
                         self._finish_drawing()
+                        return True
             case QEvent.Type.MouseMove:
                 if self.is_drawing:
                     scene_pos = self.viewer.viewport_pos_to_scene_pos(event.position().toPoint())
                     self._update_preview_segment(scene_pos)
+                    return True
             case QEvent.Type.MouseButtonDblClick:
                 if event.button() is Qt.MouseButton.LeftButton:
                     self._finish_drawing()
+                    return True
 
         return super().eventFilter(watched_obj, event)
 
     @property
     def is_drawing(self) -> bool:
-        return self._curr_polyline_view is not None
+        return self._state is PolylineToolState.DRAWING
 
     def _add_point(self, pos: QPointF):
-        if self._curr_polyline_view is None:
-            self._curr_polyline = Polyline()
-            self._curr_polyline_view = PolylineView(self._curr_polyline)
-
-            add_polyline_view_command = AddPolylineViewCommand(self.viewer, self._curr_polyline_view, pos)
-            self._undo_manager.push(add_polyline_view_command)
-
-            self._preview_segment = PreviewSegment()
-            pen = self._curr_polyline_view.pen()
-            pen.setColor(Qt.GlobalColor.red)
-            self._preview_segment.setPen(pen)
-            self.viewer.add_graphics_item(self._preview_segment)
-            self._preview_segment.stackBefore(self._curr_polyline_view)
-
-            self._curr_polyline.end_point_removed.connect(self._on_polyline_end_point_removed)
+        if self._state is PolylineToolState.IDLE:
+            self._start_new_polyline_drawing(pos)
         else:
             command = AddPolylinePointCommand(self._curr_polyline, pos)
             self._undo_manager.push(command)
 
-            self._preview_segment.setLine(QLineF())
-            self._preview_segment.hide()
+            self._clear_preview_segment()
+
+    def _start_new_polyline_drawing(self, pos: QPointF):
+        self._curr_polyline = Polyline()
+        self._curr_polyline_view = PolylineView(self._curr_polyline)
+
+        add_polyline_view_command = AddPolylineViewCommand(self.viewer, self._curr_polyline_view, pos)
+        self._undo_manager.push(add_polyline_view_command)
+
+        self._create_preview_segment()
+
+        self._curr_polyline.end_point_removed.connect(self._on_polyline_end_point_removed)
+
+        self._state = PolylineToolState.DRAWING
+
+    def _create_preview_segment(self):
+        self._preview_segment = PreviewSegment()
+        pen = self._curr_polyline_view.pen()
+        pen.setColor(Qt.GlobalColor.red)
+        self._preview_segment.setPen(pen)
+        self.viewer.add_graphics_item(self._preview_segment)
+        self._preview_segment.stackBefore(self._curr_polyline_view)
+
+    def _clear_preview_segment(self):
+        self._preview_segment.setLine(QLineF())
+        self._preview_segment.hide()
 
     def _update_preview_segment(self, pos: QPointF):
         self._preview_segment.setLine(QLineF(self._curr_polyline.end_point, pos))
         self._show_preview_segment()
+
+    def _update_preview_segment_to_cursor_pos(self):
+        scene_pos = self.viewer.global_pos_to_scene_pos(QCursor.pos())
+        self._update_preview_segment(scene_pos)
 
     def _on_polyline_end_point_removed(self, removed_point: QPointF):
         if self._curr_polyline.is_empty:
             self._finish_drawing()
             return
 
-        scene_pos = self.viewer.global_pos_to_scene_pos(QCursor.pos())
-        self._update_preview_segment(scene_pos)
+        if self.is_drawing:
+            self._update_preview_segment_to_cursor_pos()
 
     def _show_preview_segment(self):
         if not self._preview_segment.isVisible():
             self._preview_segment.show()
 
-    def _finish_drawing(self):
+    def _pause_drawing(self):
         if not self.is_drawing:
+            return
+
+        self._clear_preview_segment()
+
+        self._state = PolylineToolState.PAUSED
+
+    def _resume_drawing(self):
+        if self._state is not PolylineToolState.PAUSED:
+            return
+
+        self._update_preview_segment_to_cursor_pos()
+
+        self._state = PolylineToolState.DRAWING
+
+    def _finish_drawing(self):
+        if self._state is PolylineToolState.IDLE:
             return
 
         self._curr_polyline.end_point_removed.disconnect(self._on_polyline_end_point_removed)
@@ -349,14 +406,24 @@ class PolylineViewerTool(ViewerTool):
         self._curr_polyline_view = None
         self._curr_polyline = None
 
+        self._state = PolylineToolState.IDLE
+
+
+POLYLINE_CURSOR_CONFIG = CursorConfig(
+    icon_file_name=':/icons/polyline-cursor.svg',
+    hot_x=0.278,
+    hot_y=0.214,
+)
+
 
 class PolylineViewerToolSettings(ViewerToolSettings):
     def __init__(
             self,
             palette_pack_settings: PalettePackSettings,
-            icon_file_name: str = ':/icons/polyline.svg',
+            cursor_config: CursorConfig = POLYLINE_CURSOR_CONFIG,
+            action_icon_file_name: str = ':/icons/polyline-action.svg',
     ):
-        super().__init__(palette_pack_settings, icon_file_name)
+        super().__init__(palette_pack_settings, cursor_config, action_icon_file_name)
 
 
 class PolylineViewerToolPlugin(ViewerToolPlugin):

@@ -569,6 +569,9 @@ class LayeredImageViewer(DataViewer):
     def disable_panning(self):
         self.graphics_view.disable_panning()
 
+    def _on_cursor_owner_changed(self):
+        self.graphics_view.is_using_base_cursor = self._cursor_owner is None
+
     def _on_data_changing(self):
         if self.data is None:
             return

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt, QObject
 
 from bsmu.vision.plugins.tools.viewer import (
-    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerTool, ViewerToolSettings)
+    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerTool, ViewerToolSettings, CursorConfig)
 
 if TYPE_CHECKING:
     from typing import Type
@@ -17,20 +17,17 @@ if TYPE_CHECKING:
 
 
 class HandImageViewerTool(ViewerTool):
-    def activate(self):
-        pass
-
-    def deactivate(self):
-        pass
+    pass
 
 
 class HandImageViewerToolSettings(ViewerToolSettings):
     def __init__(
             self,
             palette_pack_settings: PalettePackSettings,
-            icon_file_name: str = ':/icons/hand.svg',
+            cursor_config: CursorConfig = CursorConfig(),
+            action_icon_file_name: str = ':/icons/hand.svg',
     ):
-        super().__init__(palette_pack_settings, icon_file_name)
+        super().__init__(palette_pack_settings, cursor_config, action_icon_file_name)
 
 
 class HandImageViewerToolPlugin(ViewerToolPlugin):

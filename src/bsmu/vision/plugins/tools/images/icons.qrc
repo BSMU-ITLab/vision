@@ -8,6 +8,7 @@ To generate a *.py file use the next command in the terminal:
 <qresource>
     <file>icons/hand.svg</file>
     <file>icons/brush.svg</file>
+    <file>icons/polyline-action.svg</file>
     <file>icons/polyline-cursor.svg</file>
 </qresource>
 </RCC>

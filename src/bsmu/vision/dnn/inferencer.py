@@ -8,6 +8,7 @@ from typing import ClassVar, TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
+import numpy.typing as npt
 import onnxruntime as ort
 from PySide6.QtCore import QObject, QThreadPool, QTimer
 
@@ -54,8 +55,15 @@ class ImageModelParams(ModelParams):
     channels_order: str = 'rgb'
     normalize: bool = True
     preprocessing_mode: str = 'image-net-torch'
+
+    # Data type the image is converted to at the start of preprocessing.
+    # Use np.uint8 if the model expects raw [0..255] inputs and handles normalization internally
+    # (can slightly improve GPU inference speed). Otherwise, np.float32 is recommended.
+    input_type: npt.DTypeLike = np.float32
+
+    # Which output channels to return: 'all' (default), a single index, or a list of indices.
+    output_channels: int | Sequence[int] | str = 'all'
     mask_binarization_threshold: float = 0.5
-    input_type: np.dtype = np.float32
 
     _input_image_size_cache: tuple = field(default=None, init=False, repr=False, compare=False)
 
@@ -126,6 +134,11 @@ class ImageModelParams(ModelParams):
 
         image = np.moveaxis(image, DEFAULT_CHANNELS_AXIS, self.channels_axis)
 
+        if image.dtype != self.input_type:
+            logging.warning(
+                f'Preprocessed image dtype is {image.dtype}, but expected {self.input_type}. '
+                f'The dtype may have been promoted during preprocessing steps.'
+            )
         return image
 
 

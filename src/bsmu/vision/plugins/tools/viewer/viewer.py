@@ -463,10 +463,12 @@ class LayeredImageViewerTool(ViewerTool):
         self._on_layer_image_updated()
 
     def deactivate(self):
+        self._remove_tool_mask_layer()
+        self._set_mask_layer(None)
+
         self.image_layer_view.image_layer.image_updated.disconnect(self._on_layer_image_updated)
         self.image_layer_view.image_view_updated.disconnect(self._on_layer_image_updated)
-
-        self._remove_tool_mask_layer()
+        self.image_layer_view = None
 
         super().deactivate()
 
@@ -540,7 +542,7 @@ class LayeredImageViewerTool(ViewerTool):
     def _remove_tool_mask_layer(self):
         if self._tool_mask_layer is not None:
             self.viewer.remove_layer(self._tool_mask_layer)
-            self._tool_mask_layer = None
+            self._set_tool_mask_layer(None)
 
     def _update_masks(self):
         if self._mask_layer.image is None:

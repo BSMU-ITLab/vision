@@ -1,2 +1,2 @@
-from .config import Config, IntList
+from .config import Config, IntList, NamesOrAll
 from .united import UnitedConfig

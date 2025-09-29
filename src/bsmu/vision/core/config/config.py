@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, fields
 from enum import Enum
 from pathlib import Path
 from types import UnionType
-from typing import get_type_hints, TYPE_CHECKING
+from typing import get_args, get_origin, get_type_hints, Union, TYPE_CHECKING
 
 import numpy as np
 from ruamel.yaml import YAML
@@ -39,25 +40,25 @@ class Config:
 
             # Do not use field.type, because it can contain string instead of actual resolved type.
             field_type = type_hints[field_name]
-            if not isinstance(config_value, field_type):
-                # Try to convert `config_value` to `field_type`.
-                if isinstance(field_type, UnionType):
-                    # Iterate through individual types from the UnionType
-                    # and try to find a suitable one to convert the `config_value`
-                    is_converted = False
-                    for union_member_type in field_type.__args__:
-                        config_value, is_converted = cls._converted_value_to_type(config_value, union_member_type)
-                        if is_converted:
-                            break
-                    if not is_converted:
-                        raise ValueError(
-                            f'Cannot convert {config_value} to any type from {field_type} '
-                            f'for field name {field_name!r} of {cls}')
-                else:
-                    config_value, is_converted = cls._converted_value_to_type(config_value, field_type)
-                    if not is_converted:
-                        raise ValueError(
-                            f'Cannot convert {config_value} to {field_type} for field name {field_name!r} of {cls}')
+
+            origin_field_type = get_origin(field_type)
+            if origin_field_type in (UnionType, Union):
+                # Iterate through individual types from the UnionType
+                # and try to find a suitable one to convert the `config_value`
+                is_converted = False
+                for union_member_type in get_args(field_type):
+                    config_value, is_converted = cls._converted_value_to_type(config_value, union_member_type)
+                    if is_converted:
+                        break
+                if not is_converted:
+                    raise ValueError(
+                        f"Cannot convert {config_value} to any type from {field_type} "
+                        f"for field name {field_name!r} of {cls}")
+            else:
+                config_value, is_converted = cls._converted_value_to_type(config_value, field_type)
+                if not is_converted:
+                    raise ValueError(
+                        f"Cannot convert {config_value} to {field_type} for field name {field_name!r} of {cls}")
 
             field_name_to_config_value[field_name] = config_value
 
@@ -65,28 +66,88 @@ class Config:
 
     @classmethod
     def _converted_value_to_type(cls, value: Any, type_: Type) -> tuple[Any, bool]:
+        if isinstance(value, type_):
+            return value, True
+
+        if issubclass(type_, ValueWrapper):
+            if type_.can_wrap(value):
+                return type_(value), True
+            else:
+                return value, False
+
         # If `value` is a dictionary and the `type_` is a subclass of Config,
         # then recursively call from_dict to create a nested Config object.
         if isinstance(value, dict) and issubclass(type_, Config):
             return type_.from_dict(value), True
-        elif isinstance(value, (str, int)) and issubclass(type_, Enum):
+
+        if isinstance(value, (str, int)) and issubclass(type_, Enum):
             try:
                 if isinstance(value, str):
                     return type_[value.upper()], True
                 return type_(value), True
             except (ValueError, KeyError):
                 return value, False
-        else:
-            # Try to cast `value` to `type_` according to the `_TARGET_CASTING_TO_SOURCE_TYPES`.
-            for target_type, source_type in _TARGET_CASTING_TO_SOURCE_TYPES.items():
-                if issubclass(type_, target_type) and isinstance(value, source_type):
-                    return type_(value), True
+
+        # Try to cast `value` to `type_` according to the `_TARGET_CASTING_TO_SOURCE_TYPES`.
+        for target_type, source_type in _TARGET_CASTING_TO_SOURCE_TYPES.items():
+            if issubclass(type_, target_type) and isinstance(value, source_type):
+                return type_(value), True
+
         return value, False
 
     def save_to_yaml(self, file_path: Path):
         yaml = YAML()
         with open(file_path, 'w') as file:
             yaml.dump(asdict(self), file)
+
+
+class ValueWrapper:
+    """Base class for types that can validate and wrap raw config values."""
+
+    @classmethod
+    def can_wrap(cls, value: Any) -> bool:
+        raise NotImplementedError
+
+
+class NamesOrAll(ValueWrapper):
+    """
+    Represents either a sequence of strings or the keyword 'all'.
+    """
+    def __init__(self, value: str | Sequence[str]):
+        match value:
+            case 'all':
+                self._names: Sequence[str] | None = None
+            case Sequence() if not isinstance(value, str):
+                self._names = value
+            case _:
+                raise ValueError(
+                    f"Invalid value {value!r} for {self.__class__.__name__}. "
+                    f"Expected 'all' or a sequence of strings."
+                )
+
+    @classmethod
+    def can_wrap(cls, value: Any) -> bool:
+        return (
+                value == 'all'
+                or (isinstance(value, Sequence) and not isinstance(value, str)
+                    and all(isinstance(x, str) for x in value))
+        )
+
+    @property
+    def names(self) -> Sequence[str] | None:
+        return self._names
+
+    @property
+    def is_all(self) -> bool:
+        return self._names is None
+
+    def __contains__(self, name: str) -> bool:
+        return True if self._names is None else name in self._names
+
+    def __repr__(self) -> str:
+        if self.is_all:
+            return f"{self.__class__.__name__}('all')"
+        return f"{self.__class__.__name__}({list(self._names)!r})"
 
 
 class IntList:
@@ -129,7 +190,7 @@ class IntList:
         elif isinstance(value, dict):
             self._values = range(value['start'], value['stop'])
         else:
-            raise ValueError(f'Invalid value {value} for {self.__class__.__name__}')
+            raise ValueError(f"Invalid value {value} for {self.__class__.__name__}")
 
     @property
     def values(self) -> list[int] | range | None:
@@ -145,7 +206,7 @@ class IntList:
         If the class instance represents all integers, it always returns True.
         """
         if not isinstance(value, int):
-            raise ValueError(f'Invalid value {value}')
+            raise ValueError(f"Invalid value {value}")
 
         return True if self._values is None else value in self._values
 

@@ -46,10 +46,26 @@ class UnitedConfig:
 
     def value(self, key: str, default: Any = None) -> Any:
         result = self._data.get(key, self._SENTINEL)
-        while result is self._SENTINEL and self._last_united_config_index != len(self.priority_config_paths) - 1:
+        while result is self._SENTINEL and not self._is_fully_united():
             self._unite_with_next_config()
             result = self._data.get(key, self._SENTINEL)
         return default if result is self._SENTINEL else result
+
+    @property
+    def full_data(self) -> dict:
+        """
+        Return the fully united configuration data.
+
+        Unlike `value()`, which lazily loads configs only until the requested key is found,
+        this method ensures that *all* configs in the hierarchy are merged before returning.
+        Useful when the complete configuration dictionary is needed.
+        """
+        while not self._is_fully_united():
+            self._unite_with_next_config()
+        return self._data
+
+    def _is_fully_united(self) -> bool:
+        return self._last_united_config_index == len(self.priority_config_paths) - 1
 
     @classmethod
     def configure_app_class(cls, app_class: type[App]):

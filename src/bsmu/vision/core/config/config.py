@@ -113,9 +113,11 @@ class NamesOrAll(ValueWrapper):
     """
     Represents either a sequence of strings or the keyword 'all'.
     """
+    ALL_KEYWORD = 'all'
+
     def __init__(self, value: str | Sequence[str]):
         match value:
-            case 'all':
+            case self.ALL_KEYWORD:
                 self._names: Sequence[str] | None = None
             case Sequence() if not isinstance(value, str):
                 self._names = value
@@ -126,9 +128,21 @@ class NamesOrAll(ValueWrapper):
                 )
 
     @classmethod
+    def all(cls) -> Self:
+        return cls(value=cls.ALL_KEYWORD)
+
+    @classmethod
+    def empty(cls) -> Self:
+        return cls(value=())
+
+    @classmethod
+    def from_names(cls, names: Sequence[str]) -> Self:
+        return cls(value=names)
+
+    @classmethod
     def can_wrap(cls, value: Any) -> bool:
         return (
-                value == 'all'
+                value == cls.ALL_KEYWORD
                 or (isinstance(value, Sequence) and not isinstance(value, str)
                     and all(isinstance(x, str) for x in value))
         )

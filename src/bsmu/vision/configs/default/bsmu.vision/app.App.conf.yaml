@@ -26,6 +26,7 @@ plugins:
 #  - bsmu.vision.plugins.tools.viewer.polyline.PolylineViewerToolPlugin
 
   - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
+#  - bsmu.vision.plugins.walkers.mask_auto_save.MaskAutoSaveOnWalkPlugin
 #  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
 
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin

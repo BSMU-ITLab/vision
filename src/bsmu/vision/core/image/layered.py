@@ -25,6 +25,7 @@ class ImageLayer(QObject):
 
     image_updated = Signal(Image)
 
+    image_path_changed = Signal(Path)
     image_shape_changed = Signal(object, object)
     image_pixels_modified = Signal(BBox)
 
@@ -96,6 +97,7 @@ class ImageLayer(QObject):
             return
 
         if self._image is not None:
+            self._image.path_changed.disconnect(self._on_image_path_changed)
             self._image.pixels_modified.disconnect(self.image_pixels_modified)
             self._image.shape_changed.disconnect(self.image_shape_changed)
 
@@ -103,9 +105,9 @@ class ImageLayer(QObject):
         self._on_image_updated()
 
         if self._image is not None:
-            if self._image.path is not None:
-                self.extension = self._image.path.suffix
+            self._update_extension()
             self.palette = self._image.palette
+            self._image.path_changed.connect(self._on_image_path_changed)
             self._image.pixels_modified.connect(self.image_pixels_modified)
             self._image.shape_changed.connect(self.image_shape_changed)
 
@@ -123,6 +125,14 @@ class ImageLayer(QObject):
 
     def _on_image_updated(self):
         self.image_updated.emit(self.image)
+
+    def _on_image_path_changed(self, path: Path | None):
+        self._update_extension()
+        self.image_path_changed.emit(path)
+
+    def _update_extension(self):
+        if self._image.path is not None:
+            self.extension = self._image.path.suffix
 
 
 class LayeredImage(Data):

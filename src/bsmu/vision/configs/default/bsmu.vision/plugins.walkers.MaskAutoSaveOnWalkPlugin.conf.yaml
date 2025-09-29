@@ -1,0 +1,6 @@
+# Choose target layers for autosaving:
+# - 'all'         -> save every indexed layer
+# - list of names -> save only listed layers
+# Example: [ 'masks-vessels', 'masks-drusen' ]
+layers:
+  - 'masks'

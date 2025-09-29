@@ -1,29 +1,37 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
-from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 
 class Data(QObject):
+    path_changed = Signal(Path)
     updated = Signal()
 
-    def __init__(self, path: Path = None):
+    def __init__(self, path: Path | None = None):
         super().__init__()
 
-        self.path = path
+        self._path = path
+
+    @property
+    def path(self) -> Path | None:
+        return self._path
+
+    @path.setter
+    def path(self, value: Path | None):
+        if self._path != value:
+            self._path = value
+            self.path_changed.emit(self._path)
 
     @property
     def path_name(self):
-        return '' if self.path is None else self.path.name
+        return '' if self._path is None else self._path.name
 
     @property
     def dir_name(self):
-        return '' if self.path is None else self.path.parent.name
+        return '' if self._path is None else self._path.parent.name
 
     def update(self):
         self.updated.emit()

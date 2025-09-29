@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import QObject, Qt, Signal
 
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
+from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -16,7 +17,6 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
     from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
-    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 
 class MdiImageLayerFileWalkerPlugin(Plugin):
@@ -61,12 +61,16 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
         )
 
         self._main_window.add_menu_action(
-            ViewMenu, self.tr('Next Image'), self._mdi_image_layer_file_walker.show_next_image, Qt.CTRL | Qt.Key_Right)
+            ViewMenu,
+            self.tr('Next Image'),
+            self._mdi_image_layer_file_walker.show_next_image,
+            Qt.Modifier.CTRL | Qt.Key.Key_Right,
+        )
         self._main_window.add_menu_action(
             ViewMenu,
             self.tr('Previous Image'),
             self._mdi_image_layer_file_walker.show_prev_image,
-            Qt.CTRL | Qt.Key_Left,
+            Qt.Modifier.CTRL | Qt.Key.Key_Left,
         )
 
     def _disable(self):
@@ -76,6 +80,9 @@ class MdiImageLayerFileWalkerPlugin(Plugin):
 
 
 class MdiImageLayerFileWalker(QObject):
+    next_image_requested = Signal(LayeredImageViewer)
+    prev_image_requested = Signal(LayeredImageViewer)
+
     def __init__(self, mdi: Mdi, file_reading_manager: FileReadingManager, allowed_extensions: list[str] | None):
         super().__init__()
 
@@ -88,14 +95,16 @@ class MdiImageLayerFileWalker(QObject):
     def show_next_image(self):
         walker = self._image_layer_file_walker()
         if walker is not None:
+            self.next_image_requested.emit(walker.image_viewer)
             walker.show_next_image()
 
     def show_prev_image(self):
         walker = self._image_layer_file_walker()
         if walker is not None:
+            self.prev_image_requested.emit(walker.image_viewer)
             walker.show_prev_image()
 
-    def _image_layer_file_walker(self):
+    def _image_layer_file_walker(self) -> ImageLayerFileWalker | None:
         active_sub_window = self._mdi.activeSubWindow()
         if not isinstance(active_sub_window, LayeredImageViewerSubWindow):
             return None
@@ -124,6 +133,10 @@ class ImageLayerFileWalker(QObject):
         self._main_layer_dir: Path | None = None
         self._main_layer_dir_relative_file_paths: list[Path] | None = None
         self._main_layer_file_index: int | None = None
+
+    @property
+    def image_viewer(self) -> LayeredImageViewer:
+        return self._image_viewer
 
     @property
     def active_layer(self) -> ImageLayer:

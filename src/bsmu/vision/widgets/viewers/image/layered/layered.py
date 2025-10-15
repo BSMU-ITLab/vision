@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.config import UnitedConfig
     from bsmu.vision.core.palette import Palette
     from bsmu.vision.core.visibility import Visibility
+    from bsmu.vision.widgets.viewers.graphics_view import NormalizedViewRegion
 
 
 class IntensityWindowing:
@@ -458,6 +459,8 @@ class LayeredImageViewer(DataViewer):
 
         self._settings = settings
 
+        self._is_syncing_scene_rect = False
+
         self.layered_image_graphics_object = _LayeredImageGraphicsObject()
         self.layered_image_graphics_object.active_layer_view_changed.connect(
             self._on_active_layer_view_changed)
@@ -635,7 +638,15 @@ class LayeredImageViewer(DataViewer):
         return self.viewport_pos_to_layered_image_item_pos(viewport_pos)
 
     def fit_image_in(self):
-        self.graphics_view.fit_in_view(self.layered_image_graphics_object.boundingRect(), Qt.KeepAspectRatio)
+        self.graphics_view.fit_in_view(
+            self.layered_image_graphics_object.boundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
+    def capture_normalized_view_region(self) -> NormalizedViewRegion | None:
+        return self.graphics_view.capture_normalized_view_region()
+
+    def restore_normalized_view_region(self, normalized_view_region: NormalizedViewRegion | None):
+        self._sync_scene_rect_with_bounding_rect()
+        self.graphics_view.restore_normalized_view_region(normalized_view_region)
 
     def _on_active_layer_view_changed(self, old_active_layer_view: ImageLayerView,
                                       new_active_layer_view: ImageLayerView):
@@ -645,7 +656,19 @@ class LayeredImageViewer(DataViewer):
             new_active_layer_view.image_view_updated.connect(self._on_active_layer_image_view_updated)
 
     def _on_graphics_object_bounding_rect_changed(self, rect: QRectF):
-        self.graphics_view.set_visualized_scene_rect(rect)
+        self._sync_scene_rect_with_bounding_rect(rect)
+
+    def _sync_scene_rect_with_bounding_rect(self, rect: QRectF | None = None):
+        if self._is_syncing_scene_rect:
+            return
+
+        self._is_syncing_scene_rect = True
+
+        if rect is None:
+            rect = self.layered_image_graphics_object.boundingRect()
+        self.graphics_view.set_scrollable_scene_rect(rect)
+
+        self._is_syncing_scene_rect = False
 
     def _on_active_layer_image_view_updated(self, image_view: FlatImage):
         self.data_name_changed.emit('' if image_view is None else image_view.path_name)

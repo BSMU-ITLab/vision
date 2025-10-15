@@ -181,6 +181,8 @@ class ImageLayerFileWalker(QObject):
             self._show_image_with_index(self.main_layer_file_index - 1)
 
     def _show_image_with_index(self, index: int):
+        normalized_view_region = self._image_viewer.capture_normalized_view_region()
+
         self._main_layer_file_index = index % len(self.main_layer_dir_relative_file_paths)
         requested_file_relative_path = self.main_layer_dir_relative_file_paths[self._main_layer_file_index]
         # Update images of all layers
@@ -193,3 +195,5 @@ class ImageLayerFileWalker(QObject):
             if layer != self._image_viewer.active_layer and layer.extension is not None:
                 file_path = file_path.with_suffix(layer.extension)
             layer.image = self._file_reading_manager.read_file(file_path, palette=layer.palette)
+
+        self._image_viewer.restore_normalized_view_region(normalized_view_region)

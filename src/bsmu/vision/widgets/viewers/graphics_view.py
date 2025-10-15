@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
 
-import numpy as np
 from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QRect, QRectF, QPointF
 from PySide6.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics
 from PySide6.QtWidgets import QGraphicsView
@@ -35,8 +35,15 @@ class GraphicsViewSettings(Settings):
         return self._zoom_settings
 
 
+@dataclass
+class NormalizedViewRegion:
+    min_ratio: float
+    center: QPointF
+
+
 class GraphicsView(QGraphicsView):
     zoom_finished = Signal()
+    pan_finished = Signal()
     scrollable_reset = Signal()
 
     def __init__(self, scene: QGraphicsScene, settings: GraphicsViewSettings):
@@ -62,15 +69,17 @@ class GraphicsView(QGraphicsView):
         self._scale_font_metrics = QFontMetrics(self._scale_font)
         self._scale_text_rect = QRect()
 
-        self._viewport_anchors = None
-        self._reset_viewport_anchors()
-        self._viewport_anchoring = False
+        self._viewport_rect_in_scene: QRectF | None = None
 
-        self._viewport_anchoring_scheduled = False
-        scene.sceneRectChanged.connect(self._reset_viewport_anchors)
+        self._min_ratio: float | None = None
+        self._anchor_rect: QRectF | None = None
+        self._aspect_ratio_mode: Qt.AspectRatioMode = Qt.AspectRatioMode.KeepAspectRatio
 
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self._is_fitting_in_anchor_rect = False
+        self._is_scene_rect_changing = False
+
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
 
         # Without FullViewportUpdate mode, scale text will not be properly updated when scrolling,
         # Because QGraphicsView::scrollContentsBy contains scroll optimization to update only part of the viewport.
@@ -120,23 +129,23 @@ class GraphicsView(QGraphicsView):
 
         if self._view_pan is None:
             self._view_pan = _ViewPan(self, self)
+            self._view_pan.pan_finished.connect(self._on_pan_finished)
+            self._view_pan.pan_finished.connect(self.pan_finished)
         self._view_pan.activate()
 
     def disable_panning(self):
         if self._view_pan is not None:
             self._view_pan.deactivate()
 
-    def set_visualized_scene_rect(self, rect: QRectF):
+    def set_scrollable_scene_rect(self, rect: QRectF):
+        self._is_scene_rect_changing = True
         self.setSceneRect(rect)
+        self._is_scene_rect_changing = False
 
-        self._update_viewport_anchors()
+        self._reset_scrollable()
 
     def paintEvent(self, event: QPaintEvent):
         super().paintEvent(event)
-
-        if self._viewport_anchoring_scheduled:
-            self._anchor_viewport()
-            self._viewport_anchoring_scheduled = False
 
         painter = QPainter(self.viewport())
         painter.setRenderHint(QPainter.Antialiasing)
@@ -158,6 +167,11 @@ class GraphicsView(QGraphicsView):
         path.addText(self._scale_text_rect.bottomLeft(), self._scale_font, scale_text)
         painter.drawPath(path)
 
+    def resizeEvent(self, resize_event: QResizeEvent):
+        self._fit_in_anchor_rect()
+
+        super().resizeEvent(resize_event)
+
     def scrollContentsBy(self, dx: int, dy: int):
         super().scrollContentsBy(dx, dy)
 
@@ -165,7 +179,46 @@ class GraphicsView(QGraphicsView):
         self.viewport().update(self._scale_text_rect)
         self.viewport().update(self._scale_text_rect.translated(dx, dy))
 
-        self._update_viewport_anchors()
+        self._refresh_viewport_region()
+
+    def fit_in_view(self, rect: QRectF, aspect_ratio_mode: Qt.AspectRatioMode = Qt.AspectRatioMode.KeepAspectRatio):
+        self._anchor_rect = rect
+        self._aspect_ratio_mode = aspect_ratio_mode
+        self._fit_in_anchor_rect()
+        self._update_viewport_rect_in_scene()
+
+    def capture_normalized_view_region(self) -> NormalizedViewRegion | None:
+        if self._should_display_full_scene():
+            return None  # Or we can return NormalizedViewRegion(1.0, QPointF(0.5, 0.5))
+
+        if self._min_ratio is None:
+            self._min_ratio = self._calculate_min_ratio()
+
+        viewport_center_in_scene = self._viewport_rect_in_scene.center()
+        normalized_center = QPointF(
+            viewport_center_in_scene.x() / self.sceneRect().width(),
+            viewport_center_in_scene.y() / self.sceneRect().height()
+        )
+        return NormalizedViewRegion(self._min_ratio, normalized_center)
+
+    def restore_normalized_view_region(self, normalized_view_region: NormalizedViewRegion | None):
+        scene_rect = self.sceneRect()
+        if normalized_view_region is None:
+            self._anchor_rect = scene_rect
+        else:
+            center = QPointF(normalized_view_region.center.x() * scene_rect.width(),
+                             normalized_view_region.center.y() * scene_rect.height())
+            self._anchor_rect = self._build_anchor_rect(normalized_view_region.min_ratio, center)
+
+        self._fit_in_anchor_rect()
+
+        if normalized_view_region is None:
+            self._viewport_rect_in_scene = None
+        else:
+            self._update_viewport_rect_in_scene()
+
+    def _on_pan_finished(self):
+        self._refresh_viewport_region()
 
     def set_cursor(self, cursor_shape: Qt.CursorShape):
         self.viewport().setCursor(cursor_shape)
@@ -186,54 +239,75 @@ class GraphicsView(QGraphicsView):
     def _on_zoom_finished(self):
         self._update_scale()
         self._reset_scrollable()
-        self._update_viewport_anchors()
 
-    def _update_viewport_anchors(self):
-        if self._viewport_anchoring:
+        self._refresh_viewport_region()
+
+    def _refresh_viewport_region(self):
+        if self._is_fitting_in_anchor_rect or self._is_scene_rect_changing:
             return
 
         scene_rect = self.sceneRect()
         if scene_rect.isEmpty():
             return
 
-        scene_size = np.array([scene_rect.width(), scene_rect.height()])
+        self._update_viewport_rect_in_scene()
+        self._min_ratio = None
+        self._anchor_rect = None
 
+    def _update_viewport_rect_in_scene(self):
         viewport_rect = self.viewport().rect()
-        top_left_viewport_point = self.mapToScene(viewport_rect.topLeft())
-        bottom_right_viewport_point = self.mapToScene(viewport_rect.bottomRight())
+        self._viewport_rect_in_scene = self.mapToScene(viewport_rect).boundingRect()
 
-        self._viewport_anchors[0] = np.array([top_left_viewport_point.x(), top_left_viewport_point.y()]) / scene_size
-        self._viewport_anchors[1] = \
-            np.array([bottom_right_viewport_point.x(), bottom_right_viewport_point.y()]) / scene_size
+    def _should_display_full_scene(self) -> bool:
+        return self._viewport_rect_in_scene is None
 
-    def resizeEvent(self, resize_event: QResizeEvent):
-        self._schedule_viewport_anchoring()
+    def _calculate_min_ratio(self) -> float:
+        width_ratio = self._viewport_rect_in_scene.width() / self.sceneRect().width()
+        height_ratio = self._viewport_rect_in_scene.height() / self.sceneRect().height()
+        return min(width_ratio, height_ratio)
 
-    def _schedule_viewport_anchoring(self):
-        self._viewport_anchoring_scheduled = True
-
-    def _reset_viewport_anchors(self):
-        self._viewport_anchors = np.array([[0, 0], [1, 1]], dtype=float)
-        self._schedule_viewport_anchoring()
-
-    def _anchor_viewport(self):
-        self._viewport_anchoring = True
-
+    def _build_anchor_rect(self, min_ratio: float, center: QPointF) -> QRectF:
         scene_rect = self.sceneRect()
-        scene_size = np.array([scene_rect.width(), scene_rect.height()])
+        scene_width = scene_rect.width()
+        scene_height = scene_rect.height()
 
-        viewport_rect_angle_point_coords = self._viewport_anchors * scene_size
-        viewport_rect = QRectF(QPointF(*viewport_rect_angle_point_coords[0]),
-                               QPointF(*viewport_rect_angle_point_coords[1]))
-        self.fit_in_view(viewport_rect, Qt.KeepAspectRatio)
+        new_width = scene_width * min_ratio
+        new_height = scene_height * min_ratio
 
-        self._viewport_anchoring = False
+        # Build rectangle centered at `center`
+        top_left = QPointF(
+            center.x() - new_width / 2,
+            center.y() - new_height / 2
+        )
+        bottom_right = QPointF(
+            center.x() + new_width / 2,
+            center.y() + new_height / 2
+        )
+        return QRectF(top_left, bottom_right)
 
-    def fit_in_view(self, rect: QRectF, aspect_ratio_mode: Qt.AspectRatioMode = Qt.IgnoreAspectRatio):
-        self.fitInView(rect, aspect_ratio_mode)
+    def _determine_anchor_rect(self) -> QRectF | None:
+        """Decide which anchor rect should be used based on current state."""
+        scene_rect = self.sceneRect()
+        if scene_rect.isEmpty():
+            return None
 
-        self._update_scale()
-        self._update_viewport_anchors()
+        if self._should_display_full_scene():
+            return scene_rect
+
+        self._min_ratio = self._calculate_min_ratio()
+        return self._build_anchor_rect(self._min_ratio, self._viewport_rect_in_scene.center())
+
+    def _fit_in_anchor_rect(self):
+        self._is_fitting_in_anchor_rect = True
+
+        if self._anchor_rect is None:
+            self._anchor_rect = self._determine_anchor_rect()
+
+        if self._anchor_rect is not None:
+            self.fitInView(self._anchor_rect, self._aspect_ratio_mode)
+            self._update_scale()
+
+        self._is_fitting_in_anchor_rect = False
 
 
 class ZoomSettings(Settings):
@@ -309,6 +383,8 @@ class _ZoomTimeLine(QTimeLine):
 
 
 class _ViewPan(QObject):
+    pan_finished = Signal()
+
     def __init__(self, view: GraphicsView, parent: QObject = None):
         super().__init__(parent)
 
@@ -356,6 +432,7 @@ class _ViewPan(QObject):
         elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton and self.is_panning:
             self._old_pos = None
             self.update_cursor()
+            self.pan_finished.emit()
             return False
         elif event.type() == QEvent.MouseMove and event.buttons() == Qt.LeftButton and self.is_panning:
             new_pos = self.event_pos(event)

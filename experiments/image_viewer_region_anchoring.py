@@ -7,6 +7,9 @@ This standalone script isolates and verifies viewport handling logic:
 - When switching between images of different sizes, the viewer restores
   the same relative portion of the image (e.g. full image, central area),
   so the user's point of view is preserved across images.
+
+Known limitation: Using fit_in_view with IgnoreAspectRatio prevents the
+                  algorithm from restoring the correct viewport region.
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ class ImageViewer(QGraphicsView):
 
         self._min_ratio: float | None = None
         self._anchor_rect: QRectF | None = None
+        self._aspect_ratio_mode: Qt.AspectRatioMode = Qt.AspectRatioMode.KeepAspectRatio
 
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._anchor_rect_item: QGraphicsRectItem | None = None
@@ -108,8 +112,16 @@ class ImageViewer(QGraphicsView):
         self._draw_anchor_rect()
         self._fit_in_anchor_rect()
 
-        if not self._should_display_full_scene():
+        if normalized_view_region is None:
+            self._viewport_rect_in_scene = None
+        else:
             self._update_viewport_rect_in_scene()
+
+    def fit_in_view(self, rect: QRectF, aspect_ratio_mode: Qt.AspectRatioMode = Qt.AspectRatioMode.KeepAspectRatio):
+        self._anchor_rect = rect
+        self._aspect_ratio_mode = aspect_ratio_mode
+        self._fit_in_anchor_rect()
+        self._update_viewport_rect_in_scene()
 
     def set_scrollable_scene_rect(self, rect: QRectF):
         self._is_scene_rect_changing = True
@@ -190,7 +202,7 @@ class ImageViewer(QGraphicsView):
             self._draw_anchor_rect()
 
         if self._anchor_rect is not None:
-            self.fitInView(self._anchor_rect, Qt.AspectRatioMode.KeepAspectRatio)
+            self.fitInView(self._anchor_rect, self._aspect_ratio_mode)
 
         self._is_fitting_in_anchor_rect = False
 
@@ -240,6 +252,12 @@ class ImageViewer(QGraphicsView):
                 random_rect = QRectF(-300, -300, 200, 200)
                 self._scene.addRect(random_rect, brush=QBrush(Qt.GlobalColor.green))
                 # self.set_scrollable_scene_rect(self._scene.sceneRect())
+            case Qt.Key.Key_1:  # Test KeepAspectRatio
+                print('Fitting with KeepAspectRatio')
+                self.fit_in_view(QRectF(300, 300, 200, 300), Qt.AspectRatioMode.KeepAspectRatio)
+            case Qt.Key.Key_2:  # Test IgnoreAspectRatio
+                print('Fitting with IgnoreAspectRatio')
+                self.fit_in_view(QRectF(300, 300, 200, 300), Qt.AspectRatioMode.IgnoreAspectRatio)
             case _:
                 super().keyPressEvent(event)
 

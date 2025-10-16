@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QEvent, QRect, QRectF, QPointF
+from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QTimer, QEvent, QRect, QRectF, QPointF
 from PySide6.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics
 from PySide6.QtWidgets import QGraphicsView
 
@@ -44,7 +44,8 @@ class NormalizedViewRegion:
 class GraphicsView(QGraphicsView):
     zoom_finished = Signal()
     pan_finished = Signal()
-    scrollable_reset = Signal()
+    scrollable_invalidated = Signal()
+    scrollable_changed = Signal(bool)
 
     def __init__(self, scene: QGraphicsScene, settings: GraphicsViewSettings):
         super().__init__()
@@ -54,7 +55,8 @@ class GraphicsView(QGraphicsView):
         self._is_using_base_cursor: bool = True
 
         self._view_pan: _ViewPan | None = None
-        self._is_scrollable: bool | None = None
+        self._is_scrollable: bool = False  # Last computed scrollability state
+        self._is_scrollable_valid: bool = True  # False if scrollability must be recomputed
 
         self._settings = settings
         if self._settings.zoomable:
@@ -88,15 +90,28 @@ class GraphicsView(QGraphicsView):
 
     @property
     def is_scrollable(self) -> bool:
-        if self._is_scrollable is None:
-            transformed_scene_rect = self.transform().mapRect(self.sceneRect())
-            viewport_rect = self.viewport().rect()
-
-            can_scroll_horizontally = transformed_scene_rect.width() > viewport_rect.width()
-            can_scroll_vertically = transformed_scene_rect.height() > viewport_rect.height()
-
-            self._is_scrollable = can_scroll_horizontally or can_scroll_vertically
+        # Returns the last computed scrollability state.
+        # Note: may be stale if _is_scrollable_valid is False.
         return self._is_scrollable
+
+    def _update_scrollable(self):
+        h = self.horizontalScrollBar()
+        v = self.verticalScrollBar()
+        can_scroll_horizontally = h.maximum() > h.minimum()
+        can_scroll_vertically = v.maximum() > v.minimum()
+        new_is_scrollable = can_scroll_horizontally or can_scroll_vertically
+        self._is_scrollable_valid = True
+        if self._is_scrollable != new_is_scrollable:
+            self._is_scrollable = new_is_scrollable
+            self.scrollable_changed.emit(self._is_scrollable)
+
+    def _invalidate_scrollable(self):
+        if self._is_scrollable_valid:
+            self._is_scrollable_valid = False
+            self.scrollable_invalidated.emit()
+            # Defer the update until the next event loop cycle,
+            # ensuring that Qt has updated the scrollbars before we recompute.
+            QTimer.singleShot(0, self._update_scrollable)
 
     @property
     def is_using_base_cursor(self) -> bool:
@@ -142,7 +157,7 @@ class GraphicsView(QGraphicsView):
         self.setSceneRect(rect)
         self._is_scene_rect_changing = False
 
-        self._reset_scrollable()
+        self._invalidate_scrollable()
 
     def paintEvent(self, event: QPaintEvent):
         super().paintEvent(event)
@@ -223,11 +238,6 @@ class GraphicsView(QGraphicsView):
     def set_cursor(self, cursor_shape: Qt.CursorShape):
         self.viewport().setCursor(cursor_shape)
 
-    def _reset_scrollable(self):
-        if self._is_scrollable is not None:
-            self._is_scrollable = None
-            self.scrollable_reset.emit()
-
     def _calculate_scale(self) -> float:
         cur_transform = self.transform()
         assert cur_transform.m11() == cur_transform.m22(), 'Scaled without keeping aspect ratio'
@@ -238,7 +248,7 @@ class GraphicsView(QGraphicsView):
 
     def _on_zoom_finished(self):
         self._update_scale()
-        self._reset_scrollable()
+        self._invalidate_scrollable()
 
         self._refresh_viewport_region()
 
@@ -394,7 +404,7 @@ class _ViewPan(QObject):
 
         self._is_active = False
 
-        self._view.scrollable_reset.connect(self.update_cursor)
+        self._view.scrollable_changed.connect(self.update_cursor)
 
     @property
     def is_active(self) -> bool:
@@ -425,7 +435,7 @@ class _ViewPan(QObject):
         self._is_active = False
 
     def eventFilter(self, watched_obj, event):
-        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self._view.is_scrollable:
             self._old_pos = self.event_pos(event)
             self.update_cursor()
             return False

@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QTimer, QEvent, QRect, QRectF, QPointF
-from PySide6.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics
+from PySide6.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics, QWheelEvent, QMouseEvent
 from PySide6.QtWidgets import QGraphicsView
 
 from bsmu.vision.core.settings import Settings
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import QPaintEvent, QResizeEvent, QMouseEvent
+    from PySide6.QtGui import QPaintEvent, QResizeEvent
     from PySide6.QtWidgets import QGraphicsScene
 
 
@@ -129,8 +129,8 @@ class GraphicsView(QGraphicsView):
             self._view_pan.update_cursor()
 
     def enable_zooming(self):
-        self.setTransformationAnchor(QGraphicsView.NoAnchor)
-        self.setResizeAnchor(QGraphicsView.NoAnchor)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
 
         view_smooth_zoom = _ViewSmoothZoom(self, self._settings.zoom_settings, self)
         view_smooth_zoom.zoom_finished.connect(self._on_zoom_finished)
@@ -163,19 +163,21 @@ class GraphicsView(QGraphicsView):
         super().paintEvent(event)
 
         painter = QPainter(self.viewport())
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setBrush(QColor(123, 184, 234))
-        painter.setPen(QPen(Qt.white, 0.5))
+        painter.setPen(QPen(Qt.GlobalColor.white, 0.5))
 
         scale_text = f'{self._cur_scale * 100:.0f}%'
         scale_text_bounding_rect = self._scale_font_metrics.boundingRect(scale_text)
         viewport_rect = self.viewport().rect()
         # Align the scale text to (Qt.AlignHCenter | Qt.AlignBottom)
         pad = 2
-        self._scale_text_rect = QRect(viewport_rect.width() / 2 - scale_text_bounding_rect.width() / 2,
-                                      viewport_rect.height() - scale_text_bounding_rect.height() - 6,
-                                      scale_text_bounding_rect.width(), scale_text_bounding_rect.height())\
-            .adjusted(-pad, -pad, pad, pad)  # add pads to update when scrolling without artifacts
+        self._scale_text_rect = QRect(
+            int(viewport_rect.width() / 2 - scale_text_bounding_rect.width() / 2),
+            viewport_rect.height() - scale_text_bounding_rect.height() - 6,
+            scale_text_bounding_rect.width(),
+            scale_text_bounding_rect.height()
+        ).adjusted(-pad, -pad, pad, pad)  # Add pads to update when scrolling without artifacts
 
         # Use QPainterPath to draw text with outline
         path = QPainterPath()
@@ -342,21 +344,22 @@ class ZoomSettings(Settings):
 class _ViewSmoothZoom(QObject):
     zoom_finished = Signal()
 
-    def __init__(self, view, settings: ZoomSettings, parent: QObject = None):
+    def __init__(self, view: QGraphicsView, settings: ZoomSettings, parent: QObject = None):
         super().__init__(parent)
 
-        self.view = view
+        self._view = view
 
         self._settings = settings
 
-    def eventFilter(self, watched_obj, event):
-        if event.type() == QEvent.Wheel:
-            self.on_wheel_scrolled(event)
+    def eventFilter(self, watched_obj: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.Wheel:
+            wheel_event = cast(QWheelEvent, event)
+            self._on_wheel_scrolled(wheel_event)
             return True
-        else:
-            return super().eventFilter(watched_obj, event)
 
-    def on_wheel_scrolled(self, event):
+        return super().eventFilter(watched_obj, event)
+
+    def _on_wheel_scrolled(self, event: QWheelEvent):
         angle_in_degrees = event.angleDelta().y() / 8
         zoom_factor = angle_in_degrees / 60 * self._settings.zoom_factor
         zoom_factor = 1 + zoom_factor / (SMOOTH_ZOOM_DURATION / SMOOTH_ZOOM_UPDATE_INTERVAL)
@@ -364,25 +367,27 @@ class _ViewSmoothZoom(QObject):
         zoom = _Zoom(event.position(), zoom_factor)
         zoom_time_line = _ZoomTimeLine(SMOOTH_ZOOM_DURATION, self)
         zoom_time_line.setUpdateInterval(SMOOTH_ZOOM_UPDATE_INTERVAL)
-        zoom_time_line.valueChanged.connect(partial(self.zoom_view, zoom))
+        zoom_time_line.valueChanged.connect(partial(self._zoom_view, zoom))
         zoom_time_line.finished.connect(self.zoom_finished)
         zoom_time_line.start()
 
-    def zoom_view(self, zoom, time_line_value):  # PySide signal doesn't work without one more parameter from signal (time_line_value)
-        old_pos = self.view.mapToScene(zoom.pos.toPoint())
-        self.view.scale(zoom.factor, zoom.factor)
+    def _zoom_view(self, zoom: _Zoom, _time_line_value: float):
+        # The PySide signal requires an extra parameter (_time_line_value),
+        # even though it is not used in this method.
+        old_pos = self._view.mapToScene(zoom.pos.toPoint())
+        self._view.scale(zoom.factor, zoom.factor)
 
-        new_pos = self.view.mapToScene(zoom.pos.toPoint())
+        new_pos = self._view.mapToScene(zoom.pos.toPoint())
 
         # Move the scene's view to old position
         delta = new_pos - old_pos
-        self.view.translate(delta.x(), delta.y())
+        self._view.translate(delta.x(), delta.y())
 
 
-class _Zoom:  # TODO: Use Python 3.7 dataclasses
-    def __init__(self, pos, factor):
-        self.pos = pos
-        self.factor = factor
+@dataclass
+class _Zoom:
+    pos: QPointF
+    factor: float
 
 
 class _ZoomTimeLine(QTimeLine):
@@ -418,7 +423,7 @@ class _ViewPan(QObject):
         if self._is_active:
             return
 
-        self._view.setTransformationAnchor(QGraphicsView.NoAnchor)
+        self._view.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.update_cursor()
         self._view.viewport().installEventFilter(self)
 
@@ -434,27 +439,34 @@ class _ViewPan(QObject):
 
         self._is_active = False
 
-    def eventFilter(self, watched_obj, event):
-        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self._view.is_scrollable:
-            self._old_pos = self.event_pos(event)
-            self.update_cursor()
-            return False
-        elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton and self.is_panning:
-            self._old_pos = None
-            self.update_cursor()
-            self.pan_finished.emit()
-            return False
-        elif event.type() == QEvent.MouseMove and event.buttons() == Qt.LeftButton and self.is_panning:
-            new_pos = self.event_pos(event)
-            delta = self._view.mapToScene(new_pos.toPoint()) - self._view.mapToScene(self._old_pos.toPoint())
-            self._view.translate(delta.x(), delta.y())
-            self._old_pos = new_pos
-            return False
-        else:
+    def eventFilter(self, watched_obj: QObject, event: QEvent) -> bool:
+        if not isinstance(event, QMouseEvent):
             return super().eventFilter(watched_obj, event)
 
+        match event.type():
+            case QEvent.Type.MouseButtonPress:
+                if event.button() == Qt.MouseButton.LeftButton and self._view.is_scrollable:
+                    self._old_pos = self.event_pos(event)
+                    self.update_cursor()
+                    return False
+            case QEvent.Type.MouseButtonRelease:
+                if event.button() == Qt.MouseButton.LeftButton and self.is_panning:
+                    self._old_pos = None
+                    self.update_cursor()
+                    self.pan_finished.emit()
+                    return False
+            case QEvent.Type.MouseMove:
+                if self.is_panning:
+                    new_pos = self.event_pos(event)
+                    delta = self._view.mapToScene(new_pos.toPoint()) - self._view.mapToScene(self._old_pos.toPoint())
+                    self._view.translate(delta.x(), delta.y())
+                    self._old_pos = new_pos
+                    return False
+
+        return super().eventFilter(watched_obj, event)
+
     @staticmethod
-    def event_pos(event: QMouseEvent):
+    def event_pos(event: QMouseEvent) -> QPointF:
         return event.position()
 
     def _reset(self):
@@ -469,7 +481,7 @@ class _ViewPan(QObject):
             return
 
         if self._view.is_scrollable:
-            cursor_shape = Qt.ClosedHandCursor if self.is_panning else Qt.OpenHandCursor
+            cursor_shape = Qt.CursorShape.ClosedHandCursor if self.is_panning else Qt.CursorShape.OpenHandCursor
         else:
-            cursor_shape = Qt.ArrowCursor
+            cursor_shape = Qt.CursorShape.ArrowCursor
         self._set_cursor(cursor_shape)

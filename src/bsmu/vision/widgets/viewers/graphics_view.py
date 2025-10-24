@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
+import time
 from dataclasses import dataclass
-from functools import partial
 from typing import TYPE_CHECKING, cast
 
-from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QTimer, QEvent, QRect, QRectF, QPointF
+from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QTimer, QEvent, QRect, QRectF, QPointF, QEasingCurve
 from PySide6.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics, QWheelEvent, QMouseEvent
 from PySide6.QtWidgets import QGraphicsView
 
@@ -15,8 +16,15 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QGraphicsScene
 
 
-SMOOTH_ZOOM_DURATION = 100
-SMOOTH_ZOOM_UPDATE_INTERVAL = 10
+SMOOTH_ZOOM_DURATION_MS = 150
+SMOOTH_ZOOM_UPDATE_INTERVAL_MS = 10
+
+ACCELERATED_ZOOM_RESET_TIMEOUT_MS = 300
+ACCELERATED_ZOOM_INCREMENT_MAX = 4
+ACCELERATED_ZOOM_MULTIPLIER_MAX = 10
+
+MIN_SCALE = 0.01
+MAX_SCALE = 100
 
 
 class GraphicsViewSettings(Settings):
@@ -247,6 +255,7 @@ class GraphicsView(QGraphicsView):
 
     def _update_scale(self):
         self._cur_scale = self._calculate_scale()
+        self.viewport().update(self._scale_text_rect)
 
     def _on_zoom_finished(self):
         self._update_scale()
@@ -342,14 +351,46 @@ class ZoomSettings(Settings):
 
 
 class _ViewSmoothZoom(QObject):
+    """
+    Key features:
+
+    1) Acceleration (Time-sensitive scaling):
+        The zoom factor is dynamically adjusted based on the timing of successive
+        wheel events. Rapid consecutive scrolls increase the zoom multiplier,
+        producing accelerated zooming, while pauses reset the multiplier.
+
+    2) Invertibility (Reversibility):
+        A zoom-in followed by an equal zoom-out (or vice versa) returns the view
+        to its original scale. This is guaranteed by exponential scaling:
+            scale = base ** scroll_steps
+        so the inverse cancels the previous operation (up to floating‑point precision):
+            base**(+scroll_steps) * base**(-scroll_steps) = base**0 = 1
+
+    3) Step Consistency (Composability):
+        The same exponential form ensures that multiple small steps produce
+        exactly the same final scale as one large step with the same total scroll:
+            base**a * base**b = base**(a + b)
+        In contrast, a naive approach like:
+
+            scale = abs(scroll_steps) + 1
+            if scroll_steps < 0:
+                scale = 1 / scale
+
+        would preserve invertibility but breaks composability.
+    """
+
     zoom_finished = Signal()
 
     def __init__(self, view: QGraphicsView, settings: ZoomSettings, parent: QObject = None):
         super().__init__(parent)
 
         self._view = view
-
         self._settings = settings
+
+        # Accelerated zoom state
+        self._last_scroll_timestamp_ms: float = 0.0
+        self._last_zoom_direction: int = 0  # +1 for zoom in, -1 for zoom out
+        self._accelerated_zoom_multiplier: float = 1.0
 
     def eventFilter(self, watched_obj: QObject, event: QEvent) -> bool:
         if event.type() == QEvent.Type.Wheel:
@@ -361,27 +402,31 @@ class _ViewSmoothZoom(QObject):
 
     def _on_wheel_scrolled(self, event: QWheelEvent):
         angle_in_degrees = event.angleDelta().y() / 8
-        zoom_factor = angle_in_degrees / 60 * self._settings.zoom_factor
-        zoom_factor = 1 + zoom_factor / (SMOOTH_ZOOM_DURATION / SMOOTH_ZOOM_UPDATE_INTERVAL)
+
+        zoom_direction = int(math.copysign(1, angle_in_degrees))
+        current_timestamp_ms = time.monotonic() * 1000
+        elapsed_ms = current_timestamp_ms - self._last_scroll_timestamp_ms
+
+        if zoom_direction != self._last_zoom_direction or elapsed_ms > ACCELERATED_ZOOM_RESET_TIMEOUT_MS:
+            # Reset accelerated zoom multiplier
+            self._accelerated_zoom_multiplier = 1.0
+        else:
+            # Increase the zoom multiplier based on scroll frequency (faster successive events -> larger increment)
+            multiplier_increment = ACCELERATED_ZOOM_INCREMENT_MAX * (
+                    1 - elapsed_ms / ACCELERATED_ZOOM_RESET_TIMEOUT_MS)
+            self._accelerated_zoom_multiplier = min(
+                self._accelerated_zoom_multiplier + multiplier_increment, ACCELERATED_ZOOM_MULTIPLIER_MAX)
+        self._last_zoom_direction = zoom_direction
+        self._last_scroll_timestamp_ms = current_timestamp_ms
+
+        zoom_factor = 0.02 * angle_in_degrees * self._accelerated_zoom_multiplier * self._settings.zoom_factor
 
         zoom = _Zoom(event.position(), zoom_factor)
-        zoom_time_line = _ZoomTimeLine(SMOOTH_ZOOM_DURATION, self)
-        zoom_time_line.setUpdateInterval(SMOOTH_ZOOM_UPDATE_INTERVAL)
-        zoom_time_line.valueChanged.connect(partial(self._zoom_view, zoom))
+        zoom_time_line = _ZoomTimeLine(self._view, zoom, SMOOTH_ZOOM_DURATION_MS, self)
+        zoom_time_line.setUpdateInterval(SMOOTH_ZOOM_UPDATE_INTERVAL_MS)
+        zoom_time_line.setEasingCurve(QEasingCurve.Type.OutQuad)
         zoom_time_line.finished.connect(self.zoom_finished)
         zoom_time_line.start()
-
-    def _zoom_view(self, zoom: _Zoom, _time_line_value: float):
-        # The PySide signal requires an extra parameter (_time_line_value),
-        # even though it is not used in this method.
-        old_pos = self._view.mapToScene(zoom.pos.toPoint())
-        self._view.scale(zoom.factor, zoom.factor)
-
-        new_pos = self._view.mapToScene(zoom.pos.toPoint())
-
-        # Move the scene's view to old position
-        delta = new_pos - old_pos
-        self._view.translate(delta.x(), delta.y())
 
 
 @dataclass
@@ -391,10 +436,42 @@ class _Zoom:
 
 
 class _ZoomTimeLine(QTimeLine):
-    def __init__(self, duration: int = 1000, parent: QObject = None):
+    def __init__(self, view: QGraphicsView, zoom: _Zoom, duration: int = 1000, parent: QObject = None):
         super().__init__(duration, parent)
 
+        self._view = view
+        self._zoom = zoom
+
+        self._prev_value: float = 0.0
+
+        self.valueChanged.connect(self._on_value_changed)
         self.finished.connect(self.deleteLater)
+
+    def _on_value_changed(self, value: float):
+        # QTimeLine updates aren't guaranteed to occur exactly duration/update_interval times.
+        # The actual count depends on the event loop and system load, so we use the delta
+        # since the last value to apply the correct incremental zoom.
+        delta_value = value - self._prev_value
+        self._prev_value = value
+
+        scale_multiplier = 1.1 ** (self._zoom.factor * delta_value)
+
+        current_scale = self._view.transform().m11()
+        target_scale = current_scale * scale_multiplier
+        clamped_target_scale = max(MIN_SCALE, min(target_scale, MAX_SCALE))
+        # Multiplier that respects clamping
+        clamped_scale_multiplier = clamped_target_scale / current_scale
+        if clamped_scale_multiplier == 1.0:  # No scaling needed
+            return
+
+        # Keep zoom centered on the cursor position
+        old_pos = self._view.mapToScene(self._zoom.pos.toPoint())
+        self._view.scale(clamped_scale_multiplier, clamped_scale_multiplier)
+        new_pos = self._view.mapToScene(self._zoom.pos.toPoint())
+
+        # Translate view so the cursor stays fixed
+        delta_pos = new_pos - old_pos
+        self._view.translate(delta_pos.x(), delta_pos.y())
 
 
 class _ViewPan(QObject):

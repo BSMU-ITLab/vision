@@ -21,6 +21,7 @@ from bsmu.vision.core.rle import encode_rle, decode_rle
 from bsmu.vision.plugins.tools.viewer import (
     LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget, CursorConfig)
 from bsmu.vision.plugins.undo import UndoCommand
+from bsmu.vision.tools.viewer.radius_scaler import RadiusScaler
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -581,6 +582,9 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         self._stroke_repainted_mask_class: int | MASK_TYPE | None = None  # Mask class under the mouse pointer,
         # set at the start of a brush stroke and remains constant throughout the stroke.
 
+        self._radius_scaler = RadiusScaler(
+            self.settings.min_radius, self.settings.max_radius, self.settings.radius_zoom_factor)
+
     @property
     def mode(self) -> Mode:
         return self._mode
@@ -675,12 +679,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         return f'Brush Stroke #{self._STROKE_ID}'
 
     def _process_wheel_event(self, wheel_event: QWheelEvent):
-        angle_in_degrees = wheel_event.angleDelta().y() / 8
-        zoom_factor = 1 + angle_in_degrees / 65 * self.settings.radius_zoom_factor
-        self.settings.radius = min(
-            max(self.settings.min_radius, self.settings.radius * zoom_factor),
-            self.settings.max_radius,
-        )
+        self.settings.radius = self._radius_scaler.scale(self.settings.radius, wheel_event)
 
     def _handle_mode_event(self, event: QEvent):
         """Handle the event based on current mode"""

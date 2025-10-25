@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -9,6 +7,7 @@ from PySide6.QtCore import Qt, QObject, Signal, QTimeLine, QTimer, QEvent, QRect
 from PySide6.QtGui import QPainter, QFont, QColor, QPainterPath, QPen, QFontMetrics, QWheelEvent, QMouseEvent
 from PySide6.QtWidgets import QGraphicsView
 
+from bsmu.vision.core.input.acceleration import StepAccelerator, StepAcceleratorConfig
 from bsmu.vision.core.settings import Settings
 
 if TYPE_CHECKING:
@@ -387,10 +386,9 @@ class _ViewSmoothZoom(QObject):
         self._view = view
         self._settings = settings
 
-        # Accelerated zoom state
-        self._last_scroll_timestamp_ms: float = 0.0
-        self._last_zoom_direction: int = 0  # +1 for zoom in, -1 for zoom out
-        self._accelerated_zoom_multiplier: float = 1.0
+        accelerator_config = StepAcceleratorConfig(
+            ACCELERATED_ZOOM_RESET_TIMEOUT_MS, ACCELERATED_ZOOM_INCREMENT_MAX, ACCELERATED_ZOOM_MULTIPLIER_MAX)
+        self._accelerator = StepAccelerator(accelerator_config)
 
     def eventFilter(self, watched_obj: QObject, event: QEvent) -> bool:
         if event.type() == QEvent.Type.Wheel:
@@ -401,25 +399,9 @@ class _ViewSmoothZoom(QObject):
         return super().eventFilter(watched_obj, event)
 
     def _on_wheel_scrolled(self, event: QWheelEvent):
-        angle_in_degrees = event.angleDelta().y() / 8
-
-        zoom_direction = int(math.copysign(1, angle_in_degrees))
-        current_timestamp_ms = time.monotonic() * 1000
-        elapsed_ms = current_timestamp_ms - self._last_scroll_timestamp_ms
-
-        if zoom_direction != self._last_zoom_direction or elapsed_ms > ACCELERATED_ZOOM_RESET_TIMEOUT_MS:
-            # Reset accelerated zoom multiplier
-            self._accelerated_zoom_multiplier = 1.0
-        else:
-            # Increase the zoom multiplier based on scroll frequency (faster successive events -> larger increment)
-            multiplier_increment = ACCELERATED_ZOOM_INCREMENT_MAX * (
-                    1 - elapsed_ms / ACCELERATED_ZOOM_RESET_TIMEOUT_MS)
-            self._accelerated_zoom_multiplier = min(
-                self._accelerated_zoom_multiplier + multiplier_increment, ACCELERATED_ZOOM_MULTIPLIER_MAX)
-        self._last_zoom_direction = zoom_direction
-        self._last_scroll_timestamp_ms = current_timestamp_ms
-
-        zoom_factor = 0.02 * angle_in_degrees * self._accelerated_zoom_multiplier * self._settings.zoom_factor
+        angle_delta_in_degrees = event.angleDelta().y() / 8
+        accelerated_delta = self._accelerator.accelerate(angle_delta_in_degrees)
+        zoom_factor = 0.02 * accelerated_delta * self._settings.zoom_factor
 
         zoom = _Zoom(event.position(), zoom_factor)
         zoom_time_line = _ZoomTimeLine(self._view, zoom, SMOOTH_ZOOM_DURATION_MS, self)

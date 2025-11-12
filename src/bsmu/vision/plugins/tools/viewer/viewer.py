@@ -6,13 +6,14 @@ from typing import cast
 
 from PySide6.QtCore import Qt, QEvent, QObject, Signal
 from PySide6.QtGui import QCursor, QPixmap, QAction, QIcon
-from PySide6.QtWidgets import QWidget, QDockWidget
+from PySide6.QtWidgets import QApplication, QWidget, QDockWidget
 
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.tools.images import icons_rc  # noqa: F401
 from bsmu.vision.plugins.windows.main import ToolsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
+from bsmu.vision.widgets.viewers.data import DataViewer
 from bsmu.vision.widgets.viewers.image.layered import ImageLayerView
 
 if TYPE_CHECKING:
@@ -28,7 +29,6 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.undo import UndoPlugin, UndoManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
-    from bsmu.vision.widgets.viewers.data import DataViewer
     from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 
@@ -342,11 +342,21 @@ class ViewerTool(QObject):
 
     def eventFilter(self, watched_obj: QObject, event: QEvent):
         if event.type() is QEvent.Type.Enter:
-            # Set focus to ensure the viewport captures key events.
+            # Ensure this viewer's viewport captures key events by setting focus,
+            # unless another DataViewer or one of its child widgets already has focus.
             # Otherwise, key events will be processed by other widgets that have focus.
             # For example, instead of switching tools using digits '1', '2', etc.,
             # the digit will be entered into a QLineEdit if it currently has focus.
-            self.viewer.viewport.setFocus()
+            current_focus_widget = QApplication.focusWidget()
+            focus_within_data_viewer = False
+            while current_focus_widget is not None:
+                if isinstance(current_focus_widget, DataViewer):
+                    focus_within_data_viewer = True
+                    break
+                else:
+                    current_focus_widget = current_focus_widget.parentWidget()
+            if not focus_within_data_viewer:
+                self.viewer.viewport.setFocus()
 
         return super().eventFilter(watched_obj, event)
 

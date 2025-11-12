@@ -480,10 +480,7 @@ class LayeredImageViewer(DataViewer):
 
         self.graphics_scene.addItem(self.layered_image_graphics_object)
 
-        grid_layout = QGridLayout()
-        grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.addWidget(self.graphics_view)
-        self.setLayout(grid_layout)
+        self.set_content_widget(self.graphics_view)
 
     @property
     def active_layer_view(self) -> ImageLayerView:

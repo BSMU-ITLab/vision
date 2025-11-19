@@ -1,1 +1,1 @@
-from .layered import ImageLayerView, LayeredImageViewer, LayeredImageViewerHolder, ImageViewerSettings
+from .layered import ImageLayerView, LayeredImageViewer, LayeredImageViewerHolder

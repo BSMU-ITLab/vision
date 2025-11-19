@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QFormLayout, QDoubleSpinBox
 from bsmu.vision.plugins.settings import SettingsPlugin
 from bsmu.vision.plugins.windows.main import SettingsMenu
 from bsmu.vision.widgets.settings import SettingsWidget
-from bsmu.vision.widgets.viewers.image.layered import ImageViewerSettings
+from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
 
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget

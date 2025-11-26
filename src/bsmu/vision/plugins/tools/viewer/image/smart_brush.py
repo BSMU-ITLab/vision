@@ -11,8 +11,8 @@ from PySide6.QtCore import QEvent, Qt
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.plugins.tools.viewer import (
-    LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget)
+from bsmu.vision.plugins.tools.viewer import ViewerToolPlugin, ViewerToolSettingsWidget
+from bsmu.vision.plugins.tools.viewer.image.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject

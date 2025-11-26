@@ -18,8 +18,8 @@ from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.config import Config
 from bsmu.vision.core.image import MASK_TYPE, MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
-from bsmu.vision.plugins.tools.viewer import (
-    LayeredImageViewerTool, LayeredImageViewerToolSettings, ViewerToolPlugin, ViewerToolSettingsWidget, CursorConfig)
+from bsmu.vision.plugins.tools.viewer import CursorConfig, ViewerToolPlugin, ViewerToolSettingsWidget
+from bsmu.vision.plugins.tools.viewer.image.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
 from bsmu.vision.plugins.undo import UndoCommand
 from bsmu.vision.tools.viewer.radius_scaler import RadiusScaler
 

@@ -1,0 +1,230 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
+
+from PySide6.QtCore import QPointF
+
+from bsmu.vision.core.palette import Palette
+from bsmu.vision.plugins.tools.viewer import CursorConfig, ViewerToolSettings
+from bsmu.vision.plugins.tools.viewer.graphics import GraphicsViewerTool
+from bsmu.vision.widgets.viewers.image.layered import ImageLayerView, LayeredImageViewer
+
+if TYPE_CHECKING:
+    import numpy as np
+    from PySide6.QtCore import QPoint
+
+    from bsmu.vision.core.config.united import UnitedConfig
+    from bsmu.vision.core.image import Image, FlatImage
+    from bsmu.vision.core.image.layered import ImageLayer
+    from bsmu.vision.plugins.palette.settings import PalettePackSettings
+    from bsmu.vision.plugins.undo import UndoManager
+
+LAYER_NAME_PROPERTY_KEY = 'name'
+
+
+class LayeredImageViewerToolSettings(ViewerToolSettings):
+    def __init__(
+            self,
+            layers_props: dict,
+            palette_pack_settings: PalettePackSettings,
+            cursor_config: CursorConfig = CursorConfig(),
+            action_icon_file_name: str = '',
+    ):
+        super().__init__(palette_pack_settings, cursor_config, action_icon_file_name)
+
+        self._layers_props = layers_props
+
+        self._mask_palette = Palette.from_config(self._layers_props['mask'].get('palette'))
+        self._tool_mask_palette = Palette.from_config(self._layers_props['tool_mask'].get('palette'))
+
+    @property
+    def layers_props(self) -> dict:
+        return self._layers_props
+
+    @property
+    def mask_palette(self) -> Palette:
+        return self._mask_palette or self.palette_pack_settings.main_palette
+
+    @property
+    def tool_mask_palette(self) -> Palette:
+        return self._tool_mask_palette
+
+    @staticmethod
+    def layers_props_from_config(config: UnitedConfig) -> dict:
+        return config.value('layers')
+
+    @classmethod
+    def from_config(
+            cls, config: UnitedConfig, palette_pack_settings: PalettePackSettings) -> LayeredImageViewerToolSettings:
+        return cls(cls.layers_props_from_config(config), palette_pack_settings)
+
+
+class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
+    viewer_type: type[LayeredImageViewer] = LayeredImageViewer
+
+    def __init__(
+            self,
+            viewer: LayeredImageViewer,
+            undo_manager: UndoManager,
+            settings: LayeredImageViewerToolSettings,
+    ):
+        super().__init__(viewer, undo_manager, settings)
+
+        self.image_layer_view = None
+
+        self._mask_layer: ImageLayer | None = None
+        self._tool_mask_layer: ImageLayer | None = None
+
+    @property
+    def settings(self) -> LayeredImageViewerToolSettings:
+        return cast(LayeredImageViewerToolSettings, self._settings)
+
+    @property
+    def image(self) -> FlatImage:
+        return self.image_layer_view and self.image_layer_view.flat_image
+
+    @property
+    def mask(self) -> FlatImage:
+        return self.viewer.layer_view_by_model(self._mask_layer).flat_image
+
+    @property
+    def tool_mask(self) -> FlatImage:
+        return self.viewer.layer_view_by_model(self._tool_mask_layer).flat_image
+
+    @property
+    def mask_palette(self) -> Palette:
+        return self.settings.mask_palette
+
+    @property
+    def layers_props(self) -> dict:
+        return self.settings.layers_props
+
+    def activate(self):
+        self.viewer.disable_panning()
+
+        super().activate()
+
+        image_layer_props = self.layers_props['image']
+        if image_layer_props == 'active_layer':
+            self.image_layer_view = self.viewer.active_layer_view
+        else:
+            image_layer_name = image_layer_props.get(LAYER_NAME_PROPERTY_KEY)
+            if image_layer_name is not None:
+                self.image_layer_view = self.viewer.layer_view_by_name(image_layer_name)
+            else:
+                image_layer_number = image_layer_props.get('number')
+                if image_layer_number is not None:
+                    self.image_layer_view = self.viewer.layer_views[image_layer_number]
+                else:
+                    assert False, f'Unknown image layer properties: {image_layer_props}'
+
+        self.image_layer_view.image_layer.image_updated.connect(self._on_layer_image_updated)
+        self.image_layer_view.image_view_updated.connect(self._on_layer_image_updated)
+
+        self._on_layer_image_updated()
+
+    def deactivate(self):
+        self._remove_tool_mask_layer()
+        self._set_mask_layer(None)
+
+        self.image_layer_view.image_layer.image_updated.disconnect(self._on_layer_image_updated)
+        self.image_layer_view.image_view_updated.disconnect(self._on_layer_image_updated)
+        self.image_layer_view = None
+
+        super().deactivate()
+
+        self.viewer.enable_panning()
+
+    def _set_mask_layer(self, new_mask_layer: ImageLayer | None):
+        if self._mask_layer == new_mask_layer:
+            return
+
+        if self._mask_layer is not None:
+            self._mask_layer.image_updated.disconnect(self._update_masks)
+
+        self._mask_layer = new_mask_layer
+
+        if self._mask_layer is not None:
+            self._mask_layer.image_updated.connect(self._update_masks)
+
+    def _set_tool_mask_layer(self, new_tool_mask_layer: ImageLayer | None):
+        if self._tool_mask_layer == new_tool_mask_layer:
+            return
+
+        if self._tool_mask_layer is not None:
+            self._tool_mask_layer.image_updated.disconnect(self._update_tool_mask)
+
+        self._tool_mask_layer = new_tool_mask_layer
+
+        if self._tool_mask_layer is not None:
+            self._tool_mask_layer.image_updated.connect(self._update_tool_mask)
+
+    def _create_nonexistent_layer_with_zeros_mask(
+            self, layer_key: str, name_property_key: str, image: Image, palette: Palette) -> ImageLayer:
+        layer_props = self.layers_props[layer_key]
+        layer_name = layer_props[name_property_key]
+        layer = self.viewer.layer_by_name(layer_name)
+
+        if layer is None:
+            # Create and add the layer
+            layer_image = image.zeros_mask(palette=palette)
+            layer = self.viewer.add_layer_from_image(layer_image, layer_name)
+
+            layer_opacity = layer_props.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
+            self.viewer.layer_view_by_model(layer).opacity = layer_opacity
+
+        return layer
+
+    def _on_layer_image_updated(self):
+        self._set_mask_layer(self._configured_mask_layer())
+
+        if self._tool_mask_layer is None:
+            tool_mask_layer = self._create_nonexistent_layer_with_zeros_mask(
+                'tool_mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.tool_mask_palette)
+            self._set_tool_mask_layer(tool_mask_layer)
+
+        self._update_masks()
+
+    def _configured_mask_layer(self) -> ImageLayer:
+        mask_layer_props = self.layers_props['mask']
+        if mask_layer_props.get('use_active_indexed_layer', True):
+            active_layer = self.viewer.active_layer_view.image_layer
+            if active_layer.is_indexed:
+                return active_layer
+
+        if mask_layer_props.get('use_first_indexed_layer', True):
+            for layer in self.viewer.layers:
+                if layer.is_indexed:
+                    return layer
+
+        return self._create_nonexistent_layer_with_zeros_mask(
+            'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.mask_palette)
+
+    def _remove_tool_mask_layer(self):
+        if self._tool_mask_layer is not None:
+            self.viewer.remove_layer(self._tool_mask_layer)
+            self._set_tool_mask_layer(None)
+
+    def _update_masks(self):
+        if self._mask_layer.image is None:
+            self._mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self._mask_layer.palette)
+            self.viewer.layer_view_by_model(self._mask_layer).slice_number = self.image_layer_view.slice_number
+
+        self._update_tool_mask()
+
+    def _update_tool_mask(self):
+        if self._tool_mask_layer.image is None:
+            self._tool_mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self._tool_mask_layer.palette)
+            self.viewer.layer_view_by_model(self._tool_mask_layer).slice_number = (
+                self.viewer.layer_view_by_model(self._mask_layer).slice_number)
+
+    def map_viewport_to_content(self, viewport_pos: QPoint) -> QPointF:
+        return self.viewer.map_viewport_to_content(viewport_pos)
+
+    def map_viewport_to_pixel_coords(self, viewport_pos: QPoint | QPointF, image: Image) -> np.ndarray:
+        if isinstance(viewport_pos, QPointF):
+            viewport_pos = viewport_pos.toPoint()
+        return self.viewer.map_viewport_to_pixel_coords(viewport_pos, image)
+
+    def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+        return self.viewer.map_viewport_to_pixel_indices(viewport_pos, image)

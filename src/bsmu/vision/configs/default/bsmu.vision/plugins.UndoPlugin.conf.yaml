@@ -1,1 +1,1 @@
-stack_limit: 30  # use 0 for no limit of undo stack
+stack_limit: 50  # use 0 for no limit of undo stack

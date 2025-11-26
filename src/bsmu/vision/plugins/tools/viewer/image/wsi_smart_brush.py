@@ -704,7 +704,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 self._draw_brush_in_pos(pos)
 
     def _mask_class_in_pos(self, pos: QPoint) -> int | None:
-        row, col = self.pos_to_image_pixel_indexes_rounded(pos, self.mask)
+        row, col = self.map_viewport_to_pixel_indices(pos, self.mask)
         if 0 <= row < self.mask.shape[0] and 0 <= col < self.mask.shape[1]:
             # Convert from numpy type (e.g. np.uint8) to int
             return int(self.mask.pixels[row, col])
@@ -724,12 +724,12 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
     def _draw_brush_in_pos(self, pos: QPoint):
-        image_pixel_indexes = self.pos_to_image_pixel_indexes(pos, self.tool_mask)
-        self.draw_brush(*image_pixel_indexes)
+        image_pixel_coords = self.map_viewport_to_pixel_coords(pos, self.tool_mask)
+        self.draw_brush(*image_pixel_coords)
 
     def draw_brush(self, row_f: float, col_f: float):
         row_spatial_radius, col_spatial_radius = \
-            self.tool_mask.spatial_size_to_indexed(np.array([self.settings.radius, self.settings.radius]))
+            self.tool_mask.map_spatial_vector_to_pixel_vector(np.array([self.settings.radius, self.settings.radius]))
         not_clipped_brush_bbox = BBox(
             int(round(col_f - col_spatial_radius)), int(round(col_f + col_spatial_radius)) + 1,
             int(round(row_f - row_spatial_radius)), int(round(row_f + row_spatial_radius)) + 1)

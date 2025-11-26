@@ -11,9 +11,10 @@ from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer, ImageL
 from bsmu.vision.widgets.viewers.image.layered.flat import FlatImageLayerView
 
 if TYPE_CHECKING:
+    from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.image import Image
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
-    from bsmu.vision.widgets.viewers.image.layered import ImageViewerSettings
+    from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
 
 
 class VolumeSliceImageLayerView(ImageLayerView):
@@ -76,7 +77,7 @@ class VolumeSliceImageLayerView(ImageLayerView):
             self._slice_number = self.image.center_slice_number(self.plane_axis)
         super()._on_layer_image_updated(image)
 
-    def _update_image_view(self):
+    def _update_image_view(self, bbox: BBox = None):
         self._flat_image_cache = None
         super()._update_image_view()
 

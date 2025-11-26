@@ -7,7 +7,7 @@ from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer, ImageL
 if TYPE_CHECKING:
     from bsmu.vision.core.image import FlatImage
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
-    from bsmu.vision.widgets.viewers.image.layered import ImageViewerSettings
+    from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
 
 
 class FlatImageLayerView(ImageLayerView):

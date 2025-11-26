@@ -152,13 +152,16 @@ class ImageLayerView(QObject):
             self._update_displayed_qimage_cache()
         return self._displayed_qimage_cache
 
+    def _create_image_view(self) -> FlatImage:
+        raise NotImplementedError(f'{self.__class__.__name__} must implement _create_image_view')
+
     def calculate_view_min_spacing(self) -> float:
         return float(self.image_view.spatial.spacing.min())  # cast to float, else it will have numpy.float type
 
     def _update_displayed_qimage_cache(self):
         if self.image_view.is_indexed:
             self._displayed_pixels = self.image_view.pixels
-            displayed_qimage_format = QImage.Format_Indexed8
+            displayed_qimage_format = QImage.Format.Format_Indexed8
         else:
             # self._displayed_pixels = image_converter.converted_to_normalized_uint8(self.image.array)
             # self._displayed_pixels = image_converter.converted_to_rgba(self._displayed_pixels)
@@ -169,9 +172,9 @@ class ImageLayerView(QObject):
             # See: https://doc.qt.io/qt-6/qimage.html#Format-enum
             self._displayed_pixels = image_converter.converted_to_rgba(self.image_view.array)
 
-            displayed_qimage_format = QImage.Format_RGBA8888_Premultiplied \
+            displayed_qimage_format = QImage.Format.Format_RGBA8888_Premultiplied \
                 if self._displayed_pixels.itemsize == 1 \
-                else QImage.Format_RGBA64_Premultiplied
+                else QImage.Format.Format_RGBA64_Premultiplied
 
         if not self._displayed_pixels.flags['C_CONTIGUOUS']:
             self._displayed_pixels = np.ascontiguousarray(self._displayed_pixels)
@@ -188,7 +191,7 @@ class ImageLayerView(QObject):
         spatial_height = height_spacing / self.view_min_spacing * self._displayed_qimage_cache.height()
 
         self._displayed_qimage_cache = self._displayed_qimage_cache.scaled(
-            spatial_width, spatial_height, mode=Qt.SmoothTransformation)
+            spatial_width, spatial_height, mode=Qt.TransformationMode.SmoothTransformation)
 
         self._modified_cache_bboxes = []
 
@@ -341,9 +344,9 @@ class _LayeredImageGraphicsObject(BaseGraphicsObject):
             rect_top_left_pixel_indexes = np.array([0, 0])
             rect_bottom_right_pixel_indexes = np.array(first_layer_image_view.array.shape[:2])
 
-            rect_top_left_pos = first_layer_image_view.pixel_indexes_to_pos(
+            rect_top_left_pos = first_layer_image_view.map_pixel_coords_to_spatial(
                 rect_top_left_pixel_indexes / self.view_min_spacing)
-            rect_bottom_right_pos = first_layer_image_view.pixel_indexes_to_pos(
+            rect_bottom_right_pos = first_layer_image_view.map_pixel_coords_to_spatial(
                 rect_bottom_right_pixel_indexes / self.view_min_spacing)
 
             bounding_rect = QRectF(QPointF(rect_top_left_pos[1], rect_top_left_pos[0]),
@@ -364,17 +367,17 @@ class _LayeredImageGraphicsObject(BaseGraphicsObject):
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
         # painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         for layer_view in self.layer_views:
             if layer_view.visible and layer_view.image_view is not None:
                 painter.setOpacity(layer_view.opacity)
                 image_view_origin = layer_view.image_view.spatial.origin
                 painter.drawImage(QPointF(image_view_origin[1], image_view_origin[0]), layer_view.displayed_image)
 
-    def _on_layer_image_changed(self, image: Image):
+    def _on_layer_image_changed(self, _image: Image):
         self._reset_bounding_rect_cache()
 
-    def _on_layer_image_shape_changed(self, old_shape: tuple[int] | None, new_shape: tuple[int] | None):
+    def _on_layer_image_shape_changed(self, _old_shape: tuple[int] | None, _new_shape: tuple[int] | None):
         self._reset_bounding_rect_cache()
 
     def _update_view_min_spacing(self):
@@ -393,19 +396,19 @@ class _LayeredImageGraphicsObject(BaseGraphicsObject):
         for layer_view in self.layer_views:
             layer_view.view_min_spacing = self._view_min_spacing
 
-    def _on_layer_image_view_updated(self, image_view: FlatImage):
+    def _on_layer_image_view_updated(self, _image_view: FlatImage):
         self._update_view_min_spacing()
 
         self.update()
 
-    def _on_layer_view_visibility_changed(self, visible: bool):
+    def _on_layer_view_visibility_changed(self, _visible: bool):
         self.update()
 
-    def _on_layer_view_opacity_changed(self, opacity: float):
+    def _on_layer_view_opacity_changed(self, _opacity: float):
         self.update()
 
 
-class LayeredImageViewer(GraphicsViewer):
+class LayeredImageViewer(GraphicsViewer[LayeredImage]):
     layer_view_adding = Signal(ImageLayerView, int)
     layer_view_added = Signal(ImageLayerView, int)
     layer_view_removing = Signal(ImageLayerView, int)
@@ -540,19 +543,15 @@ class LayeredImageViewer(GraphicsViewer):
     def _remove_layer_view_by_model(self, image_layer: ImageLayer):
         self.layered_image_graphics_object.remove_layer_view_by_model(image_layer)
 
-    def viewport_pos_to_image_pixel_indexes(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
-        layered_image_item_pos = self.viewport_pos_to_content_pos(viewport_pos)
-        return image.pos_to_pixel_indexes(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()])) \
+    def map_viewport_to_pixel_coords(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+        """Map viewport position to continuous pixel coordinates"""
+        layered_image_item_pos = self.map_viewport_to_content(viewport_pos)
+        return image.map_spatial_to_pixel_coords(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()])) \
             * self.layered_image_graphics_object.view_min_spacing
 
-    def viewport_pos_to_image_pixel_indexes_rounded(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
-        return self.viewport_pos_to_image_pixel_indexes(viewport_pos, image).round().astype(np.int_)
-
-    def viewport_pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
-        return self.viewport_pos_to_content_pos(viewport_pos)
-
-    def pos_to_layered_image_item_pos(self, pos: QPoint) -> QPointF:
-        return self.pos_to_content_pos(pos)
+    def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+        """Map viewport position to discrete pixel array indices"""
+        return self.map_viewport_to_pixel_coords(viewport_pos, image).round().astype(np.int_)
 
     def _on_active_layer_view_changed(self, old_active_layer_view: ImageLayerView,
                                       new_active_layer_view: ImageLayerView):

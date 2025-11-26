@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-from typing import cast
+from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
-from PySide6.QtCore import Qt, QEvent, QObject, Signal
+from PySide6.QtCore import Qt, QEvent, QObject, Signal, QPointF
 from PySide6.QtGui import QCursor, QPixmap, QAction, QIcon
 from PySide6.QtWidgets import QApplication, QWidget, QDockWidget
 
@@ -14,11 +13,12 @@ from bsmu.vision.plugins.tools.images import icons_rc  # noqa: F401
 from bsmu.vision.plugins.windows.main import ToolsMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.data import DataViewer
-from bsmu.vision.widgets.viewers.image.layered import ImageLayerView
+from bsmu.vision.widgets.viewers.graphics import GraphicsViewer
+from bsmu.vision.widgets.viewers.image.layered import ImageLayerView, LayeredImageViewer
 
 if TYPE_CHECKING:
     import numpy as np
-    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtCore import QPoint
     from PySide6.QtWidgets import QMdiSubWindow
 
     from bsmu.vision.core.config.united import UnitedConfig
@@ -29,8 +29,8 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.undo import UndoPlugin, UndoManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
-    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
+ViewerT = TypeVar('ViewerT', bound=DataViewer)
 
 LAYER_NAME_PROPERTY_KEY = 'name'
 
@@ -306,15 +306,19 @@ class ViewerToolSettingsWidget(QWidget):
         return self._tool_settings
 
 
-class ViewerTool(QObject):
-    def __init__(self, viewer: DataViewer, undo_manager: UndoManager, settings: ViewerToolSettings):
+class ViewerTool(QObject, Generic[ViewerT]):
+    def __init__(self, viewer: ViewerT, undo_manager: UndoManager, settings: ViewerToolSettings):
         super().__init__()
 
-        self.viewer = viewer
+        self._viewer: ViewerT = viewer
         self._undo_manager = undo_manager
         self._settings = settings
 
         self._original_focus_proxy = None
+
+    @property
+    def viewer(self) -> ViewerT:
+        return self._viewer
 
     @property
     def settings(self) -> ViewerToolSettings:
@@ -373,6 +377,14 @@ class ViewerTool(QObject):
             self.viewer.cursor_owner = None
 
 
+GraphicsViewerT = TypeVar('GraphicsViewerT', bound=GraphicsViewer)
+
+
+class GraphicsViewerTool(ViewerTool[GraphicsViewerT]):
+    def __init__(self, viewer: GraphicsViewerT, undo_manager: UndoManager, settings: ViewerToolSettings):
+        super().__init__(viewer, undo_manager, settings)
+
+
 class LayeredImageViewerToolSettings(ViewerToolSettings):
     def __init__(
             self,
@@ -410,7 +422,7 @@ class LayeredImageViewerToolSettings(ViewerToolSettings):
         return cls(cls.layers_props_from_config(config), palette_pack_settings)
 
 
-class LayeredImageViewerTool(ViewerTool):
+class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
     def __init__(
             self,
             viewer: LayeredImageViewer,
@@ -567,14 +579,13 @@ class LayeredImageViewerTool(ViewerTool):
             self.viewer.layer_view_by_model(self._tool_mask_layer).slice_number = (
                 self.viewer.layer_view_by_model(self._mask_layer).slice_number)
 
-    def pos_to_layered_image_item_pos(self, viewport_pos: QPoint) -> QPointF:
-        return self.viewer.viewport_pos_to_layered_image_item_pos(viewport_pos)
+    def map_viewport_to_content(self, viewport_pos: QPoint) -> QPointF:
+        return self.viewer.map_viewport_to_content(viewport_pos)
 
-    def pos_to_image_pixel_indexes(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
-        return self.viewer.viewport_pos_to_image_pixel_indexes(viewport_pos, image)
+    def map_viewport_to_pixel_coords(self, viewport_pos: QPoint | QPointF, image: Image) -> np.ndarray:
+        if isinstance(viewport_pos, QPointF):
+            viewport_pos = viewport_pos.toPoint()
+        return self.viewer.map_viewport_to_pixel_coords(viewport_pos, image)
 
-    def pos_f_to_image_pixel_indexes(self, viewport_pos_f: QPointF, image: Image) -> np.ndarray:
-        return self.pos_to_image_pixel_indexes(viewport_pos_f.toPoint(), image)
-
-    def pos_to_image_pixel_indexes_rounded(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
-        return self.viewer.viewport_pos_to_image_pixel_indexes_rounded(viewport_pos, image)
+    def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+        return self.viewer.map_viewport_to_pixel_indices(viewport_pos, image)

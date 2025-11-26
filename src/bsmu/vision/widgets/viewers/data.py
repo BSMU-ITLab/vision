@@ -1,22 +1,25 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from PySide6.QtWidgets import QWidget, QApplication, QGridLayout
+
+from bsmu.vision.core.data import Data
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
     from PySide6.QtGui import QCloseEvent
-    from bsmu.vision.core.data import Data
+
+DataT = TypeVar('DataT', bound=Data)
 
 
-class DataViewer(QWidget):
+class DataViewer(QWidget, Generic[DataT]):
     CONTENT_WIDGET_OBJECT_NAME = 'content_widget'
 
-    def __init__(self, data: Data = None, parent: QWidget = None):
+    def __init__(self, data: DataT | None = None, parent: QWidget | None = None):
         super().__init__(parent)
 
-        self._data = None
+        self._data: DataT | None = None
         self.data = data
 
         # Cursor shape should only be changed by the current cursor owner
@@ -34,7 +37,7 @@ class DataViewer(QWidget):
 
         app = QApplication.instance()
         if not isinstance(app, QApplication):
-            raise RuntimeError('QApplication must be created before DataViewer.')
+            raise RuntimeError(f'QApplication must be created before {self.__class__.__name__}.')
         app.focusChanged.connect(self._on_app_focus_changed)
 
     def set_content_widget(self, widget: QWidget | None):
@@ -61,11 +64,11 @@ class DataViewer(QWidget):
         super().closeEvent(event)
 
     @property
-    def data(self) -> Data:
+    def data(self) -> DataT | None:
         return self._data
 
     @data.setter
-    def data(self, value: Data):
+    def data(self, value: DataT | None):
         if self._data != value:
             self._on_data_changing()
             self._data = value

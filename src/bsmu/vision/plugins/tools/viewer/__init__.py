@@ -3,6 +3,8 @@ from .viewer import (
     LayeredImageViewerToolSettings,
     MdiViewerTool,
     ViewerTool,
+    GraphicsViewerTool,
+    GraphicsViewerT,
     ViewerToolPlugin,
     ViewerToolSettings,
     ViewerToolSettingsWidget,

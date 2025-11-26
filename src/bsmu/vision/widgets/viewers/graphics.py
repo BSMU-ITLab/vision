@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsObject
 
 from bsmu.vision.core.settings import Settings
-from bsmu.vision.widgets.viewers.data import DataViewer
+from bsmu.vision.widgets.viewers.data import DataT, DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView, GraphicsViewSettings, ZoomSettings
 
 if TYPE_CHECKING:
@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QGraphicsItem, QWidget
 
     from bsmu.vision.core.config import UnitedConfig
-    from bsmu.vision.core.data import Data
     from bsmu.vision.widgets.viewers.graphics_view import NormalizedViewRegion
 
 
@@ -64,8 +63,8 @@ class ImageViewerSettings(Settings):
         )
 
 
-class GraphicsViewer(DataViewer):
-    def __init__(self, data: Data = None, settings: ImageViewerSettings = None, parent: QWidget = None):
+class GraphicsViewer(DataViewer[DataT]):
+    def __init__(self, data: DataT = None, settings: ImageViewerSettings = None, parent: QWidget = None):
         super().__init__(data, parent)
 
         self._settings = settings
@@ -108,26 +107,26 @@ class GraphicsViewer(DataViewer):
     def _on_cursor_owner_changed(self):
         self._graphics_view.is_using_base_cursor = self._cursor_owner is None
 
-    def viewport_pos_to_content_pos(self, viewport_pos: QPoint) -> QPointF:
+    def map_viewport_to_content(self, viewport_pos: QPoint) -> QPointF:
         scene_pos = self._graphics_view.mapToScene(viewport_pos)
         return self._main_graphics_object.mapFromScene(scene_pos)
 
-    def viewport_pos_to_scene_pos(self, viewport_pos: QPoint) -> QPointF:
+    def map_viewport_to_scene(self, viewport_pos: QPoint) -> QPointF:
         return self._graphics_view.mapToScene(viewport_pos)
 
-    def global_pos_to_scene_pos(self, global_pos: QPoint) -> QPointF:
-        viewport_pos = self.viewport.mapFromGlobal(global_pos)
-        return self.viewport_pos_to_scene_pos(viewport_pos)
-
-    def scene_pos_to_viewport_pos(self, scene_pos: QPointF) -> QPoint:
+    def map_scene_to_viewport(self, scene_pos: QPointF) -> QPoint:
         return self._graphics_view.mapFromScene(scene_pos)
 
-    def pos_to_content_pos(self, pos: QPoint) -> QPointF:
+    def map_global_to_scene(self, global_pos: QPoint) -> QPointF:
+        viewport_pos = self.viewport.mapFromGlobal(global_pos)
+        return self.map_viewport_to_scene(viewport_pos)
+
+    def map_to_content(self, pos: QPoint) -> QPointF:
         # From viewer pos to self._graphics_view pos
         graphics_view_pos = self._graphics_view.mapFrom(self, pos)
         # From self._graphics_view pos to self.viewport pos
         viewport_pos = self.viewport.mapFrom(self._graphics_view, graphics_view_pos)
-        return self.viewport_pos_to_content_pos(viewport_pos)
+        return self.map_viewport_to_content(viewport_pos)
 
     def fit_content_in(self):
         self._graphics_view.fit_in_view(

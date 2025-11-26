@@ -106,20 +106,26 @@ class Image(Data):
         if bbox is None or not bbox.empty:
             self.pixels_modified.emit(bbox)
 
-    def pos_to_pixel_indexes(self, pos: np.ndarray) -> np.ndarray:
-        return (pos - self.spatial.origin) / self.spatial.spacing
+    def map_spatial_to_pixel_coords(self, spatial_pos: np.ndarray) -> np.ndarray:
+        """Convert spatial (e.g., mm) coordinates to continuous pixel coordinates."""
+        return (spatial_pos - self.spatial.origin) / self.spatial.spacing
 
-    def pos_to_pixel_indexes_rounded(self, pos: np.ndarray) -> np.ndarray:
-        return self.pos_to_pixel_indexes(pos).round().astype(np.int_)
+    def map_spatial_to_pixel_indices(self, spatial_pos: np.ndarray) -> np.ndarray:
+        """Convert spatial coordinates to nearest pixel indices (int)."""
+        return self.map_spatial_to_pixel_coords(spatial_pos).round().astype(np.int_)
 
-    def pixel_indexes_to_pos(self, pixel_indexes: np.ndarray) -> np.ndarray:
-        return pixel_indexes * self.spatial.spacing + self.spatial.origin
+    def map_pixel_coords_to_spatial(self, pixel_coords: np.ndarray) -> np.ndarray:
+        """Convert continuous pixel coordinates to spatial coordinates."""
+        return pixel_coords * self.spatial.spacing + self.spatial.origin
 
-    def spatial_size_to_indexed(self, spatial_size: np.ndarray):
-        return spatial_size / self.spatial.spacing
+    def map_spatial_vector_to_pixel_vector(self, spatial_vector: np.ndarray) -> np.ndarray:
+        return spatial_vector / self.spatial.spacing
 
-    def spatial_size_to_indexed_rounded(self, spatial_size: np.ndarray):
-        return self.spatial_size_to_indexed(spatial_size).round().astype(np.int_)
+    def map_pixel_vector_to_spatial_vector(self, pixel_vector: np.ndarray) -> np.ndarray:
+        return pixel_vector * self.spatial.spacing
+
+    def map_spatial_vector_to_pixel_vector_rounded(self, spatial_vector: np.ndarray):
+        return self.map_spatial_vector_to_pixel_vector(spatial_vector).round().astype(np.int_)
 
     def bboxed_pixels(self, bbox: BBox) -> np.ndarray:
         return self.array[bbox.top:bbox.bottom, bbox.left:bbox.right]

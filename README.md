@@ -4,6 +4,8 @@ Application to work with images and other visual information.
 The app contains a lot of plugins to preprocess and analyze segmentation results.
 Necessary plugins can be enabled/disabled using plugin manager.
 
+> For architecture and design principles, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Python Environment
 
 python 3.11

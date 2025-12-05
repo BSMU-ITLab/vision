@@ -1,3 +1,31 @@
+"""
+Generic handler registration and resolution system supporting heterogeneous key types.
+
+- Handlers declare compatibility via class-level `HANDLED_KEYS` (e.g., types like `Raster`,
+  or strings like `.png`). The term "key" is used generically to support both type-based
+  and value-based dispatch (e.g., file extensions).
+
+- For **type-keyed handlers** (e.g., visualizers, converters), resolution is inheritance-aware:
+  when querying for an instance of type `T`, the system walks `T.__mro__` up to (and including)
+  a logical boundary (e.g., `Data` or `object`) to collect all registered handler candidates.
+
+- Static key matching is **not sufficient**: handlers must implement a classmethod
+  `can_handle(cls, instance) -> bool` to evaluate instance-specific conditions
+  (e.g., `raster.spatial_ndim == 2`). This enables precise, runtime-aware dispatch.
+
+- The **registry** stores handler classes by key and returns candidate lists.
+  The **manager** (e.g., `VisualizerManager`) performs two-phase lookup:
+    1. Gather candidates via MRO-based key matching.
+    2. Select the first handler where `can_handle(instance)` returns `True`.
+
+- **String-keyed handlers** (e.g., file readers) skip MRO logic-lookup uses exact key match.
+
+Note: `Processor` has been conceptually replaced by `Handler` to reflect broader semantics
+(reader, visualizer, converter, etc.). Existing "processor" terminology should be updated
+accordingly.
+"""
+
+
 from __future__ import annotations
 
 import logging

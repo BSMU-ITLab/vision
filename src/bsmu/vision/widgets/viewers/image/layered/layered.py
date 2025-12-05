@@ -65,7 +65,7 @@ class ImageLayerView(QObject):
         super().__init__()
 
         self._image_layer = image_layer
-        self._image_layer.image_updated.connect(self._on_layer_image_updated)
+        self._image_layer.data_changed.connect(self._on_layer_image_updated)
         self._image_layer.image_shape_changed.connect(self.image_shape_changed)
         self._image_layer.image_pixels_modified.connect(self._update_image_view)
         self._visible = visible

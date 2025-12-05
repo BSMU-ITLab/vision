@@ -11,6 +11,8 @@ from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer, ImageL
 from bsmu.vision.widgets.viewers.image.layered.flat import FlatImageLayerView
 
 if TYPE_CHECKING:
+    from PySide6.QtWidgets import QWidget
+
     from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.image import Image
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
@@ -92,6 +94,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
             slice_number: int | None = None,
             data: LayeredImage = None,
             settings: ImageViewerSettings = None,
+            parent: QWidget | None = None,
     ):
         self.plane_axis = plane_axis
 
@@ -101,7 +104,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
 
         self.slice_number = slice_number
 
-        super().__init__(data, settings)
+        super().__init__(data, settings, parent)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> VolumeSliceImageLayerView:
         if isinstance(image_layer.image, VolumeImage):

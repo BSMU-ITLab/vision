@@ -118,7 +118,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
                 else:
                     assert False, f'Unknown image layer properties: {image_layer_props}'
 
-        self.image_layer_view.image_layer.image_updated.connect(self._on_layer_image_updated)
+        self.image_layer_view.image_layer.data_changed.connect(self._on_layer_image_updated)
         self.image_layer_view.image_view_updated.connect(self._on_layer_image_updated)
 
         self._on_layer_image_updated()
@@ -127,7 +127,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
         self._remove_tool_mask_layer()
         self._set_mask_layer(None)
 
-        self.image_layer_view.image_layer.image_updated.disconnect(self._on_layer_image_updated)
+        self.image_layer_view.image_layer.data_changed.disconnect(self._on_layer_image_updated)
         self.image_layer_view.image_view_updated.disconnect(self._on_layer_image_updated)
         self.image_layer_view = None
 
@@ -140,24 +140,24 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
             return
 
         if self._mask_layer is not None:
-            self._mask_layer.image_updated.disconnect(self._update_masks)
+            self._mask_layer.data_changed.disconnect(self._update_masks)
 
         self._mask_layer = new_mask_layer
 
         if self._mask_layer is not None:
-            self._mask_layer.image_updated.connect(self._update_masks)
+            self._mask_layer.data_changed.connect(self._update_masks)
 
     def _set_tool_mask_layer(self, new_tool_mask_layer: ImageLayer | None):
         if self._tool_mask_layer == new_tool_mask_layer:
             return
 
         if self._tool_mask_layer is not None:
-            self._tool_mask_layer.image_updated.disconnect(self._update_tool_mask)
+            self._tool_mask_layer.data_changed.disconnect(self._update_tool_mask)
 
         self._tool_mask_layer = new_tool_mask_layer
 
         if self._tool_mask_layer is not None:
-            self._tool_mask_layer.image_updated.connect(self._update_tool_mask)
+            self._tool_mask_layer.data_changed.connect(self._update_tool_mask)
 
     def _create_nonexistent_layer_with_zeros_mask(
             self, layer_key: str, name_property_key: str, image: Image, palette: Palette) -> ImageLayer:

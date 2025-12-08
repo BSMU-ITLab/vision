@@ -34,6 +34,7 @@ class DataViewer(QWidget, Generic[DataT]):
         highlight_color = self.palette().color(self.palette().ColorRole.Highlight).name()
         self._default_style = f'#{self.CONTENT_WIDGET_OBJECT_NAME}'
         self._focus_style = f'#{self.CONTENT_WIDGET_OBJECT_NAME} {{ border: 1px solid {highlight_color}; }}'
+        self._is_focus_style_used: bool = False
 
         app = QApplication.instance()
         if not isinstance(app, QApplication):
@@ -45,15 +46,26 @@ class DataViewer(QWidget, Generic[DataT]):
             self._layout.removeWidget(self._content_widget)
 
         self._content_widget = widget
+        self._is_focus_style_used = False
 
         if self._content_widget is not None:
             self._content_widget.setObjectName(self.CONTENT_WIDGET_OBJECT_NAME)
             self._layout.addWidget(self._content_widget)
 
-    def _on_app_focus_changed(self, old: QWidget, now: QWidget):
-        """Highlight this DataViewer if the newly focused widget is our descendant."""
+    def _on_app_focus_changed(self, _old: QWidget, now: QWidget):
+        """Highlight content widget when the newly focused widget is our descendant."""
+        if self._content_widget is None:
+            return
+
         has_focus_within = isinstance(now, QWidget) and self.isAncestorOf(now)
-        self.setStyleSheet(self._focus_style if has_focus_within else self._default_style)
+        if has_focus_within:
+            if not self._is_focus_style_used:
+                self._content_widget.setStyleSheet(self._focus_style)
+                self._is_focus_style_used = True
+        else:
+            if self._is_focus_style_used:
+                self._content_widget.setStyleSheet(self._default_style)
+                self._is_focus_style_used = False
 
     def closeEvent(self, event: QCloseEvent):
         app = QApplication.instance()

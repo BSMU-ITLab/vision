@@ -504,7 +504,7 @@ class LayeredImageViewer(GraphicsViewer[LayeredImage]):
                 '<br>(Next draw mode will be used: {0})').format(mask_draw_mode.description)
 
         reply = QMessageBox.question(
-            self,
+            self.window(),
             self.tr('Duplicate Layer Name'),
             self.tr(
                 'Viewer already contains a layer with such name: <i>{0}</i>.<br>'

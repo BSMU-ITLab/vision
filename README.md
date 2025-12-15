@@ -4,6 +4,12 @@ Application to work with images and other visual information.
 The app contains a lot of plugins to preprocess and analyze segmentation results.
 Necessary plugins can be enabled/disabled using plugin manager.
 
+**Project handling**:
+- **Folder-based projects**: Load layers from a directory structure (e.g., `images/`, `masks/`) without a project file.
+- **Project files** (planned): Save and load complete layer state in two ways:
+    - **Referenced**: Stores only links to your original files.
+    - **Self-contained**: Embeds all data inside the project file.
+
 > For architecture and design principles, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Python Environment

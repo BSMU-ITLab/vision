@@ -15,6 +15,8 @@ from bsmu.vision.core.data import Data
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from PySide6.QtCore import QObject
+
     from bsmu.vision.core.constants import PlaneAxis
     from bsmu.vision.core.palette import Palette
 
@@ -45,8 +47,14 @@ class Raster(Data):
     shape_changed = Signal(object, object)  # old_shape: tuple[int] | None, new_shape: tuple[int] | None
 
     def __init__(
-            self, array: np.ndarray = None, palette: Palette = None, path: Path = None, spatial: SpatialAttrs = None):
-        super().__init__(path)
+            self,
+            array: np.ndarray = None,
+            palette: Palette = None,
+            path: Path = None,
+            spatial: SpatialAttrs = None,
+            parent: QObject | None = None,
+    ):
+        super().__init__(path, parent)
 
         assert palette is None or array.dtype == np.uint8, 'Indexed images (with palette) have to be of np.uint8 type'
 

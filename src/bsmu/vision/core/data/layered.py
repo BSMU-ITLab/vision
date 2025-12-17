@@ -5,12 +5,14 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Signal
 
 from bsmu.vision.core.data import Data
-from bsmu.vision.core.layer import Layer, RasterLayer
+from bsmu.vision.core.layers import Layer, RasterLayer
 
 if TYPE_CHECKING:
     from typing import Type
     from pathlib import Path
     import numpy.typing as npt
+
+    from PySide6.QtCore import QObject
 
     from bsmu.vision.core.data.raster import Raster
     from bsmu.vision.core.image import Image
@@ -24,8 +26,8 @@ class LayeredData(Data):
     layer_removing = Signal(Layer, int)
     layer_removed = Signal(Layer, int)
 
-    def __init__(self, path: Path = None):
-        super().__init__(path)
+    def __init__(self, path: Path = None, parent: QObject | None = None):
+        super().__init__(path, parent)
 
         self._layers: list[Layer] = []
         self._layer_by_name = {}

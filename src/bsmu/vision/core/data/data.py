@@ -10,8 +10,8 @@ class Data(QObject):
     path_changed = Signal(Path)
     updated = Signal()
 
-    def __init__(self, path: Path | None = None):
-        super().__init__()
+    def __init__(self, path: Path | None = None, parent: QObject | None = None):
+        super().__init__(parent)
 
         self._path = path
 

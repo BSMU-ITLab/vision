@@ -4,10 +4,9 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt
-from PySide6.QtGui import QUndoGroup, QUndoStack, QUndoCommand, QKeySequence
+from PySide6.QtGui import QUndoGroup, QUndoStack, QKeySequence
 from PySide6.QtWidgets import QUndoView, QDockWidget
 
-from bsmu.vision.core.abc import QABCMeta
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.windows.main import EditMenu, WindowsMenu
 
@@ -17,6 +16,7 @@ if TYPE_CHECKING:
 
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
+    from bsmu.vision.undo import UndoCommand
 
 
 class UndoPlugin(Plugin):
@@ -138,24 +138,3 @@ class UndoManager(QObject):
 
         undo_stack = self._undo_stack_by_sub_window[sub_window]
         undo_stack.setActive()
-
-
-class UndoCommandMeta(QABCMeta):
-    MAX_ID = 0
-
-    def __new__(mcs, name, bases, namespace):
-        cls = super().__new__(mcs, name, bases, namespace)
-        mcs.MAX_ID += 1
-        cls._id = mcs.MAX_ID  # every inherited class type should have unique ID
-        return cls
-
-
-class UndoCommand(QUndoCommand, metaclass=UndoCommandMeta):
-    def __init__(self, text: str = '', parent: QUndoCommand = None):
-        super().__init__(text, parent)
-
-        # print(f'{self.__class__.__name__} id={self._id}')
-
-    @classmethod
-    def command_type_id(cls) -> int:
-        return cls._id

@@ -20,8 +20,8 @@ from bsmu.vision.core.image import MASK_TYPE, MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
 from bsmu.vision.plugins.tools.viewer import CursorConfig, ViewerToolPlugin, ViewerToolSettingsWidget
 from bsmu.vision.plugins.tools.viewer.image.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
-from bsmu.vision.plugins.undo import UndoCommand
 from bsmu.vision.tools.viewer.radius_scaler import RadiusScaler
+from bsmu.vision.undo import UndoCommand
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -437,7 +437,7 @@ class ModifyMaskCommand(UndoCommand):
         self._mergeable = None
 
     def id(self) -> int:
-        return self._id
+        return self.command_type_id()
 
     def redo(self):
         modified_bbox_pixels = self._uncompressed_modified_bbox_pixels() \

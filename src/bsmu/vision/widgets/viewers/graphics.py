@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QGraphicsItem, QWidget
 
     from bsmu.vision.core.config import UnitedConfig
+    from bsmu.vision.widgets.actors import GraphicsActor
     from bsmu.vision.widgets.viewers.graphics_view import NormalizedViewRegion
 
 
@@ -91,6 +92,14 @@ class GraphicsViewer(DataViewer[DataT]):
     def _create_main_graphics_object(self) -> BaseGraphicsObject:
         """Override this method in subclasses to create the specific graphics object"""
         raise NotImplementedError(f'{self.__class__.__name__} must implement _create_main_graphics_object')
+
+    def add_actor(self, actor: GraphicsActor):
+        actor.setParent(self)
+        self._graphics_scene.addItem(actor.graphics_item)
+
+    def remove_actor(self, actor: GraphicsActor):
+        self._graphics_scene.removeItem(actor.graphics_item)
+        actor.setParent(None)
 
     def add_graphics_item(self, item: QGraphicsItem):
         self._graphics_scene.addItem(item)

@@ -514,7 +514,7 @@ class LayeredImageViewer(GraphicsViewer[LayeredImage]):
         )
         return reply is QMessageBox.StandardButton.Yes
 
-    def _on_data_changing(self):
+    def _data_about_to_change(self, new_data: LayeredImage | None):
         if self.data is None:
             return
 
@@ -524,7 +524,7 @@ class LayeredImageViewer(GraphicsViewer[LayeredImage]):
         for layer in self.layers:
             self._remove_layer_view_by_model(layer)
 
-    def _on_data_changed(self):
+    def _data_changed(self):
         if self.data is None:
             return
 

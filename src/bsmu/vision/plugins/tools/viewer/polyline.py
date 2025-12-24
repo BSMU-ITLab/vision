@@ -11,8 +11,9 @@ from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsLineItem, QGraphicsEll
 
 from bsmu.vision.core.utils.geometry import GeometryUtils
 from bsmu.vision.plugins.tools.viewer import (
-    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerTool, ViewerToolSettings, CursorConfig)
-from bsmu.vision.plugins.undo import UndoCommand
+    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerToolSettings, CursorConfig)
+from bsmu.vision.plugins.tools.viewer.graphics import GraphicsViewerT, GraphicsViewerTool
+from bsmu.vision.undo import UndoCommand
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QUndoCommand
@@ -20,9 +21,9 @@ if TYPE_CHECKING:
 
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
+    from bsmu.vision.plugins.tools.viewer import ViewerTool
     from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
-    from bsmu.vision.widgets.viewers.data import DataViewer
     from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 
@@ -268,8 +269,8 @@ class PolylineToolState(Enum):
     PAUSED = 3   # When switched to another tool while drawing
 
 
-class PolylineViewerTool(ViewerTool):
-    def __init__(self, viewer: DataViewer, undo_manager: UndoManager, settings: ViewerToolSettings):
+class PolylineViewerTool(GraphicsViewerTool):
+    def __init__(self, viewer: GraphicsViewerT, undo_manager: UndoManager, settings: ViewerToolSettings):
         super().__init__(viewer, undo_manager, settings)
 
         self._curr_polyline: Polyline | None = None
@@ -302,7 +303,7 @@ class PolylineViewerTool(ViewerTool):
             case QEvent.Type.MouseButtonPress:
                 match event.button():
                     case Qt.MouseButton.LeftButton:
-                        scene_pos = self.viewer.viewport_pos_to_scene_pos(event.position().toPoint())
+                        scene_pos = self.viewer.map_viewport_to_scene(event.position().toPoint())
                         self._add_point(scene_pos)
                         return True
                     case Qt.MouseButton.RightButton:
@@ -310,7 +311,7 @@ class PolylineViewerTool(ViewerTool):
                         return True
             case QEvent.Type.MouseMove:
                 if self.is_drawing:
-                    scene_pos = self.viewer.viewport_pos_to_scene_pos(event.position().toPoint())
+                    scene_pos = self.viewer.map_viewport_to_scene(event.position().toPoint())
                     self._update_preview_segment(scene_pos)
                     return True
             case QEvent.Type.MouseButtonDblClick:
@@ -363,7 +364,7 @@ class PolylineViewerTool(ViewerTool):
         self._show_preview_segment()
 
     def _update_preview_segment_to_cursor_pos(self):
-        scene_pos = self.viewer.global_pos_to_scene_pos(QCursor.pos())
+        scene_pos = self.viewer.map_global_to_scene(QCursor.pos())
         self._update_preview_segment(scene_pos)
 
     def _on_polyline_end_point_removed(self, removed_point: QPointF):
@@ -437,7 +438,7 @@ class PolylineViewerToolPlugin(ViewerToolPlugin):
             tool_settings_cls: type[ViewerToolSettings] = PolylineViewerToolSettings,
             tool_settings_widget_cls: type[ViewerToolSettingsWidget] = None,
             action_name: str = QObject.tr('Polyline'),
-            action_shortcut: Qt.Key = Qt.Key_6,
+            action_shortcut: Qt.Key = Qt.Key.Key_6,
     ):
         super().__init__(
             main_window_plugin,

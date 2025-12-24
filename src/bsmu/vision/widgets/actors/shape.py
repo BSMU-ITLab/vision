@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QBrush, QPen
 from PySide6.QtWidgets import QGraphicsItem
+from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsEllipseItem
 
 from bsmu.vision.core.data.vector.shapes import VectorShape, Point, Polyline
 from bsmu.vision.widgets.actors import GraphicsActor, ItemT
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject, QPointF
-    from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsEllipseItem
 
 ShapeT = TypeVar('ShapeT', bound=VectorShape)
 

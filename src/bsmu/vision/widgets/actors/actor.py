@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from PySide6.QtCore import QObject
-
-if TYPE_CHECKING:
-    from PySide6.QtWidgets import QGraphicsItem
+from PySide6.QtWidgets import QGraphicsItem
 
 ModelT = TypeVar('ModelT', bound=QObject)
 ItemT = TypeVar('ItemT', bound=QGraphicsItem)

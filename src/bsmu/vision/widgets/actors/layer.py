@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Generic
+
+from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem
+
 from bsmu.vision.core.layers import Layer
 from bsmu.vision.widgets.actors import GraphicsActor, ItemT
 
-from typing import TYPE_CHECKING, Generic
-
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
-    from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem
 
 
 class LayerActor(Generic[ItemT], GraphicsActor[Layer, ItemT]):

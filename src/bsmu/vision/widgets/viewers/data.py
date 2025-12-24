@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generic, TypeVar
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QWidget, QApplication, QGridLayout
 
 from bsmu.vision.core.data import Data
@@ -14,6 +15,9 @@ DataT = TypeVar('DataT', bound=Data)
 
 
 class DataViewer(QWidget, Generic[DataT]):
+    data_about_to_change = Signal(Data, Data)
+    data_changed = Signal(Data)
+
     CONTENT_WIDGET_OBJECT_NAME = 'content_widget'
 
     def __init__(self, data: DataT | None = None, parent: QWidget | None = None):
@@ -81,10 +85,16 @@ class DataViewer(QWidget, Generic[DataT]):
 
     @data.setter
     def data(self, value: DataT | None):
-        if self._data != value:
-            self._on_data_changing()
-            self._data = value
-            self._on_data_changed()
+        if self._data == value:
+            return
+
+        self.data_about_to_change.emit(self._data, value)
+        self._data_about_to_change(value)
+
+        self._data = value
+
+        self._data_changed()
+        self.data_changed.emit(self._data)
 
     @property
     def data_path_name(self):
@@ -108,8 +118,8 @@ class DataViewer(QWidget, Generic[DataT]):
     def _on_cursor_owner_changed(self):
         pass
 
-    def _on_data_changing(self):
+    def _data_about_to_change(self, new_data: DataT | None):
         pass
 
-    def _on_data_changed(self):
+    def _data_changed(self):
         pass

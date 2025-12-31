@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QGraphicsItem
 
 ModelT = TypeVar('ModelT', bound=QObject)
 ItemT = TypeVar('ItemT', bound=QGraphicsItem)
 
 
-class GraphicsActor(Generic[ModelT, ItemT], QObject):
+class GraphicsActor(QObject, Generic[ModelT, ItemT]):
+    model_about_to_change = Signal(QObject, QObject)
+    model_changed = Signal(QObject)
+
     def __init__(self, model: ModelT | None = None, parent: QObject | None = None):
         super().__init__(parent)
 
@@ -25,16 +28,18 @@ class GraphicsActor(Generic[ModelT, ItemT], QObject):
 
     @model.setter
     def model(self, value: ModelT | None) -> None:
-        if self._model is not None:
-            self._disconnect_model_signals()
+        if self._model == value:
+            return
+
+        self.model_about_to_change.emit(self._model, value)
+        self._model_about_to_change(value)
 
         self._model = value
 
-        if self._model is not None:
-            self._connect_model_signals()
+        self._model_changed()
+        self.model_changed.emit(self._model)
 
-        # Refresh visual
-        self._update_visual()
+        self._update_graphics_item()
 
     @property
     def graphics_item(self) -> ItemT | None:
@@ -43,14 +48,12 @@ class GraphicsActor(Generic[ModelT, ItemT], QObject):
     def _create_graphics_item(self) -> ItemT:
         raise NotImplementedError(f'{self.__class__.__name__} must implement _create_graphics_item()')
 
-    def _connect_model_signals(self) -> None:
-        """Override to connect model signals (e.g., model.changed)."""
+    def _model_about_to_change(self, new_model: ModelT | None) -> None:
         pass
 
-    def _disconnect_model_signals(self) -> None:
-        """Override to disconnect model signals."""
+    def _model_changed(self) -> None:
         pass
 
-    def _update_visual(self) -> None:
+    def _update_graphics_item(self) -> None:
         """Override to update graphics_item based on model state."""
         pass

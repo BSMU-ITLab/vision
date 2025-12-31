@@ -1,1 +1,1 @@
-from .layer import Layer, RasterLayer
+from .layer import Layer, RasterLayer, VectorLayer

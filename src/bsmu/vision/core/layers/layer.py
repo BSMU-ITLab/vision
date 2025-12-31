@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, Signal
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.data.raster import Raster
+from bsmu.vision.core.data.vector import Vector
 from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
@@ -223,3 +224,7 @@ class RasterLayer(Layer[Raster]):
     def is_image_pixels_valid(self) -> bool:
         warnings.warn('`is_image_pixels_valid` is deprecated; use `is_raster_pixels_valid` instead.', DeprecationWarning, stacklevel=2)
         return self.is_raster_pixels_valid
+
+
+class VectorLayer(Layer[Vector]):
+    ...

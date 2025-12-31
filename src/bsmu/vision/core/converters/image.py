@@ -14,7 +14,7 @@ def normalized_uint8(array: np.ndarray):
     return normalized(array, 0, 255).astype(np.uint8)
 
 
-def converted_to_rgba(image):
+def converted_to_rgba(image: np.ndarray):
     if image.ndim == 2:  # one channel (grayscale image)
         image = gray2rgba(image)
     elif image.ndim == 3 and image.shape[2] == 3:  # 3-channel image
@@ -23,9 +23,10 @@ def converted_to_rgba(image):
     return image
 
 
-def numpy_array_to_qimage(numpy_array: np.ndarray, image_format: QImage.Format = QImage.Format_RGBA8888_Premultiplied):
+def numpy_array_to_qimage(
+        numpy_array: np.ndarray, image_format: QImage.Format = QImage.Format.Format_RGBA8888_Premultiplied):
     """
-    Do not delete |numpy_array| or it's data, because QImage uses it without copying,
+    Do not delete `numpy_array` or it's data, because QImage uses it without copying,
     and QImage will crash if it's data buffer will be deleted
     """
     assert numpy_array.flags['C_CONTIGUOUS'], 'Numpy array have to be C-contiguous'

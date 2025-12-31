@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Protocol, runtime_checkable
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,7 @@ from bsmu.vision.core.image import MaskDrawMode
 from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
 from bsmu.vision.core.models import positive_list_insert_index
 from bsmu.vision.widgets.viewers.graphics import BaseGraphicsObject, GraphicsViewer
+from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -26,6 +28,13 @@ if TYPE_CHECKING:
     from bsmu.vision.core.palette import Palette
     from bsmu.vision.core.visibility import Visibility
     from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
+
+
+warnings.warn(
+    'The "widgets.viewers.image.layered.layered.py" module is deprecated; use "widgets.viewers.layered.py" instead.',
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 class IntensityWindowing:
@@ -408,167 +417,177 @@ class _LayeredImageGraphicsObject(BaseGraphicsObject):
         self.update()
 
 
-class LayeredImageViewer(GraphicsViewer[LayeredImage]):
-    layer_view_adding = Signal(ImageLayerView, int)
-    layer_view_added = Signal(ImageLayerView, int)
-    layer_view_removing = Signal(ImageLayerView, int)
-    layer_view_removed = Signal(ImageLayerView, int)
-
-    data_name_changed = Signal(str)
-
-    def __init__(self, data: LayeredImage = None, settings: ImageViewerSettings = None, parent: QWidget = None):
-        # Do not pass `data` as parameter, because we need at first create
-        # _LayeredImageGraphicsObject. Thus, `data` is assigned later, when _LayeredImageGraphicsObject will be created.
-        super().__init__(settings=settings, parent=parent)
-
-        self.data = data
-
-    def _create_main_graphics_object(self) -> _LayeredImageGraphicsObject:
-        graphics_object = _LayeredImageGraphicsObject()
-        graphics_object.active_layer_view_changed.connect(
-            self._on_active_layer_view_changed)
-
-        graphics_object.layer_view_adding.connect(self.layer_view_adding)
-        graphics_object.layer_view_added.connect(self.layer_view_added)
-        graphics_object.layer_view_removing.connect(self.layer_view_removing)
-        graphics_object.layer_view_removed.connect(self.layer_view_removed)
-
-        return graphics_object
-
-    @property
-    def layered_image_graphics_object(self) -> _LayeredImageGraphicsObject:
-        return self._main_graphics_object
-
-    @property
-    def active_layer_view(self) -> ImageLayerView:
-        return self.layered_image_graphics_object.active_layer_view
-
-    @property
-    def active_layer(self) -> ImageLayer:
-        return self.active_layer_view.image_layer
-
-    @property
-    def layers(self) -> list[ImageLayer]:
-        return self.data.layers
-
-    @property
-    def layer_views(self) -> list[ImageLayerView]:
-        return self.layered_image_graphics_object.layer_views
-
-    def layer_view_by_name(self, name: str) -> ImageLayerView:
-        return self.layered_image_graphics_object.layer_view_by_name(name)
-
-    def layer_view_by_model(self, image_layer: ImageLayer) -> ImageLayerView:
-        return self.layered_image_graphics_object.layer_view_by_model(image_layer)
-
-    def layer_by_name(self, name: str) -> ImageLayer:
-        return self.data.layer_by_name(name)
-
-    def add_layer(self, layer: ImageLayer):
-        self.data.add_layer(layer)
-
-    def add_layer_from_image(self, image: Image, name: str = '') -> ImageLayer:
-        layer = ImageLayer(image, name)
-        self.add_layer(layer)
-        return layer
-
-    def add_layer_or_modify_image(
-            self, name: str, image: Image, path: Path = None, visibility: Visibility = None) -> ImageLayer:
-        return self.data.add_layer_or_modify_image(name, image, path, visibility)
-
-    def add_layer_or_modify_pixels(
-            self,
-            name: str,
-            pixels: np.array,
-            image_type: Type[Image],
-            palette: Palette = None,
-            path: Path = None,
-            visibility: Visibility = None
-    ) -> ImageLayer:
-        return self.data.add_layer_or_modify_pixels(name, pixels, image_type, palette, path, visibility)
-
-    def remove_layer(self, layer: ImageLayer):
-        self.data.remove_layer(layer)
-
-    def contains_layer(self, name: str) -> bool:
-        return self.data.contains_layer(name)
-
-    def is_confirmed_repaint_duplicate_mask_layer(
-            self, mask_layer_name: str, mask_draw_mode: MaskDrawMode = MaskDrawMode.REDRAW_ALL) -> bool:
-        if self.data.layer_image(mask_layer_name) is None:
-            return True
-
-        draw_mode_clarification = ''
-        if mask_draw_mode != MaskDrawMode.REDRAW_ALL:
-            draw_mode_clarification = self.tr(
-                '<br>(Next draw mode will be used: {0})').format(mask_draw_mode.description)
-
-        reply = QMessageBox.question(
-            self.window(),
-            self.tr('Duplicate Layer Name'),
-            self.tr(
-                'Viewer already contains a layer with such name: <i>{0}</i>.<br>'
-                'Repaint its content?{1}'
-            ).format(mask_layer_name, draw_mode_clarification),
-            defaultButton=QMessageBox.StandardButton.No,
+class LayeredImageViewer(LayeredDataViewer):
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            '`LayeredImageViewer` is deprecated; use `LayeredDataViewer` instead.',
+            DeprecationWarning,
+            stacklevel=2,
         )
-        return reply is QMessageBox.StandardButton.Yes
+        super().__init__(*args, **kwargs)
 
-    def _data_about_to_change(self, new_data: LayeredImage | None):
-        if self.data is None:
-            return
 
-        self.data.layer_added.disconnect(self._add_layer_view_from_model)
-        self.data.layer_removed.disconnect(self._remove_layer_view_by_model)
-
-        for layer in self.layers:
-            self._remove_layer_view_by_model(layer)
-
-    def _data_changed(self):
-        if self.data is None:
-            return
-
-        self.data.layer_added.connect(self._add_layer_view_from_model)
-        self.data.layer_removed.connect(self._remove_layer_view_by_model)
-
-        for layer in self.layers:
-            self._add_layer_view_from_model(layer)
-
-    def _add_layer_view(self, layer_view: ImageLayerView, layer_index: int = None):
-        self.layered_image_graphics_object.add_layer_view(layer_view, layer_index)
-
-    def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> ImageLayerView:
-        pass
-
-    def _remove_layer_view_by_model(self, image_layer: ImageLayer):
-        self.layered_image_graphics_object.remove_layer_view_by_model(image_layer)
-
-    def map_viewport_to_pixel_coords(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
-        """Map viewport position to continuous pixel coordinates"""
-        layered_image_item_pos = self.map_viewport_to_content(viewport_pos)
-        return image.map_spatial_to_pixel_coords(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()])) \
-            * self.layered_image_graphics_object.view_min_spacing
-
-    def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
-        """Map viewport position to discrete pixel array indices"""
-        return self.map_viewport_to_pixel_coords(viewport_pos, image).round().astype(np.int_)
-
-    def _on_active_layer_view_changed(self, old_active_layer_view: ImageLayerView,
-                                      new_active_layer_view: ImageLayerView):
-        if old_active_layer_view is not None:
-            old_active_layer_view.image_view_updated.disconnect(self._on_active_layer_image_view_updated)
-        if new_active_layer_view is not None:
-            new_active_layer_view.image_view_updated.connect(self._on_active_layer_image_view_updated)
-
-    def _on_active_layer_image_view_updated(self, image_view: FlatImage):
-        self.data_name_changed.emit('' if image_view is None else image_view.path_name)
-
-    def print_layers(self):
-        self.data.print_layers()
-
-    def print_layer_views(self):
-        for index, layer_view in enumerate(self.layer_views):
-            print(f'Layer {index}: {layer_view.name} opacity={layer_view.opacity}')
+# class LayeredImageViewer(GraphicsViewer[LayeredImage]):
+#     layer_view_adding = Signal(ImageLayerView, int)
+#     layer_view_added = Signal(ImageLayerView, int)
+#     layer_view_removing = Signal(ImageLayerView, int)
+#     layer_view_removed = Signal(ImageLayerView, int)
+#
+#     data_name_changed = Signal(str)
+#
+#     def __init__(self, data: LayeredImage = None, settings: ImageViewerSettings = None, parent: QWidget = None):
+#         # Do not pass `data` as parameter, because we need at first create
+#         # _LayeredImageGraphicsObject. Thus, `data` is assigned later, when _LayeredImageGraphicsObject will be created.
+#         super().__init__(settings=settings, parent=parent)
+#
+#         self.data = data
+#
+#     def _create_main_graphics_object(self) -> _LayeredImageGraphicsObject:
+#         graphics_object = _LayeredImageGraphicsObject()
+#         graphics_object.active_layer_view_changed.connect(
+#             self._on_active_layer_view_changed)
+#
+#         graphics_object.layer_view_adding.connect(self.layer_view_adding)
+#         graphics_object.layer_view_added.connect(self.layer_view_added)
+#         graphics_object.layer_view_removing.connect(self.layer_view_removing)
+#         graphics_object.layer_view_removed.connect(self.layer_view_removed)
+#
+#         return graphics_object
+#
+#     @property
+#     def layered_image_graphics_object(self) -> _LayeredImageGraphicsObject:
+#         return self._main_graphics_object
+#
+#     @property
+#     def active_layer_view(self) -> ImageLayerView:
+#         return self.layered_image_graphics_object.active_layer_view
+#
+#     @property
+#     def active_layer(self) -> ImageLayer:
+#         return self.active_layer_view.image_layer
+#
+#     @property
+#     def layers(self) -> list[ImageLayer]:
+#         return self.data.layers
+#
+#     @property
+#     def layer_views(self) -> list[ImageLayerView]:
+#         return self.layered_image_graphics_object.layer_views
+#
+#     def layer_view_by_name(self, name: str) -> ImageLayerView:
+#         return self.layered_image_graphics_object.layer_view_by_name(name)
+#
+#     def layer_view_by_model(self, image_layer: ImageLayer) -> ImageLayerView:
+#         return self.layered_image_graphics_object.layer_view_by_model(image_layer)
+#
+#     def layer_by_name(self, name: str) -> ImageLayer:
+#         return self.data.layer_by_name(name)
+#
+#     def add_layer(self, layer: ImageLayer):
+#         self.data.add_layer(layer)
+#
+#     def add_layer_from_image(self, image: Image, name: str = '') -> ImageLayer:
+#         layer = ImageLayer(image, name)
+#         self.add_layer(layer)
+#         return layer
+#
+#     def add_layer_or_modify_image(
+#             self, name: str, image: Image, path: Path = None, visibility: Visibility = None) -> ImageLayer:
+#         return self.data.add_layer_or_modify_image(name, image, path, visibility)
+#
+#     def add_layer_or_modify_pixels(
+#             self,
+#             name: str,
+#             pixels: np.array,
+#             image_type: Type[Image],
+#             palette: Palette = None,
+#             path: Path = None,
+#             visibility: Visibility = None
+#     ) -> ImageLayer:
+#         return self.data.add_layer_or_modify_pixels(name, pixels, image_type, palette, path, visibility)
+#
+#     def remove_layer(self, layer: ImageLayer):
+#         self.data.remove_layer(layer)
+#
+#     def contains_layer(self, name: str) -> bool:
+#         return self.data.contains_layer(name)
+#
+#     def is_confirmed_repaint_duplicate_mask_layer(
+#             self, mask_layer_name: str, mask_draw_mode: MaskDrawMode = MaskDrawMode.REDRAW_ALL) -> bool:
+#         if self.data.layer_image(mask_layer_name) is None:
+#             return True
+#
+#         draw_mode_clarification = ''
+#         if mask_draw_mode != MaskDrawMode.REDRAW_ALL:
+#             draw_mode_clarification = self.tr(
+#                 '<br>(Next draw mode will be used: {0})').format(mask_draw_mode.description)
+#
+#         reply = QMessageBox.question(
+#             self.window(),
+#             self.tr('Duplicate Layer Name'),
+#             self.tr(
+#                 'Viewer already contains a layer with such name: <i>{0}</i>.<br>'
+#                 'Repaint its content?{1}'
+#             ).format(mask_layer_name, draw_mode_clarification),
+#             defaultButton=QMessageBox.StandardButton.No,
+#         )
+#         return reply is QMessageBox.StandardButton.Yes
+#
+#     def _data_about_to_change(self, new_data: LayeredImage | None):
+#         if self.data is None:
+#             return
+#
+#         self.data.layer_added.disconnect(self._add_layer_view_from_model)
+#         self.data.layer_removed.disconnect(self._remove_layer_view_by_model)
+#
+#         for layer in self.layers:
+#             self._remove_layer_view_by_model(layer)
+#
+#     def _data_changed(self):
+#         if self.data is None:
+#             return
+#
+#         self.data.layer_added.connect(self._add_layer_view_from_model)
+#         self.data.layer_removed.connect(self._remove_layer_view_by_model)
+#
+#         for layer in self.layers:
+#             self._add_layer_view_from_model(layer)
+#
+#     def _add_layer_view(self, layer_view: ImageLayerView, layer_index: int = None):
+#         self.layered_image_graphics_object.add_layer_view(layer_view, layer_index)
+#
+#     def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> ImageLayerView:
+#         pass
+#
+#     def _remove_layer_view_by_model(self, image_layer: ImageLayer):
+#         self.layered_image_graphics_object.remove_layer_view_by_model(image_layer)
+#
+#     def map_viewport_to_pixel_coords(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+#         """Map viewport position to continuous pixel coordinates"""
+#         layered_image_item_pos = self.map_viewport_to_content(viewport_pos)
+#         return image.map_spatial_to_pixel_coords(np.array([layered_image_item_pos.y(), layered_image_item_pos.x()])) \
+#             * self.layered_image_graphics_object.view_min_spacing
+#
+#     def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
+#         """Map viewport position to discrete pixel array indices"""
+#         return self.map_viewport_to_pixel_coords(viewport_pos, image).round().astype(np.int_)
+#
+#     def _on_active_layer_view_changed(self, old_active_layer_view: ImageLayerView,
+#                                       new_active_layer_view: ImageLayerView):
+#         if old_active_layer_view is not None:
+#             old_active_layer_view.image_view_updated.disconnect(self._on_active_layer_image_view_updated)
+#         if new_active_layer_view is not None:
+#             new_active_layer_view.image_view_updated.connect(self._on_active_layer_image_view_updated)
+#
+#     def _on_active_layer_image_view_updated(self, image_view: FlatImage):
+#         self.data_name_changed.emit('' if image_view is None else image_view.path_name)
+#
+#     def print_layers(self):
+#         self.data.print_layers()
+#
+#     def print_layer_views(self):
+#         for index, layer_view in enumerate(self.layer_views):
+#             print(f'Layer {index}: {layer_view.name} opacity={layer_view.opacity}')
 
 
 @runtime_checkable

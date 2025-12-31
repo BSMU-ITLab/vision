@@ -118,8 +118,8 @@ class DataViewer(QWidget, Generic[DataT]):
     def _on_cursor_owner_changed(self):
         pass
 
-    def _data_about_to_change(self, new_data: DataT | None):
+    def _data_about_to_change(self, new_data: DataT | None) -> None:
         pass
 
-    def _data_changed(self):
+    def _data_changed(self) -> None:
         pass

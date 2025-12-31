@@ -1,1 +1,1 @@
-from .actor import GraphicsActor, ItemT
+from .actor import GraphicsActor, ModelT, ItemT

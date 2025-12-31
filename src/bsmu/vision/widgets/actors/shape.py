@@ -24,11 +24,13 @@ class VectorShapeActor(Generic[ShapeT, ItemT], GraphicsActor[ShapeT, ItemT]):
     def shape(self) -> ShapeT | None:
         return self.model
 
-    def _connect_model_signals(self) -> None:
-        self.model.changed.connect(self._update_visual)
+    def _model_about_to_change(self, new_model: ShapeT | None) -> None:
+        if self.model is not None:
+            self.model.changed.disconnect(self._update_graphics_item)
 
-    def _disconnect_model_signals(self) -> None:
-        self.model.changed.disconnect(self._update_visual)
+    def _model_changed(self) -> None:
+        if self.model is not None:
+            self.model.changed.connect(self._update_graphics_item)
 
 
 class PointActor(VectorShapeActor[Point, QGraphicsEllipseItem]):
@@ -44,7 +46,7 @@ class PointActor(VectorShapeActor[Point, QGraphicsEllipseItem]):
         item.setZValue(5)
         return item
 
-    def _update_visual(self):  # TODO: maybe rename it
+    def _update_graphics_item(self):
         if self.model is not None:
             self.graphics_item.setPos(self.model.pos)
             self._update_handle_position()
@@ -74,7 +76,7 @@ class PointActor(VectorShapeActor[Point, QGraphicsEllipseItem]):
 
     def _on_handle_moved(self, new_pos: QPointF):
         if self.model:
-            self.model.pos = new_pos  # emits model.changed -> updates visual
+            self.model.pos = new_pos  # emits model.changed -> updates graphics item
 
     def _on_handle_selected(self) -> None:
         # Emit selection signal if you define one in PointActor

@@ -22,6 +22,7 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
     layer_actor_about_to_remove = Signal(LayerActor)
     layer_actor_removed = Signal(LayerActor)
 
+    active_layer_view_changed = Signal(LayerActor, LayerActor)
     # data_name_changed = Signal(str)
 
     def __init__(
@@ -30,13 +31,26 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
             settings: ImageViewerSettings | None = None,
             parent: QWidget | None = None,
     ):
-        super().__init__(data, settings, parent)
-
         self._layer_to_actor: dict[Layer, LayerActor] = {}
+
+        self._active_layer_actor = None
+
+        super().__init__(data, settings, parent)
 
     @property
     def layers(self) -> list[Layer]:
         return self.data.layers
+
+    @property
+    def active_layer_view(self) -> LayerActor | None:
+        return self._active_layer_actor
+
+    @active_layer_view.setter
+    def active_layer_view(self, value: LayerActor):
+        if self._active_layer_actor != value:
+            prev_active_layer_actor = self._active_layer_actor
+            self._active_layer_actor = value
+            self.active_layer_view_changed.emit(prev_active_layer_actor, self._active_layer_actor)
 
     def _create_main_graphics_object(self) -> QGraphicsItem:  # TODO: can we remove this method?
         return None
@@ -71,6 +85,9 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         self._layer_to_actor[layer] = actor
         self.add_actor(actor)
 
+        if len(self._layer_to_actor) == 1:  # If was added the first layer actor
+            self.active_layer_view = actor
+
         self.layer_actor_added.emit(actor)
 
     def _on_layer_removed(self, layer: Layer):
@@ -82,6 +99,9 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
 
         self.remove_actor(actor)
         del self._layer_to_actor[layer]
+
+        if len(self._layer_to_actor) == 0:
+            self.active_layer_view = None
 
         self.layer_actor_removed.emit(actor)
         actor.deleteLater()

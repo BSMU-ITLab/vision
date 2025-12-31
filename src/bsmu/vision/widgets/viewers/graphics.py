@@ -66,6 +66,8 @@ class ImageViewerSettings(Settings):
 
 class GraphicsViewer(DataViewer[DataT]):
     def __init__(self, data: DataT = None, settings: ImageViewerSettings = None, parent: QWidget = None):
+        self._graphics_scene = QGraphicsScene()
+
         super().__init__(data, parent)
 
         self._settings = settings
@@ -73,12 +75,9 @@ class GraphicsViewer(DataViewer[DataT]):
         self._is_syncing_scene_rect = False
 
         self._main_graphics_object = self._create_main_graphics_object()
-        self._main_graphics_object.bounding_rect_changed.connect(
-            self._on_main_graphics_object_bounding_rect_changed)
         # self._main_graphics_object.bounding_rect_changed.connect(
-        #     self._graphics_scene.setSceneRect)
+        #     self._on_main_graphics_object_bounding_rect_changed)
 
-        self._graphics_scene = QGraphicsScene()
         self._graphics_view = GraphicsView(self._graphics_scene, self._settings.graphics_view_settings)
 
         self._graphics_scene.addItem(self._main_graphics_object)

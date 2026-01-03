@@ -19,7 +19,7 @@ packaging==24.2
 pandas==2.2.3
 pillow==11.0.0
 pluggy==1.5.0
-protobuf==5.28.3
+protobuf==5.29.5
 pydicom==3.0.1
 pyreadline3==3.5.4
 PySide6==6.8.0.2

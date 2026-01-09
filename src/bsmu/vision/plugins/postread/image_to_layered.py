@@ -75,7 +75,7 @@ class ImageToLayeredImagePostReadConverter(PostReadConverter):
     _DATA_TYPES = (FlatImage, VolumeImage)
 
     def _convert_data(self, data: Data) -> Data:
-        layered_image = LayeredImage()
         layer_name, layer_path = self.config.resolved_layer_name_and_path_from_image(data.path)
+        layered_image = LayeredImage(path=layer_path.parent)
         layered_image.add_layer_from_image(data, layer_name, layer_path, self.config.visibility)
         return layered_image

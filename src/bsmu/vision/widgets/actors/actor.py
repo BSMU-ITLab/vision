@@ -13,6 +13,8 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
     model_about_to_change = Signal(QObject, QObject)
     model_changed = Signal(QObject)
 
+    scene_bounding_rect_changed = Signal()
+
     def __init__(self, model: ModelT | None = None, parent: QObject | None = None):
         super().__init__(parent)
 

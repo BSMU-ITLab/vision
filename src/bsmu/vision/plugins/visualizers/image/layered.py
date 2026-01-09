@@ -31,16 +31,23 @@ class LayeredImageVisualizer(DataVisualizer):
         logging.info('Visualize layered image')
 
         viewer_sub_windows = []
-        if data.layers[0].image.n_dims == VolumeImage.n_dims:
-            for plane_axis in PlaneAxis:
-                image_viewer = VolumeSliceImageViewer(plane_axis, None, data, self.settings)
-                sub_window = VolumeSliceImageViewerSubWindow(image_viewer)
-                image_viewer.data_name_changed.connect(sub_window.setWindowTitle)
-                viewer_sub_windows.append(sub_window)
+        if data.base_layer.image.n_dims == VolumeImage.n_dims:
+            viewers = [
+                VolumeSliceImageViewer(plane_axis, None, data, self.settings)
+                for plane_axis in PlaneAxis
+            ]
         else:
-            image_viewer = LayeredFlatImageViewer(data, self.settings)
-            sub_window = LayeredImageViewerSubWindow(image_viewer)
-            image_viewer.data_name_changed.connect(sub_window.setWindowTitle)
+            viewers = [LayeredFlatImageViewer(data, self.settings)]
+
+        for viewer in viewers:
+            if isinstance(viewer, VolumeSliceImageViewer):
+                sub_window = VolumeSliceImageViewerSubWindow(viewer)
+            else:
+                sub_window = LayeredImageViewerSubWindow(viewer)
+
+            sub_window.setWindowTitle(viewer.data.display_name)
+            viewer.data_name_changed.connect(sub_window.setWindowTitle)
+
             viewer_sub_windows.append(sub_window)
 
         for sub_window in viewer_sub_windows:

@@ -23,6 +23,7 @@ class Data(QObject):
     def path(self, value: Path | None):
         if self._path != value:
             self._path = value
+            self._path_changed()
             self.path_changed.emit(self._path)
 
     @property
@@ -32,6 +33,9 @@ class Data(QObject):
     @property
     def dir_name(self):
         return '' if self._path is None else self._path.parent.name
+
+    def _path_changed(self):
+        pass
 
     def update(self):
         self.updated.emit()

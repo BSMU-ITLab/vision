@@ -118,7 +118,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
                 else:
                     assert False, f'Unknown image layer properties: {image_layer_props}'
 
-        self.image_layer_view.image_layer.data_changed.connect(self._on_layer_image_updated)
+        self.image_layer_view.layer.data_changed.connect(self._on_layer_image_updated)
         self.image_layer_view.image_view_updated.connect(self._on_layer_image_updated)
 
         self._on_layer_image_updated()
@@ -127,7 +127,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
         self._remove_tool_mask_layer()
         self._set_mask_layer(None)
 
-        self.image_layer_view.image_layer.data_changed.disconnect(self._on_layer_image_updated)
+        self.image_layer_view.layer.data_changed.disconnect(self._on_layer_image_updated)
         self.image_layer_view.image_view_updated.disconnect(self._on_layer_image_updated)
         self.image_layer_view = None
 
@@ -180,7 +180,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
 
         if self._tool_mask_layer is None:
             tool_mask_layer = self._create_nonexistent_layer_with_zeros_mask(
-                'tool_mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.settings.tool_mask_palette)
+                'tool_mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.raster, self.settings.tool_mask_palette)
             self._set_tool_mask_layer(tool_mask_layer)
 
         self._update_masks()
@@ -188,7 +188,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
     def _configured_mask_layer(self) -> ImageLayer:
         mask_layer_props = self.layers_props['mask']
         if mask_layer_props.get('use_active_indexed_layer', True):
-            active_layer = self.viewer.active_layer_view.image_layer
+            active_layer = self.viewer.active_layer_view.layer
             if active_layer.is_indexed:
                 return active_layer
 

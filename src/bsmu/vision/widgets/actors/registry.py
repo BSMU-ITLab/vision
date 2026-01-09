@@ -11,7 +11,7 @@ from bsmu.vision.widgets.actors.shape import VectorShapeActor, PointActor, Polyl
 
 # --- Layer Actor Registry ---
 LayerType = type[Layer]
-LayerActorFactory = Callable[[Layer], LayerActor]
+LayerActorFactory = Callable[[Any], LayerActor]
 _LAYER_ACTOR_REGISTRY: dict[LayerType, LayerActorFactory] = {}
 
 

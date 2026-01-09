@@ -8,7 +8,8 @@ from PySide6.QtWidgets import QTableView, QDockWidget
 
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.plugins import Plugin
-from bsmu.vision.widgets.viewers.image.layered import ImageLayerView, LayeredImageViewerHolder
+from bsmu.vision.widgets.actors.layer import LayerActor
+from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewerHolder
 from bsmu.vision.widgets.visibility_v2 import Visibility, VisibilityDelegate
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
-    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 
 class LayersTableViewPlugin(Plugin):
@@ -93,56 +94,58 @@ class VisibilityTableColumn(TableColumn):
 
 
 class LayersTableModel(RecordTableModel):
-    def __init__(self, record_storage: LayeredImageViewer = None, parent: QObject = None):
-        super().__init__(record_storage, ImageLayerView, (NameTableColumn, VisibilityTableColumn), parent)
+    def __init__(self, record_storage: LayeredDataViewer = None, parent: QObject = None):
+        super().__init__(record_storage, LayerActor, (NameTableColumn, VisibilityTableColumn), parent)
 
     @property
-    def storage_records(self) -> List[ImageLayerView]:
-        return self.record_storage.layer_views
+    def storage_records(self) -> List[LayerActor]:
+        return self.record_storage.layer_actors
 
-    def _record_data(self, record: ImageLayerView, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+    def _record_data(self, record: LayerActor, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if role == Qt.DisplayRole:
             if index.column() == self.column_number(NameTableColumn):
                 return record.name
             elif index.column() == self.column_number(VisibilityTableColumn):
-                return Visibility(record.visible, record.opacity)
+                layer = record.layer
+                return Visibility(layer.visible, layer.opacity)
 
-    def _set_record_data(self, record: ImageLayerView, index: QModelIndex, value: Any) -> bool | Tuple[bool, bool]:
+    def _set_record_data(self, record: LayerActor, index: QModelIndex, value: Any) -> bool | Tuple[bool, bool]:
         if index.column() == self.column_number(NameTableColumn):
             record.name = value
         elif index.column() == self.column_number(VisibilityTableColumn):
-            record.visible = value.visible
-            record.opacity = value.opacity
+            layer = record.layer
+            layer.visible = value.visible
+            layer.opacity = value.opacity
         else:
             return False
         return True
 
     def _on_record_storage_changing(self):
-        self.record_storage.layer_view_adding.disconnect(self._on_storage_record_adding)
-        self.record_storage.layer_view_added.disconnect(self._on_storage_record_added)
-        self.record_storage.layer_view_removing.disconnect(self._on_storage_record_removing)
-        self.record_storage.layer_view_removed.disconnect(self._on_storage_record_removed)
+        self.record_storage.layer_actor_about_to_add.disconnect(self._on_storage_record_adding)
+        self.record_storage.layer_actor_added.disconnect(self._on_storage_record_added)
+        self.record_storage.layer_actor_about_to_remove.disconnect(self._on_storage_record_removing)
+        self.record_storage.layer_actor_removed.disconnect(self._on_storage_record_removed)
 
     def _on_record_storage_changed(self):
-        self.record_storage.layer_view_adding.connect(self._on_storage_record_adding)
-        self.record_storage.layer_view_added.connect(self._on_storage_record_added)
-        self.record_storage.layer_view_removing.connect(self._on_storage_record_removing)
-        self.record_storage.layer_view_removed.connect(self._on_storage_record_removed)
+        self.record_storage.layer_actor_about_to_add.connect(self._on_storage_record_adding)
+        self.record_storage.layer_actor_added.connect(self._on_storage_record_added)
+        self.record_storage.layer_actor_about_to_remove.connect(self._on_storage_record_removing)
+        self.record_storage.layer_actor_removed.connect(self._on_storage_record_removed)
 
-    def _on_record_added(self, record: ImageLayerView, row: int):
+    def _on_record_added(self, record: LayerActor, row: int):
         # super()._on_record_added(record, row)
 
         self._create_record_connections(
             record,
-            ((record.visibility_changed, self._on_visibility_changed),
+            ((record.visible_changed, self._on_visible_changed),
              (record.opacity_changed, self._on_opacity_changed),
              ))
 
-    def _on_visibility_changed(self, record: ImageLayerView, visible: bool):
+    def _on_visible_changed(self, record: LayerActor, visible: bool):
         visibility_model_index = self.index(self.record_row(record), self.column_number(VisibilityTableColumn))
         self.dataChanged.emit(visibility_model_index, visibility_model_index)
 
-    def _on_opacity_changed(self, record: ImageLayerView, opacity: float):
+    def _on_opacity_changed(self, record: LayerActor, opacity: float):
         visibility_model_index = self.index(self.record_row(record), self.column_number(VisibilityTableColumn))
         self.dataChanged.emit(visibility_model_index, visibility_model_index)
 

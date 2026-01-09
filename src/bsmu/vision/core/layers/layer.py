@@ -29,6 +29,8 @@ class Layer(QObject, Generic[DataT]):
     data_changed = Signal(Data)
     path_changed = Signal(Path)
     extension_changed = Signal(str)
+    visible_changed = Signal(bool)
+    opacity_changed = Signal(float)
 
     data_path_changed = Signal(Path)
 
@@ -41,16 +43,18 @@ class Layer(QObject, Generic[DataT]):
             parent: QObject | None = None,
     ):
         """
-        :param name: Layer name.
         :param path: Layer path used to iterate over data files.
         """
         super().__init__(parent)
 
         self._id: int = Layer._max_id
         Layer._max_id += 1
+        self._name: str = name if name else f'Layer {self._id}'
 
         self._path: Path | None = path
         self._extension: str | None = None
+
+        self._visibility: Visibility = Visibility() if visibility is None else visibility
 
         self._data: DataT | None = None
 
@@ -60,10 +64,6 @@ class Layer(QObject, Generic[DataT]):
         # attributes *before* calling super().__init__(),
         # to ensure they are ready when these hooks execute.
         self.data = data
-
-        self._name: str = name if name else f'Layer {self._id}'
-
-        self._visibility: Visibility = Visibility() if visibility is None else visibility
 
     @property
     def data(self) -> DataT | None:
@@ -77,14 +77,19 @@ class Layer(QObject, Generic[DataT]):
         self.data_about_to_change.emit(self._data, value)
         self._data_about_to_change(value)
 
+        old_data_path = self.data_path
+
         if self._data is not None:
             self._data.path_changed.disconnect(self._on_data_path_changed)
 
         self._data = value
 
         if self._data is not None:
-            self._update_extension()
             self._data.path_changed.connect(self._on_data_path_changed)
+
+        new_data_path = self.data_path
+        if old_data_path != new_data_path:
+            self._on_data_path_changed(self.data_path)
 
         self._data_changed()
         self.data_changed.emit(self._data)
@@ -106,6 +111,28 @@ class Layer(QObject, Generic[DataT]):
     @property
     def visibility(self) -> Visibility:
         return self._visibility
+
+    @property
+    def visible(self) -> bool:
+        return self._visibility.visible
+
+    @visible.setter
+    def visible(self, value: bool):
+        if self._visibility.visible != value:
+            self._visibility.visible = value
+            self.visible_changed.emit(self.visible)
+
+    @property
+    def opacity(self) -> float:
+        return self._visibility.opacity
+
+    @opacity.setter
+    def opacity(self, value: float):
+        if not (0.0 <= value <= 1.0):
+            raise ValueError('Opacity must be between 0.0 and 1.0')
+        if self._visibility.opacity != value:
+            self._visibility.opacity = value
+            self.opacity_changed.emit(self.opacity)
 
     @property
     def extension(self) -> str | None:
@@ -137,7 +164,7 @@ class Layer(QObject, Generic[DataT]):
         self.data_path_changed.emit(path)
 
     def _update_extension(self):
-        if self._data.path is not None:
+        if self.data_path is not None:
             self.extension = self._data.path.suffix
 
 

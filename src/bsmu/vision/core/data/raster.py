@@ -76,6 +76,16 @@ class Raster(Data):
     def zeros_mask_like(cls, other: Raster, palette: Palette = None) -> Raster:
         return cls.zeros_like(other, create_mask=True, palette=palette)
 
+    def with_new_pixels(self, new_pixels: np.ndarray) -> Raster:
+        """Return a new instance with the same metadata but different pixel data."""
+        return type(self)(
+            array=new_pixels,
+            palette=self.palette,
+            path=self.path,
+            spatial=self.spatial,
+            parent=self.parent(),
+        )
+
     @property
     def pixels(self) -> np.ndarray:
         return self.array

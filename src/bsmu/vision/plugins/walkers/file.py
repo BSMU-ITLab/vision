@@ -12,7 +12,7 @@ from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from bsmu.vision.core.image.layered import ImageLayer
+    from bsmu.vision.core.layers import Layer
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
     from bsmu.vision.widgets.mdi.windows.data import DataViewerSubWindow
@@ -139,7 +139,7 @@ class ImageLayerFileWalker(QObject):
         return self._image_viewer
 
     @property
-    def active_layer(self) -> ImageLayer:
+    def active_layer(self) -> Layer | None:
         return self._image_viewer.active_layer
 
     @property
@@ -165,7 +165,7 @@ class ImageLayerFileWalker(QObject):
     @property
     def main_layer_file_index(self) -> int | None:
         if self._main_layer_file_index is None:
-            relative_file_path = self.active_layer.image_path.relative_to(self.main_layer_dir)
+            relative_file_path = self.active_layer.data_path.relative_to(self.main_layer_dir)
             try:
                 self._main_layer_file_index = self.main_layer_dir_relative_file_paths.index(relative_file_path)
             except ValueError:
@@ -188,12 +188,13 @@ class ImageLayerFileWalker(QObject):
         # Update images of all layers
         for layer in self._image_viewer.layers:
             if layer.path is None:
-                layer.image = None
+                layer.data = None
                 continue
 
             file_path = layer.path / requested_file_relative_path
             if layer != self._image_viewer.active_layer and layer.extension is not None:
                 file_path = file_path.with_suffix(layer.extension)
-            layer.image = self._file_reading_manager.read_file(file_path, palette=layer.palette)
+            palette = getattr(layer, 'palette', None)
+            layer.data = self._file_reading_manager.read_file(file_path, palette=palette)
 
         self._image_viewer.restore_normalized_view_region(normalized_view_region)

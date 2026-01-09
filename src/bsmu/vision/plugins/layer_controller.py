@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import QObject
 
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.windows.main import ViewMenu
@@ -38,7 +38,11 @@ class MdiImageViewerLayerControllerPlugin(Plugin):
         self._layer_controller = MdiImageViewerLayerController(self._mdi)
 
         menu_action = self._main_window.add_menu_action(
-            ViewMenu, 'Active Layer View', self._layer_controller.toggle_active_layer_view, Qt.CTRL | Qt.Key_I)
+            ViewMenu,
+            'Active Layer View',
+            self._layer_controller.toggle_active_layer_view,
+            self.tr('E'),
+        )
         # menu_action.setCheckable(True)
         menu_action.setWhatsThis('Show active layer and hide other layers / Restore')
 
@@ -86,18 +90,18 @@ class ImageViewerLayerController(QObject):
     def toggle_active_layer_view(self):
         if self._active_layer_view_toggled:
             # Restore initial state
-            for layer_view in self.image_viewer.layer_views:
-                initial_layer_visibility = self._initial_layers_visibilities.get(layer_view)
+            for layer_actor in self.image_viewer.layer_actors:
+                initial_layer_visibility = self._initial_layers_visibilities.get(layer_actor)
                 if initial_layer_visibility is not None:
-                    layer_view.visible = initial_layer_visibility
+                    layer_actor.layer.visible = initial_layer_visibility
         else:
             self._initial_layers_visibilities.clear()
 
-            for layer_view in self.image_viewer.layer_views:
+            for layer_actor in self.image_viewer.layer_actors:
                 # Save initial state
-                self._initial_layers_visibilities[layer_view] = layer_view.visible
-                if layer_view != self.image_viewer.active_layer_view:
-                    layer_view.visible = False
+                self._initial_layers_visibilities[layer_actor] = layer_actor.layer.visible
+                if layer_actor != self.image_viewer.active_layer_view:
+                    layer_actor.layer.visible = False
             if self.image_viewer.active_layer_view:
                 self.image_viewer.active_layer_view.visible = True
 

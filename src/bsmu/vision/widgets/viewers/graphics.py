@@ -68,19 +68,16 @@ class GraphicsViewer(DataViewer[DataT]):
     def __init__(self, data: DataT = None, settings: ImageViewerSettings = None, parent: QWidget = None):
         self._graphics_scene = QGraphicsScene()
 
-        super().__init__(data, parent)
+        self._is_syncing_scene_rect = False
+        self._top_level_actors: list[GraphicsActor] = []
+        self._top_level_bounding_rect: QRectF | None = None
 
         self._settings = settings
-
-        self._is_syncing_scene_rect = False
-
-        self._main_graphics_object = self._create_main_graphics_object()
-        # self._main_graphics_object.bounding_rect_changed.connect(
-        #     self._on_main_graphics_object_bounding_rect_changed)
-
         self._graphics_view = GraphicsView(self._graphics_scene, self._settings.graphics_view_settings)
 
-        self._graphics_scene.addItem(self._main_graphics_object)
+        super().__init__(data, parent)
+
+        self._main_graphics_object = self._create_main_graphics_object()
 
         self.set_content_widget(self._graphics_view)
 
@@ -96,7 +93,16 @@ class GraphicsViewer(DataViewer[DataT]):
         actor.setParent(self)
         self._graphics_scene.addItem(actor.graphics_item)
 
+        if actor.graphics_item.parentItem() is None:
+            assert actor not in self._top_level_actors, f'The {actor} is already a top-level actor'
+            self._top_level_actors.append(actor)
+            actor.scene_bounding_rect_changed.connect(self._on_top_level_actor_scene_bounding_rect_changed)
+
     def remove_actor(self, actor: GraphicsActor):
+        if actor.graphics_item.parentItem() is None:
+            self._top_level_actors.remove(actor)
+            actor.scene_bounding_rect_changed.disconnect(self._on_top_level_actor_scene_bounding_rect_changed)
+
         self._graphics_scene.removeItem(actor.graphics_item)
         actor.setParent(None)
 
@@ -136,28 +142,44 @@ class GraphicsViewer(DataViewer[DataT]):
         viewport_pos = self.viewport.mapFrom(self._graphics_view, graphics_view_pos)
         return self.map_viewport_to_content(viewport_pos)
 
-    def fit_content_in(self):
-        self._graphics_view.fit_in_view(
-            self._main_graphics_object.boundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
+    @property
+    def top_level_bounding_rect(self) -> QRectF:
+        if self._top_level_bounding_rect is None:
+            self._top_level_bounding_rect = self._calculate_top_level_bounding_rect()
+        return self._top_level_bounding_rect
+
+    def _on_top_level_actor_scene_bounding_rect_changed(self) -> None:
+        self._top_level_bounding_rect = None
+        self._sync_scene_rect_with_bounding_rect()
+
+    def _calculate_top_level_bounding_rect(self) -> QRectF:
+        union_rect = QRectF()
+        for item in self._graphics_scene.items():
+            # Parent is None for top-level items
+            if item.parentItem() is not None:
+                continue
+
+            union_rect = union_rect.united(item.sceneBoundingRect())
+
+        return union_rect
+
+    def fit_content_in(self) -> None:
+        self._graphics_view.fit_in_view(self.top_level_bounding_rect, Qt.AspectRatioMode.KeepAspectRatio)
 
     def capture_normalized_view_region(self) -> NormalizedViewRegion | None:
         return self._graphics_view.capture_normalized_view_region()
 
-    def restore_normalized_view_region(self, normalized_view_region: NormalizedViewRegion | None):
-        self._sync_scene_rect_with_bounding_rect()
+    def restore_normalized_view_region(self, normalized_view_region: NormalizedViewRegion | None) -> None:
         self._graphics_view.restore_normalized_view_region(normalized_view_region)
 
-    def _on_main_graphics_object_bounding_rect_changed(self, rect: QRectF):
-        self._sync_scene_rect_with_bounding_rect(rect)
-
-    def _sync_scene_rect_with_bounding_rect(self, rect: QRectF | None = None):
+    def _sync_scene_rect_with_bounding_rect(self, rect: QRectF | None = None) -> None:
         if self._is_syncing_scene_rect:
             return
 
         self._is_syncing_scene_rect = True
 
         if rect is None:
-            rect = self._main_graphics_object.boundingRect()
+            rect = self.top_level_bounding_rect
         self._graphics_view.set_scrollable_scene_rect(rect)
 
         self._is_syncing_scene_rect = False

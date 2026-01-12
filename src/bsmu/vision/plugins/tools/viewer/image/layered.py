@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.core.image import Image, FlatImage
     from bsmu.vision.core.image.layered import ImageLayer
+    from bsmu.vision.core.layers import RasterLayer
     from bsmu.vision.plugins.palette.settings import PalettePackSettings
     from bsmu.vision.plugins.undo import UndoManager
 
@@ -81,15 +82,23 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
 
     @property
     def image(self) -> FlatImage:
-        return self.image_layer_view and self.image_layer_view.flat_image
+        return self.image_layer_view and self.image_layer_view.current_slice
 
     @property
     def mask(self) -> FlatImage:
-        return self.viewer.layer_view_by_model(self._mask_layer).flat_image
+        return self.viewer.actor_by_layer(self._mask_layer).current_slice
 
     @property
     def tool_mask(self) -> FlatImage:
-        return self.viewer.layer_view_by_model(self._tool_mask_layer).flat_image
+        return self.viewer.actor_by_layer(self._tool_mask_layer).current_slice
+
+    @property
+    def mask_layer(self) -> RasterLayer:
+        return self._mask_layer
+
+    @property
+    def tool_mask_layer(self) -> RasterLayer:
+        return self._tool_mask_layer
 
     @property
     def mask_palette(self) -> Palette:
@@ -171,7 +180,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
             layer = self.viewer.add_layer_from_image(layer_image, layer_name)
 
             layer_opacity = layer_props.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
-            self.viewer.layer_view_by_model(layer).opacity = layer_opacity
+            self.viewer.actor_by_layer(layer).opacity = layer_opacity
 
         return layer
 
@@ -198,7 +207,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
                     return layer
 
         return self._create_nonexistent_layer_with_zeros_mask(
-            'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.image, self.mask_palette)
+            'mask', LAYER_NAME_PROPERTY_KEY, self.image_layer_view.raster, self.mask_palette)
 
     def _remove_tool_mask_layer(self):
         if self._tool_mask_layer is not None:
@@ -206,25 +215,22 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
             self._set_tool_mask_layer(None)
 
     def _update_masks(self):
-        if self._mask_layer.image is None:
-            self._mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self._mask_layer.palette)
-            self.viewer.layer_view_by_model(self._mask_layer).slice_number = self.image_layer_view.slice_number
+        if self._mask_layer.data is None:
+            self._mask_layer.data = self.image_layer_view.raster.zeros_mask(palette=self._mask_layer.palette)
+            self.viewer.actor_by_layer(self._mask_layer).slice_number = self.image_layer_view.slice_number
 
         self._update_tool_mask()
 
     def _update_tool_mask(self):
-        if self._tool_mask_layer.image is None:
-            self._tool_mask_layer.image = self.image_layer_view.image.zeros_mask(palette=self._tool_mask_layer.palette)
-            self.viewer.layer_view_by_model(self._tool_mask_layer).slice_number = (
-                self.viewer.layer_view_by_model(self._mask_layer).slice_number)
+        if self._tool_mask_layer.data is None:
+            self._tool_mask_layer.data = self.image_layer_view.raster.zeros_mask(palette=self._tool_mask_layer.palette)
+            self.viewer.actor_by_layer(self._tool_mask_layer).slice_number = (
+                self.viewer.actor_by_layer(self._mask_layer).slice_number)
 
-    def map_viewport_to_content(self, viewport_pos: QPoint) -> QPointF:
-        return self.viewer.map_viewport_to_content(viewport_pos)
-
-    def map_viewport_to_pixel_coords(self, viewport_pos: QPoint | QPointF, image: Image) -> np.ndarray:
+    def map_viewport_to_pixel_coords(self, viewport_pos: QPoint | QPointF, layer: RasterLayer) -> np.ndarray:
         if isinstance(viewport_pos, QPointF):
             viewport_pos = viewport_pos.toPoint()
-        return self.viewer.map_viewport_to_pixel_coords(viewport_pos, image)
+        return self.viewer.map_viewport_to_pixel_coords(viewport_pos, layer)
 
-    def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, image: Image) -> np.ndarray:
-        return self.viewer.map_viewport_to_pixel_indices(viewport_pos, image)
+    def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, layer: RasterLayer) -> np.ndarray:
+        return self.viewer.map_viewport_to_pixel_indices(viewport_pos, layer)

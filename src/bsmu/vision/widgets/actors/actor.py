@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QGraphicsItem
 
 ModelT = TypeVar('ModelT', bound=QObject)
 ItemT = TypeVar('ItemT', bound=QGraphicsItem)
+
+if TYPE_CHECKING:
+    from PySide6.QtCore import QPointF
 
 
 class GraphicsActor(QObject, Generic[ModelT, ItemT]):
@@ -46,6 +49,9 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
     @property
     def graphics_item(self) -> ItemT | None:
         return self._graphics_item
+
+    def map_from_scene(self, scene_pos: QPointF):
+        return self._graphics_item.mapFromScene(scene_pos)
 
     def _create_graphics_item(self) -> ItemT:
         raise NotImplementedError(f'{self.__class__.__name__} must implement _create_graphics_item()')

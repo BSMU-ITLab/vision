@@ -68,6 +68,9 @@ class LayeredData(Data):
         return self._name_to_layer.get(name)
 
     def add_layer(self, layer: Layer) -> None:
+        if layer.name in self._name_to_layer:
+            raise ValueError(f'Layer with name {layer.name} already exists in this LayeredData.')
+
         layer_index = len(self._layers)
         self.layer_adding.emit(layer, layer_index)
         self._layers.append(layer)

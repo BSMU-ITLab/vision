@@ -111,7 +111,7 @@ class SmartBrushImageViewerTool(LayeredImageViewerTool):
         #     return
 
         self.update_mode(event)
-        image_pixel_coords = self.map_viewport_to_pixel_coords(event.position(), self.tool_mask)
+        image_pixel_coords = self.map_viewport_to_pixel_coords(event.position(), self.tool_mask_layer)
         self.draw_brush(*image_pixel_coords)
 
     def draw_brush(self, row_f: float, col_f: float):

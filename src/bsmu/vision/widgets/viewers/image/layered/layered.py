@@ -7,27 +7,21 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PySide6.QtCore import QObject, Qt, Signal, QRectF, QPointF
 from PySide6.QtGui import QPainter, QImage
-from PySide6.QtWidgets import QMessageBox
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.core.image import Image, FlatImage
-from bsmu.vision.core.image import MaskDrawMode
-from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
+from bsmu.vision.core.image.layered import ImageLayer
 from bsmu.vision.core.models import positive_list_insert_index
-from bsmu.vision.widgets.viewers.graphics import BaseGraphicsObject, GraphicsViewer
+from bsmu.vision.widgets.viewers.graphics import BaseGraphicsObject
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from typing import Type
 
-    from PySide6.QtCore import QPoint
     from PySide6.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem, QWidget
 
     from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.palette import Palette
-    from bsmu.vision.core.visibility import Visibility
-    from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
 
 
 warnings.warn(
@@ -35,29 +29,6 @@ warnings.warn(
     DeprecationWarning,
     stacklevel=2,
 )
-
-
-class IntensityWindowing:
-    def __init__(self, pixels: np.ndarray, window_width: float | None = None, window_level: float | None = None):
-        self.pixels = pixels
-        # Use explicit conversion from numpy type (e.g. np.uint8) to int, to prevent possible overflow
-        pixels_min = int(pixels.min())
-        pixels_max = int(pixels.max())
-        self.window_width = window_width if window_width is not None else \
-            pixels_max - pixels_min + 1
-        self.window_level = window_level if window_level is not None else \
-            (pixels_max + pixels_min + 1) / 2
-
-    def windowing_applied(self) -> np.ndarray:
-        #  https://github.com/dicompyler/dicompyler-core/blob/master/dicompylercore/dicomparser.py
-        windowed_pixels = np.piecewise(
-            self.pixels,
-            [self.pixels <= (self.window_level - 0.5 - (self.window_width - 1) / 2),
-             self.pixels > (self.window_level - 0.5 + (self.window_width - 1) / 2)],
-            [0, 255, lambda pixels:
-                ((pixels - (self.window_level - 0.5)) / (self.window_width - 1) + 0.5) * (255 - 0)])
-        windowed_pixels = windowed_pixels.astype(np.uint8, copy=False)
-        return windowed_pixels
 
 
 class ImageLayerView(QObject):

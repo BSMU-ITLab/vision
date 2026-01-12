@@ -704,7 +704,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
                 self._draw_brush_in_pos(pos)
 
     def _mask_class_in_pos(self, pos: QPoint) -> int | None:
-        row, col = self.map_viewport_to_pixel_indices(pos, self.mask)
+        row, col = self.map_viewport_to_pixel_indices(pos, self.mask_layer)
         if 0 <= row < self.mask.shape[0] and 0 <= col < self.mask.shape[1]:
             # Convert from numpy type (e.g. np.uint8) to int
             return int(self.mask.pixels[row, col])
@@ -724,7 +724,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
             self.tool_mask.emit_pixels_modified(self._brush_bbox)
 
     def _draw_brush_in_pos(self, pos: QPoint):
-        image_pixel_coords = self.map_viewport_to_pixel_coords(pos, self.tool_mask)
+        image_pixel_coords = self.map_viewport_to_pixel_coords(pos, self.tool_mask_layer)
         self.draw_brush(*image_pixel_coords)
 
     def draw_brush(self, row_f: float, col_f: float):

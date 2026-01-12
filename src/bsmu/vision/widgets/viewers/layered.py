@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
+import numpy as np
 from PySide6.QtCore import Signal
 
 from bsmu.vision.core.data.layered import LayeredData
@@ -14,6 +16,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     import numpy.typing as npt
 
+    from PySide6.QtCore import QPoint
     from PySide6.QtWidgets import QGraphicsItem, QWidget
 
     from bsmu.vision.core.data.raster import Raster
@@ -24,10 +27,10 @@ if TYPE_CHECKING:
 
 
 class LayeredDataViewer(GraphicsViewer[LayeredData]):
-    layer_actor_about_to_add = Signal(LayerActor)
-    layer_actor_added = Signal(LayerActor)
-    layer_actor_about_to_remove = Signal(LayerActor)
-    layer_actor_removed = Signal(LayerActor)
+    layer_actor_about_to_add = Signal(LayerActor, int)
+    layer_actor_added = Signal(LayerActor, int)
+    layer_actor_about_to_remove = Signal(LayerActor, int)
+    layer_actor_removed = Signal(LayerActor, int)
 
     active_layer_view_changed = Signal(LayerActor, LayerActor)
     data_name_changed = Signal(str)
@@ -70,6 +73,14 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
     def layer_by_name(self, name: str) -> Layer | None:
         return self.data.layer_by_name(name)
 
+    def actor_by_layer(self, layer: Layer) -> LayerActor | None:
+        return self._layer_to_actor.get(layer)
+
+    def layer_view_by_model(self, layer: Layer) -> LayerActor | None:
+        warnings.warn('`layer_view_by_model` is deprecated; use `actor_by_layer` instead.',
+                      DeprecationWarning, stacklevel=2)
+        return self.actor_by_layer(layer)
+
     def add_layer(self, layer: Layer) -> None:
         self.data.add_layer(layer)
 
@@ -99,39 +110,47 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
     def contains_layer(self, name: str) -> bool:
         return self.data.contains_layer(name)
 
-    def _create_main_graphics_object(self) -> QGraphicsItem:  # TODO: can we remove this method?
-        return None
+    def map_viewport_to_pixel_coords(self, viewport_pos: QPoint, layer: RasterLayer) -> np.ndarray:
+        """Map viewport position to continuous pixel coordinates"""
+        layer_actor = self.actor_by_layer(layer)
+        layer_actor_pos = self.map_viewport_to_actor(viewport_pos, layer_actor)
+        return layer.data.map_spatial_to_pixel_coords(
+            np.array([layer_actor_pos.y(), layer_actor_pos.x()])) * layer.data.spatial.spacing
+
+    def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, layer: RasterLayer) -> np.ndarray:
+        """Map viewport position to discrete pixel array indices"""
+        return self.map_viewport_to_pixel_coords(viewport_pos, layer).round().astype(np.int_)
 
     def _data_about_to_change(self, new_data: LayeredData | None):
         if self.data is None:
             return
 
         self.data.layer_added.disconnect(self._on_layer_added)
-        self.data.layer_removed.disconnect(self._on_layer_removed)
+        self.data.layer_removing.disconnect(self._on_layer_about_to_remove)
         self.data.display_name_changed.disconnect(self.data_name_changed)
 
-        for layer in self.layers:
-            self._on_layer_removed(layer)
+        for layer_index, layer in enumerate(self.layers):
+            self._on_layer_about_to_remove(layer, layer_index)
 
     def _data_changed(self):
         if self.data is None:
             return
 
         self.data.layer_added.connect(self._on_layer_added)
-        self.data.layer_removed.connect(self._on_layer_removed)
+        self.data.layer_removing.connect(self._on_layer_about_to_remove)
         self.data.display_name_changed.connect(self.data_name_changed)
 
-        for layer in self.layers:
-            self._on_layer_added(layer)
+        for layer_index, layer in enumerate(self.layers):
+            self._on_layer_added(layer, layer_index)
 
         self.data_name_changed.emit(self.data.display_name)
 
-    def _on_layer_added(self, layer: Layer):
+    def _on_layer_added(self, layer: Layer, layer_index: int):
         actor = create_layer_actor(layer)
         if actor is None:
             return
 
-        self.layer_actor_about_to_add.emit(actor)
+        self.layer_actor_about_to_add.emit(actor, layer_index)
 
         self._layer_to_actor[layer] = actor
         self.add_actor(actor)
@@ -139,14 +158,14 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         if len(self._layer_to_actor) == 1:  # If was added the first layer actor
             self.active_layer_view = actor
 
-        self.layer_actor_added.emit(actor)
+        self.layer_actor_added.emit(actor, layer_index)
 
-    def _on_layer_removed(self, layer: Layer):
+    def _on_layer_about_to_remove(self, layer: Layer, layer_index: int):
         actor = self._layer_to_actor.get(layer)
         if actor is None:
             return
 
-        self.layer_actor_about_to_remove.emit(actor)
+        self.layer_actor_about_to_remove.emit(actor, layer_index)
 
         self.remove_actor(actor)
         del self._layer_to_actor[layer]
@@ -154,5 +173,5 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         if len(self._layer_to_actor) == 0:
             self.active_layer_view = None
 
-        self.layer_actor_removed.emit(actor)
+        self.layer_actor_removed.emit(actor, layer_index)
         actor.deleteLater()

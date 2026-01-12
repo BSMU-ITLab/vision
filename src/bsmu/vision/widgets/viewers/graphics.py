@@ -77,17 +77,11 @@ class GraphicsViewer(DataViewer[DataT]):
 
         super().__init__(data, parent)
 
-        self._main_graphics_object = self._create_main_graphics_object()
-
         self.set_content_widget(self._graphics_view)
 
     @property
     def viewport(self):
         return self._graphics_view.viewport()
-
-    def _create_main_graphics_object(self) -> BaseGraphicsObject:
-        """Override this method in subclasses to create the specific graphics object"""
-        raise NotImplementedError(f'{self.__class__.__name__} must implement _create_main_graphics_object')
 
     def add_actor(self, actor: GraphicsActor):
         actor.setParent(self)
@@ -121,9 +115,9 @@ class GraphicsViewer(DataViewer[DataT]):
     def _on_cursor_owner_changed(self):
         self._graphics_view.is_using_base_cursor = self._cursor_owner is None
 
-    def map_viewport_to_content(self, viewport_pos: QPoint) -> QPointF:
-        scene_pos = self._graphics_view.mapToScene(viewport_pos)
-        return self._main_graphics_object.mapFromScene(scene_pos)
+    def map_viewport_to_actor(self, viewport_pos: QPoint, actor: GraphicsActor) -> QPointF:
+        scene_pos = self.map_viewport_to_scene(viewport_pos)
+        return actor.map_from_scene(scene_pos)
 
     def map_viewport_to_scene(self, viewport_pos: QPoint) -> QPointF:
         return self._graphics_view.mapToScene(viewport_pos)
@@ -135,12 +129,12 @@ class GraphicsViewer(DataViewer[DataT]):
         viewport_pos = self.viewport.mapFromGlobal(global_pos)
         return self.map_viewport_to_scene(viewport_pos)
 
-    def map_to_content(self, pos: QPoint) -> QPointF:
+    def map_to_actor(self, pos: QPoint, actor: GraphicsActor) -> QPointF:
         # From viewer pos to self._graphics_view pos
         graphics_view_pos = self._graphics_view.mapFrom(self, pos)
         # From self._graphics_view pos to self.viewport pos
         viewport_pos = self.viewport.mapFrom(self._graphics_view, graphics_view_pos)
-        return self.map_viewport_to_content(viewport_pos)
+        return self.map_viewport_to_actor(viewport_pos, actor)
 
     @property
     def top_level_bounding_rect(self) -> QRectF:

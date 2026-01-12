@@ -154,6 +154,8 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
 
         self._display_slice: Raster | None = None
 
+        self.slice_number: int | None = None
+
         super().__init__(model, parent)
 
     def _create_graphics_item(self) -> QGraphicsPixmapItem:

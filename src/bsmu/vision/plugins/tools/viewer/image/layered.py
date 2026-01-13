@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import QPointF
 
+from bsmu.vision.core.layers import Layer
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools.viewer import CursorConfig, ViewerToolSettings
 from bsmu.vision.plugins.tools.viewer.graphics import GraphicsViewerTool
-from bsmu.vision.widgets.viewers.image.layered import ImageLayerView, LayeredImageViewer
+from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 if TYPE_CHECKING:
     import numpy as np
@@ -178,9 +179,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
             # Create and add the layer
             layer_image = image.zeros_mask(palette=palette)
             layer = self.viewer.add_layer_from_image(layer_image, layer_name)
-
-            layer_opacity = layer_props.get('opacity', ImageLayerView.DEFAULT_LAYER_OPACITY)
-            self.viewer.actor_by_layer(layer).opacity = layer_opacity
+            layer.opacity = layer_props.get('opacity', Layer.DEFAULT_OPACITY)
 
         return layer
 

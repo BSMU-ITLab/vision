@@ -23,6 +23,8 @@ DataT = TypeVar('DataT', bound=Data)
 
 
 class Layer(QObject, Generic[DataT]):
+    DEFAULT_OPACITY = 1
+
     _max_id: int = 0
 
     data_about_to_change = Signal(Data, Data)

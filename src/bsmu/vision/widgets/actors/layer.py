@@ -66,15 +66,19 @@ class LayerActor(Generic[LayerT, ItemT], GraphicsActor[LayerT, ItemT]):
             return self._visible_override
         return False if self.layer is None else self.layer.visible
 
-    @visible.setter
-    def visible(self, value: bool):
+    @property
+    def visible_override(self) -> bool | None:
+        """View-specific visibility override. Set to None to follow the layer's visibility."""
+        return self._visible_override
+
+    @visible_override.setter
+    def visible_override(self, value: bool | None):
         if self._visible_override != value:
             self._visible_override = value
             self._update_visible()
 
     def reset_visible_override(self) -> None:
-        self._visible_override = None
-        self._update_visible()
+        self.visible_override = None
 
     def _update_visible(self) -> None:
         self._apply_visible_to_graphics_item()
@@ -86,15 +90,21 @@ class LayerActor(Generic[LayerT, ItemT], GraphicsActor[LayerT, ItemT]):
             return self._opacity_override
         return 1.0 if self.layer is None else self.layer.opacity
 
-    @opacity.setter
-    def opacity(self, value: float):
+    @property
+    def opacity_override(self) -> float | None:
+        """View-specific opacity override. Set to None to follow the layer's opacity."""
+        return self._opacity_override
+
+    @opacity_override.setter
+    def opacity_override(self, value: float | None):
+        if value is not None and not (0.0 <= value <= 1.0):
+            raise ValueError('Opacity must be between 0.0 and 1.0 or None')
         if self._opacity_override != value:
             self._opacity_override = value
             self._update_opacity()
 
     def reset_opacity_override(self) -> None:
-        self._opacity_override = None
-        self._update_opacity()
+        self.opacity_override = None
 
     def _update_opacity(self) -> None:
         self._apply_opacity_to_graphics_item()

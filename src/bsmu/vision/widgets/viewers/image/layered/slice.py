@@ -20,10 +20,8 @@ if TYPE_CHECKING:
 
 
 class VolumeSliceImageLayerView(ImageLayerView):
-    def __init__(self, plane_axis: PlaneAxis, slice_number: int,
-                 image_layer: ImageLayer = None, visible: bool = True,
-                 opacity: float = ImageLayerView.DEFAULT_LAYER_OPACITY):
-        super().__init__(image_layer, visible, opacity)
+    def __init__(self, plane_axis: PlaneAxis, slice_number: int, image_layer: ImageLayer = None):
+        super().__init__(image_layer)
 
         self.plane_axis = plane_axis
         self._slice_number = slice_number

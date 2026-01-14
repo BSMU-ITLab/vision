@@ -146,7 +146,7 @@ class LayerActor(Generic[LayerT, ItemT], GraphicsActor[LayerT, ItemT]):
 
 
 class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
-    image_changed = Signal(Raster)  # TODO: rename into raster_changed
+    image_changed = Signal(Raster)  # TODO: rename into raster_changed or add into LayerActor data_changed signal
     image_shape_changed = Signal(object, object)  # TODO: rename into raster_shape_changed
     image_view_updated = Signal(FlatImage)  # TODO: remove this signal or rename into display_slice_updated
 
@@ -180,8 +180,8 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
         return self.data
 
     @property
-    def raster_palette(self) -> Palette:
-        return self.layer.palette
+    def raster_palette(self) -> Palette | None:
+        return self.layer.raster_palette if self.layer is not None else None
 
     @property
     def raster_pixels(self) -> np.ndarray:

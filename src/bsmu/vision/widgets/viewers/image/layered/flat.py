@@ -13,9 +13,8 @@ if TYPE_CHECKING:
 
 
 class FlatImageLayerView(ImageLayerView):
-    def __init__(self, image_layer: ImageLayer, visible: bool = True,
-                 opacity: float = ImageLayerView.DEFAULT_LAYER_OPACITY):
-        super().__init__(image_layer, visible, opacity)
+    def __init__(self, image_layer: ImageLayer):
+        super().__init__(image_layer)
 
         self._update_image_view()
 

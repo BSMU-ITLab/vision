@@ -6,10 +6,10 @@ from PySide6.QtCore import QObject
 
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.windows.main import ViewMenu
-from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewerHolder
+from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
 
 if TYPE_CHECKING:
-    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
 
@@ -67,18 +67,18 @@ class MdiImageViewerLayerController(QObject):
 
     def _sub_window_layer_controller(self):
         active_sub_window = self.mdi.activeSubWindow()
-        if not isinstance(active_sub_window, LayeredImageViewerHolder):
+        if not isinstance(active_sub_window, LayeredDataViewerHolder):
             return None
 
         layer_controller = self.sub_windows_layer_controllers.get(active_sub_window)
         if layer_controller is None:
-            layer_controller = ImageViewerLayerController(active_sub_window.layered_image_viewer)
+            layer_controller = ImageViewerLayerController(active_sub_window.layered_data_viewer)
             self.sub_windows_layer_controllers[active_sub_window] = layer_controller
         return layer_controller
 
 
 class ImageViewerLayerController(QObject):
-    def __init__(self, image_viewer: LayeredImageViewer):
+    def __init__(self, image_viewer: LayeredDataViewer):
         super().__init__()
 
         self.image_viewer = image_viewer
@@ -100,9 +100,9 @@ class ImageViewerLayerController(QObject):
             for layer_actor in self.image_viewer.layer_actors:
                 # Save initial state
                 self._initial_layers_visibilities[layer_actor] = layer_actor.layer.visible
-                if layer_actor != self.image_viewer.active_layer_view:
+                if layer_actor != self.image_viewer.active_layer_actor:
                     layer_actor.layer.visible = False
-            if self.image_viewer.active_layer_view:
-                self.image_viewer.active_layer_view.visible = True
+            if self.image_viewer.active_layer_actor:
+                self.image_viewer.active_layer_actor.layer.visible = True
 
         self._active_layer_view_toggled = not self._active_layer_view_toggled

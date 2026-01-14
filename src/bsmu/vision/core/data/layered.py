@@ -37,7 +37,8 @@ class LayeredData(Data):
 
     @property
     def layers(self) -> list[Layer]:
-        return self._layers
+        """Read-only copy of layers. Use add_layer()/remove_layer() to modify."""
+        return self._layers.copy()
 
     @property
     def base_layer(self) -> Layer | None:

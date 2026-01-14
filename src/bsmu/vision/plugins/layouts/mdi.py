@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import List
 from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide6.QtCore import QObject
 
 from bsmu.vision.core.plugins import Plugin
-from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import Mdi
@@ -57,7 +56,7 @@ class MdiLayout(QObject):
             sub_window.showMaximized()
         elif n_sub_windows == 3:
             layered_image_viewers = [sub_window.viewer for sub_window in sub_windows
-                                     if isinstance(sub_window.viewer, LayeredImageViewer)]
+                                     if isinstance(sub_window.viewer, LayeredDataViewer)]
             best_resolution_viewer = self.find_best_resolution_viewer(layered_image_viewers)
             best_resolution_sub_window = next(sub_window for sub_window in sub_windows
                                               if sub_window.viewer == best_resolution_viewer)
@@ -73,11 +72,11 @@ class MdiLayout(QObject):
             for sub_window in sub_windows:
                 sub_window.lay_out_to_anchors()
 
-    def find_best_resolution_viewer(self, layered_image_viewers: List[LayeredImageViewer]):
+    def find_best_resolution_viewer(self, layered_image_viewers: list[LayeredDataViewer]):
         best_resolution_viewer = None
         best_resolution = 0
         for viewer in layered_image_viewers:
-            flat_image_shape = viewer.active_layer_view.flat_image.array.shape
+            flat_image_shape = viewer.active_layer_actor.flat_image.array.shape
             resolution = flat_image_shape[0] * flat_image_shape[1]
             if resolution > best_resolution:
                 best_resolution = resolution

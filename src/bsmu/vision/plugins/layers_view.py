@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QTableView, QDockWidget
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.widgets.actors.layer import LayerActor
-from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewerHolder
+from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
 from bsmu.vision.widgets.visibility_v2 import Visibility, VisibilityDelegate
 
 if TYPE_CHECKING:
@@ -77,8 +77,8 @@ class LayersTableViewPlugin(Plugin):
         raise NotImplementedError
 
     def _on_mdi_sub_window_activated(self, sub_window: QMdiSubWindow):
-        if isinstance(sub_window, LayeredImageViewerHolder):
-            self._layers_table_model.record_storage = sub_window.layered_image_viewer
+        if isinstance(sub_window, LayeredDataViewerHolder):
+            self._layers_table_model.record_storage = sub_window.layered_data_viewer
         else:
             self._layers_table_model.record_storage = None
 

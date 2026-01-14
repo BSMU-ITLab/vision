@@ -120,7 +120,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
         ...
 
     def center_slice_number(self):
-        return math.floor(self.active_layer_view.image_pixels.shape[self.plane_axis] / 2)
+        return math.floor(self.active_layer_actor.image_pixels.shape[self.plane_axis] / 2)
 
     def show_next_slice(self):
         for layer_view in self.layer_views:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, Signal, QRectF
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsObject
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtWidgets import QGraphicsScene
 
 from bsmu.vision.core.settings import Settings
 from bsmu.vision.widgets.viewers.data import DataT, DataViewer
@@ -16,32 +16,6 @@ if TYPE_CHECKING:
     from bsmu.vision.core.config import UnitedConfig
     from bsmu.vision.widgets.actors import GraphicsActor
     from bsmu.vision.widgets.viewers.graphics_view import NormalizedViewRegion
-
-
-class BaseGraphicsObject(QGraphicsObject):
-    bounding_rect_changed = Signal(QRectF)
-
-    def __init__(self, parent: QGraphicsItem = None):
-        super().__init__(parent)
-
-        self._bounding_rect_cache = None
-        self._bounding_rect_cache_before_reset = None
-
-    def boundingRect(self):
-        if self._bounding_rect_cache is None:
-            self._bounding_rect_cache = self._calculate_bounding_rect()
-            if self._bounding_rect_cache != self._bounding_rect_cache_before_reset:
-                self.bounding_rect_changed.emit(self._bounding_rect_cache)
-        return self._bounding_rect_cache
-
-    def _calculate_bounding_rect(self) -> QRectF:
-        raise NotImplementedError(f'{self.__class__.__name__} must implement _calculate_bounding_rect')
-
-    def _reset_bounding_rect_cache(self):
-        if self._bounding_rect_cache is not None:
-            self.prepareGeometryChange()
-            self._bounding_rect_cache_before_reset = self._bounding_rect_cache
-            self._bounding_rect_cache = None
 
 
 class ImageViewerSettings(Settings):

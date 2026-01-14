@@ -9,7 +9,7 @@ from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.core.visibility import Visibility
 from bsmu.vision.plugins.windows.main import FileMenu
-from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewerHolder
+from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
 
 if TYPE_CHECKING:
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
@@ -63,13 +63,13 @@ class ImageViewerOverlayerPlugin(Plugin):
         raise NotImplementedError
 
     def _load_mask_and_overlay(self):
-        layered_image_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredImageViewerHolder)
-        if layered_image_viewer_sub_window is None:
+        layered_data_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredDataViewerHolder)
+        if layered_data_viewer_sub_window is None:
             return
 
-        layered_image_viewer = layered_image_viewer_sub_window.layered_image_viewer
+        layered_data_viewer = layered_data_viewer_sub_window.layered_data_viewer
         if self._last_opened_file_dir is None:
-            dialog_dir = layered_image_viewer.active_layer.path
+            dialog_dir = layered_data_viewer.active_layer.path
         else:
             dialog_dir = self._last_opened_file_dir
         dialog_dir_str = '' if dialog_dir is None else str(dialog_dir)
@@ -81,7 +81,7 @@ class ImageViewerOverlayerPlugin(Plugin):
 
         layers_props = self.config.value('layers')
         layer_name = 'masks'
-        if not layered_image_viewer.is_confirmed_repaint_duplicate_mask_layer(layer_name):
+        if not layered_data_viewer.is_confirmed_repaint_duplicate_mask_layer(layer_name):
             return
 
         mask_props = layers_props.get(layer_name)
@@ -92,4 +92,4 @@ class ImageViewerOverlayerPlugin(Plugin):
 
         mask_opacity = mask_props.get('opacity')
         mask_visibility = None if mask_opacity is None else Visibility(opacity=mask_opacity)
-        layered_image_viewer.add_layer_or_modify_image(layer_name, mask, visibility=mask_visibility)
+        layered_data_viewer.add_layer_or_modify_image(layer_name, mask, visibility=mask_visibility)

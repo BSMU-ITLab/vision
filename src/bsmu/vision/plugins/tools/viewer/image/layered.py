@@ -116,7 +116,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
 
         image_layer_props = self.layers_props['image']
         if image_layer_props == 'active_layer':
-            self.image_layer_view = self.viewer.active_layer_view
+            self.image_layer_view = self.viewer.active_layer_actor
         else:
             image_layer_name = image_layer_props.get(LAYER_NAME_PROPERTY_KEY)
             if image_layer_name is not None:
@@ -196,7 +196,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
     def _configured_mask_layer(self) -> ImageLayer:
         mask_layer_props = self.layers_props['mask']
         if mask_layer_props.get('use_active_indexed_layer', True):
-            active_layer = self.viewer.active_layer_view.layer
+            active_layer = self.viewer.active_layer_actor.layer
             if active_layer.is_indexed:
                 return active_layer
 

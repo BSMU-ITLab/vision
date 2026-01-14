@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bsmu.vision.plugins.windows.main import FileMenu
 from bsmu.vision.plugins.writers.file import FileWriterPlugin, FileWriter
-from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewerHolder
+from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
 
 if TYPE_CHECKING:
     from bsmu.vision.core.image import Image
@@ -57,7 +57,7 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
         :return: path is the active layer path (to use as default save directory)
         """
         active_sub_window = self._mdi.activeSubWindow()
-        if not isinstance(active_sub_window, LayeredImageViewerHolder):
+        if not isinstance(active_sub_window, LayeredDataViewerHolder):
             QMessageBox.warning(
                 self._main_window,
                 'No Layered Image',
@@ -65,8 +65,8 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
             return None, None
 
         layer_name = 'masks'
-        active_layered_image_viewer = active_sub_window.layered_image_viewer
-        image_layer = active_layered_image_viewer.layer_by_name(layer_name)
+        active_layered_data_viewer = active_sub_window.layered_data_viewer
+        image_layer = active_layered_data_viewer.layer_by_name(layer_name)
         if not image_layer or not image_layer.image:
             QMessageBox.warning(
                 self._main_window,
@@ -74,7 +74,7 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
                 f'The layered image does not contain an image in the <{layer_name}> layer.')
             return None, None
 
-        return image_layer.image, active_layered_image_viewer.active_layer.path
+        return image_layer.image, active_layered_data_viewer.active_layer.path
 
     def _save_active_window_image(self):
         image, active_layer_path = self._active_window_image()

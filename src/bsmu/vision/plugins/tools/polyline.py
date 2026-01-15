@@ -10,9 +10,9 @@ from PySide6.QtGui import QMouseEvent, QPainterPath, QPen, QBrush, QPainter, QCu
 from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsLineItem, QGraphicsEllipseItem, QGraphicsItem
 
 from bsmu.vision.core.utils.geometry import GeometryUtils
-from bsmu.vision.plugins.tools.viewer import (
+from bsmu.vision.plugins.tools import (
     ViewerToolPlugin, ViewerToolSettingsWidget, ViewerToolSettings, CursorConfig)
-from bsmu.vision.plugins.tools.viewer.graphics import GraphicsViewerT, GraphicsViewerTool
+from bsmu.vision.plugins.tools.graphics import GraphicsViewerT, GraphicsViewerTool
 from bsmu.vision.undo import UndoCommand
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
-    from bsmu.vision.plugins.tools.viewer import ViewerTool
+    from bsmu.vision.plugins.tools import ViewerTool
     from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer

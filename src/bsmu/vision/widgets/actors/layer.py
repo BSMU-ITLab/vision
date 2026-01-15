@@ -118,15 +118,13 @@ class LayerActor(Generic[LayerT, ItemT], GraphicsActor[LayerT, ItemT]):
         if self.graphics_item is not None:
             self.graphics_item.setOpacity(self.opacity)
 
-    def _on_layer_visible_changed(self, visible: bool) -> None:
+    def _on_layer_visible_changed(self, _visible: bool) -> None:
         if self._visible_override is None:
-            self._apply_visible_to_graphics_item()
-            self.visible_changed.emit(visible)
+            self._update_visible()
 
-    def _on_layer_opacity_changed(self, opacity: float) -> None:
+    def _on_layer_opacity_changed(self, _opacity: float) -> None:
         if self._opacity_override is None:
-            self._apply_opacity_to_graphics_item()
-            self.opacity_changed.emit(opacity)
+            self._update_opacity()
 
     def _model_about_to_change(self, new_model: RasterLayer | None) -> None:
         super()._model_about_to_change(new_model)

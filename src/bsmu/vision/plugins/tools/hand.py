@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QObject
 
-from bsmu.vision.plugins.tools.viewer import (
+from bsmu.vision.plugins.tools import (
     ViewerToolPlugin, ViewerToolSettingsWidget, ViewerTool, ViewerToolSettings, CursorConfig)
 
 if TYPE_CHECKING:

@@ -6,11 +6,11 @@ from PySide6.QtCore import Qt, QObject, QEvent, QElapsedTimer, QCoreApplication
 from PySide6.QtGui import QActionGroup
 
 from bsmu.vision.core.plugins.observer import ObserverPlugin
-from bsmu.vision.plugins.tools.viewer import ViewerToolPlugin
+from bsmu.vision.plugins.tools import ViewerToolPlugin
 from bsmu.vision.plugins.windows.main import ToolsMenu
 
 if TYPE_CHECKING:
-    from bsmu.vision.plugins.tools.viewer import MdiViewerTool
+    from bsmu.vision.plugins.tools import MdiViewerTool
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
 

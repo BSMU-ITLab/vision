@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeVar
 
-from bsmu.vision.plugins.tools.viewer import ViewerTool
+from bsmu.vision.plugins.tools import ViewerTool
 from bsmu.vision.widgets.viewers.graphics import GraphicsViewer
 
 if TYPE_CHECKING:
-    from bsmu.vision.plugins.tools.viewer import ViewerToolSettings
+    from bsmu.vision.plugins.tools import ViewerToolSettings
     from bsmu.vision.plugins.undo import UndoManager
 
 GraphicsViewerT = TypeVar('GraphicsViewerT', bound=GraphicsViewer)

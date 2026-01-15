@@ -11,8 +11,8 @@ from PySide6.QtCore import QEvent, Qt
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.plugins.tools.viewer import ViewerToolPlugin, ViewerToolSettingsWidget
-from bsmu.vision.plugins.tools.viewer.image.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
+from bsmu.vision.plugins.tools import ViewerToolPlugin, ViewerToolSettingsWidget
+from bsmu.vision.plugins.tools.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
-    from bsmu.vision.plugins.tools.viewer import ViewerTool, ViewerToolSettings
+    from bsmu.vision.plugins.tools import ViewerTool, ViewerToolSettings
     from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer

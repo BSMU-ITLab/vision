@@ -6,8 +6,8 @@ from PySide6.QtCore import QPointF
 
 from bsmu.vision.core.layers import Layer
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.plugins.tools.viewer import CursorConfig, ViewerToolSettings
-from bsmu.vision.plugins.tools.viewer.graphics import GraphicsViewerTool
+from bsmu.vision.plugins.tools import CursorConfig, ViewerToolSettings
+from bsmu.vision.plugins.tools.graphics import GraphicsViewerTool
 from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 
 if TYPE_CHECKING:

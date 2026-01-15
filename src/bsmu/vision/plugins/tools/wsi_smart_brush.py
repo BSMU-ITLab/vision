@@ -18,8 +18,8 @@ from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.config import Config
 from bsmu.vision.core.image import MASK_TYPE, MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
-from bsmu.vision.plugins.tools.viewer import CursorConfig, ViewerToolPlugin, ViewerToolSettingsWidget
-from bsmu.vision.plugins.tools.viewer.image.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
+from bsmu.vision.plugins.tools import CursorConfig, ViewerToolPlugin, ViewerToolSettingsWidget
+from bsmu.vision.plugins.tools.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
 from bsmu.vision.tools.viewer.radius_scaler import RadiusScaler
 from bsmu.vision.undo import UndoCommand
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.image import FlatImage
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
-    from bsmu.vision.plugins.tools.viewer import ViewerTool, ViewerToolSettings
+    from bsmu.vision.plugins.tools import ViewerTool, ViewerToolSettings
     from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
     from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer

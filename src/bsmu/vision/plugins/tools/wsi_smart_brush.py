@@ -19,7 +19,7 @@ from bsmu.vision.core.config import Config
 from bsmu.vision.core.image import MASK_TYPE, MASK_MAX
 from bsmu.vision.core.rle import encode_rle, decode_rle
 from bsmu.vision.plugins.tools import CursorConfig, ViewerToolPlugin, ViewerToolSettingsWidget
-from bsmu.vision.plugins.tools.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
+from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
 from bsmu.vision.tools.viewer.radius_scaler import RadiusScaler
 from bsmu.vision.undo import UndoCommand
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.tools import ViewerTool, ViewerToolSettings
     from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
-    from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+    from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 
 class Mode(Enum):
@@ -67,7 +67,7 @@ class RepaintingConfig(Config):
     custom_class: int = 1
 
 
-class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
+class WsiSmartBrushToolSettings(LayeredDataViewerToolSettings):
     radius_changed = Signal(float)
     smart_mode_enabled_changed = Signal(bool)
     repainting_enabled_changed = Signal(bool)
@@ -270,7 +270,7 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
             cls,
             config: UnitedConfig,
             palette_pack_settings: PalettePackSettings
-    ) -> WsiSmartBrushImageViewerToolSettings:
+    ) -> WsiSmartBrushToolSettings:
         return cls(
             cls.layers_props_from_config(config),
             palette_pack_settings,
@@ -288,8 +288,8 @@ class WsiSmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         )
 
 
-class WsiSmartBrushImageViewerToolSettingsWidget(ViewerToolSettingsWidget):
-    def __init__(self, tool_settings: WsiSmartBrushImageViewerToolSettings, parent: QWidget = None):
+class WsiSmartBrushToolSettingsWidget(ViewerToolSettingsWidget):
+    def __init__(self, tool_settings: WsiSmartBrushToolSettings, parent: QWidget = None):
         super().__init__(tool_settings, parent)
 
         form_layout = QFormLayout()
@@ -559,16 +559,16 @@ class FinishModifyMaskCommand(ModifyMaskCommand):
         pass
 
 
-class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
+class WsiSmartBrushTool(LayeredDataViewerTool):
     # Store and increment stroke ID, when DRAW or ERASE mode is activated.
     # Use class attribute, because new instances of tool are created, when tool is activated/deactivated
     _STROKE_ID = 0
 
     def __init__(
             self,
-            viewer: LayeredImageViewer,
+            viewer: LayeredDataViewer,
             undo_manager: UndoManager,
-            settings: WsiSmartBrushImageViewerToolSettings,
+            settings: WsiSmartBrushToolSettings,
     ):
         super().__init__(viewer, undo_manager, settings)
 
@@ -943,7 +943,7 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
     def _start_stroke(self):
         self._is_stroke_finished = False
         self._is_mask_modified_during_stroke = False
-        WsiSmartBrushImageViewerTool._STROKE_ID += 1
+        WsiSmartBrushTool._STROKE_ID += 1
 
         self._stroke_repainted_mask_class = self._mask_class_under_mouse_pointer()
 
@@ -987,16 +987,16 @@ class WsiSmartBrushImageViewerTool(LayeredImageViewerTool):
         return resized_image, temp_foreground_index
 
 
-class WsiSmartBrushImageViewerToolPlugin(ViewerToolPlugin):
+class WsiSmartBrushToolPlugin(ViewerToolPlugin):
     def __init__(
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
             undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
-            tool_cls: type[ViewerTool] = WsiSmartBrushImageViewerTool,
-            tool_settings_cls: type[ViewerToolSettings] = WsiSmartBrushImageViewerToolSettings,
-            tool_settings_widget_cls: type[ViewerToolSettingsWidget] = WsiSmartBrushImageViewerToolSettingsWidget,
+            tool_cls: type[ViewerTool] = WsiSmartBrushTool,
+            tool_settings_cls: type[ViewerToolSettings] = WsiSmartBrushToolSettings,
+            tool_settings_widget_cls: type[ViewerToolSettingsWidget] = WsiSmartBrushToolSettingsWidget,
             action_name: str = 'Smart Brush (WSI)',
             action_shortcut: Qt.Key = Qt.Key_2,
     ):

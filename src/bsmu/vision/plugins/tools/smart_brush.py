@@ -12,7 +12,7 @@ from PySide6.QtCore import QEvent, Qt
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools import ViewerToolPlugin, ViewerToolSettingsWidget
-from bsmu.vision.plugins.tools.layered import LayeredImageViewerTool, LayeredImageViewerToolSettings
+from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject
@@ -36,7 +36,7 @@ DEFAULT_RADIUS = 22
 MIN_RADIUS = 2
 
 
-class SmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
+class SmartBrushToolSettings(LayeredDataViewerToolSettings):
     def __init__(
             self,
             layers_props: dict,
@@ -46,7 +46,7 @@ class SmartBrushImageViewerToolSettings(LayeredImageViewerToolSettings):
         super().__init__(layers_props, palette_pack_settings, icon_file_name)
 
 
-class SmartBrushImageViewerTool(LayeredImageViewerTool):
+class SmartBrushTool(LayeredDataViewerTool):
     def __init__(self, viewer: LayeredImageViewer, undo_manager: UndoManager, config: UnitedConfig):
         super().__init__(viewer, undo_manager, config)
 
@@ -208,8 +208,8 @@ class SmartBrushImageViewerToolPlugin(ViewerToolPlugin):
             mdi_plugin: MdiPlugin,
             undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
-            tool_cls: type[ViewerTool] = SmartBrushImageViewerTool,
-            tool_settings_cls: type[ViewerToolSettings] = SmartBrushImageViewerToolSettings,
+            tool_cls: type[ViewerTool] = SmartBrushTool,
+            tool_settings_cls: type[ViewerToolSettings] = SmartBrushToolSettings,
             tool_settings_widget_cls: type[ViewerToolSettingsWidget] = None,
             action_name: str = 'Smart Brush',
             action_shortcut: Qt.Key = Qt.Key_2,

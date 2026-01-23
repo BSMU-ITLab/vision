@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import QPointF
 
-from bsmu.vision.core.data.vector import Vector
 from bsmu.vision.core.data.vector.shapes import Point
 from bsmu.vision.undo import UndoCommand
+
+if TYPE_CHECKING:
+    from bsmu.vision.core.data.vector import Vector
 
 
 class CreatePointCommand(UndoCommand):
     """Create a new point in a vector data."""
-
     def __init__(
             self,
             vector: Vector,

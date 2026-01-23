@@ -26,3 +26,6 @@ layers:
           # if the tool is used, because it is an isolated region
         no_paint: [ 5, 0, 0, 0, 31 ]  # tool region, where mask will not be painted, if the tool is used
     opacity: 0.5
+  vector:
+    name: 'vectors'
+    opacity: 0.8

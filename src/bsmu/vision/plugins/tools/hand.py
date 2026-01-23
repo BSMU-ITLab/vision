@@ -16,11 +16,11 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
 
 
-class HandImageViewerTool(ViewerTool):
+class HandTool(ViewerTool):
     pass
 
 
-class HandImageViewerToolSettings(ViewerToolSettings):
+class HandToolSettings(ViewerToolSettings):
     def __init__(
             self,
             palette_pack_settings: PalettePackSettings,
@@ -30,18 +30,18 @@ class HandImageViewerToolSettings(ViewerToolSettings):
         super().__init__(palette_pack_settings, cursor_config, action_icon_file_name)
 
 
-class HandImageViewerToolPlugin(ViewerToolPlugin):
+class HandToolPlugin(ViewerToolPlugin):
     def __init__(
             self,
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
             undo_plugin: UndoPlugin,
             palette_pack_settings_plugin: PalettePackSettingsPlugin,
-            tool_cls: Type[ViewerTool] = HandImageViewerTool,
-            tool_settings_cls: Type[ViewerToolSettings] = HandImageViewerToolSettings,
+            tool_cls: Type[ViewerTool] = HandTool,
+            tool_settings_cls: Type[ViewerToolSettings] = HandToolSettings,
             tool_settings_widget_cls: Type[ViewerToolSettingsWidget] = None,
             action_name: str = QObject.tr('Hand'),
-            action_shortcut: Qt.Key = Qt.Key_1,
+            action_shortcut: Qt.Key = Qt.Key.Key_1,
     ):
         super().__init__(
             main_window_plugin,

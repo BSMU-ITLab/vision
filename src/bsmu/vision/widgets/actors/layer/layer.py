@@ -4,7 +4,7 @@ import warnings
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy as np
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QPixmap, QImage, QTransform
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem
 
@@ -13,15 +13,20 @@ from bsmu.vision.core.data.raster import Raster
 from bsmu.vision.core.image import FlatImage
 from bsmu.vision.core.layers import Layer, RasterLayer, VectorLayer
 from bsmu.vision.widgets.actors import GraphicsActor, ItemT
+from bsmu.vision.widgets.actors.shape.registry import create_shape_actor
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from PySide6.QtCore import QObject
+    from PySide6.QtGui import QPainter
+    from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
     from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.data import Data
+    from bsmu.vision.core.data.vector.shapes import VectorShape
     from bsmu.vision.core.palette import Palette
+    from bsmu.vision.widgets.actors.shape import VectorShapeActor
 
 LayerT = TypeVar('LayerT', bound=Layer)
 
@@ -127,11 +132,11 @@ class LayerActor(Generic[LayerT, ItemT], GraphicsActor[LayerT, ItemT]):
             self._update_opacity()
 
     def _model_about_to_change(self, new_model: RasterLayer | None) -> None:
-        super()._model_about_to_change(new_model)
-
         if self.layer is not None:
             self.layer.visible_changed.disconnect(self._on_layer_visible_changed)
             self.layer.opacity_changed.disconnect(self._on_layer_opacity_changed)
+
+        super()._model_about_to_change(new_model)
 
     def _model_changed(self) -> None:
         super()._model_changed()
@@ -169,8 +174,6 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
     def _create_graphics_item(self) -> QGraphicsPixmapItem:
         graphics_item = QGraphicsPixmapItem()
         graphics_item.setShapeMode(QGraphicsPixmapItem.ShapeMode.BoundingRectShape)
-        graphics_item.setOpacity(self.opacity)
-        graphics_item.setVisible(self.visible)
         return graphics_item
 
     @property
@@ -315,6 +318,75 @@ class IntensityWindowing:
         return windowed_pixels
 
 
-class VectorLayerActor(LayerActor[VectorLayer, QGraphicsItem]):
-    def __init__(self, model: Layer | None = None, parent: QObject | None = None):
+class GraphicsContainerItem(QGraphicsItem):
+    def __init__(self):
+        super().__init__()
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemHasNoContents)
+        self.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+
+    def boundingRect(self) -> QRectF:
+        # Return null rect since it has no visual content
+        return QRectF()
+
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
+        # Nothing to paint
+        pass
+
+
+class VectorLayerActor(LayerActor[VectorLayer, GraphicsContainerItem]):
+    def __init__(self, model: VectorLayer | None = None, parent: QObject | None = None):
+        self._shape_to_actor: dict[VectorShape, VectorShapeActor] = {}
+
         super().__init__(model, parent)
+
+    @property
+    def shapes(self) -> list[VectorShape]:
+        return self.layer.shapes if self.layer is not None else []
+
+    def actor_by_shape(self, shape: VectorShape) -> VectorShapeActor | None:
+        return self._shape_to_actor.get(shape)
+
+    def _create_graphics_item(self) -> GraphicsContainerItem:
+        graphics_item = GraphicsContainerItem()
+        return graphics_item
+
+    def _model_about_to_change(self, new_model: VectorLayer | None) -> None:
+        if self.layer is not None:
+            for shape in self.shapes:
+                self._on_shape_about_to_remove(shape)
+
+            self.layer.shape_added.disconnect(self._on_shape_added)
+            self.layer.shape_about_to_remove.disconnect(self._on_shape_about_to_remove)
+
+        super()._model_about_to_change(new_model)
+
+    def _model_changed(self) -> None:
+        super()._model_changed()
+
+        if self.layer is not None:
+            self.layer.shape_added.connect(self._on_shape_added)
+            self.layer.shape_about_to_remove.connect(self._on_shape_about_to_remove)
+
+            for shape in self.shapes:
+                self._on_shape_added(shape)
+
+    def _on_shape_added(self, shape: VectorShape) -> None:
+        if shape in self._shape_to_actor:
+            raise ValueError(f'Shape {shape!r} already has an actor - likely added twice to the layer.')
+
+        actor = create_shape_actor(shape)
+        if actor is None:
+            return
+
+        self._shape_to_actor[shape] = actor
+        actor.graphics_item.setParentItem(self.graphics_item)
+
+    def _on_shape_about_to_remove(self, shape: VectorShape) -> None:
+        actor = self._shape_to_actor.pop(shape, None)
+        if actor is not None:
+            self.graphics_item.scene().removeItem(actor.graphics_item)
+            # TODO: check, maybe setParentItem(None) does the work? According to the docs - NO, it just do it top-level item
+            # actor.graphics_item.setParentItem(None)
+            # TODO: or maybe the LayeredDataViewer have to add_actor/remove_actor when some signal was emitted?
+
+            actor.deleteLater()

@@ -10,6 +10,7 @@ from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
 from bsmu.vision.core.data.raster import Raster
 from bsmu.vision.core.data.vector import Vector
+from bsmu.vision.core.data.vector.shapes import VectorShape
 from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
@@ -256,4 +257,38 @@ class RasterLayer(Layer[Raster]):
 
 
 class VectorLayer(Layer[Vector]):
-    ...
+    shape_about_to_add = Signal(VectorShape)
+    shape_added = Signal(VectorShape)
+    shape_about_to_remove = Signal(VectorShape)
+    shape_removed = Signal(VectorShape)
+
+    @property
+    def shapes(self) -> list[VectorShape]:
+        return self.data.shapes if self.data is not None else []
+
+    def _data_about_to_change(self, new_data: Vector | None):
+        if self.data is not None:
+            self.data.shape_about_to_add.disconnect(self.shape_about_to_add)
+            self.data.shape_added.disconnect(self.shape_added)
+            self.data.shape_about_to_remove.disconnect(self.shape_about_to_remove)
+            self.data.shape_removed.disconnect(self.shape_removed)
+
+    def _data_changed(self):
+        if self.data is not None:
+            self.data.shape_about_to_add.connect(self.shape_about_to_add)
+            self.data.shape_added.connect(self.shape_added)
+            self.data.shape_about_to_remove.connect(self.shape_about_to_remove)
+            self.data.shape_removed.connect(self.shape_removed)
+
+    def add_shape(self, shape: VectorShape) -> None:
+        if self.data is None:
+            raise ValueError('Cannot add shape: VectorLayer has no Vector data.')
+        self.data.add_shape(shape)
+
+    def remove_shape(self, shape: VectorShape) -> None:
+        if self.data is None:
+            raise ValueError('Cannot remove shape: VectorLayer has no Vector data.')
+        self.data.remove_shape(shape)
+
+    def contains_shape(self, shape: VectorShape) -> bool:
+        return self.data is not None and self.data.contains_shape(shape)

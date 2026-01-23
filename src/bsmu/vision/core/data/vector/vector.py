@@ -46,7 +46,7 @@ class Vector(Data):
     def shapes(self) -> list[VectorShape]:
         return self._shapes.copy()  # copy to prevent external mutation
 
-    def add_shape(self, shape: VectorShape):
+    def add_shape(self, shape: VectorShape) -> None:
         assert shape not in self._shapes, f'Shape: {shape} already exists'
 
         self.shape_about_to_add.emit(shape)
@@ -56,7 +56,7 @@ class Vector(Data):
 
         self.shape_added.emit(shape)
 
-    def remove_shape(self, shape: VectorShape):
+    def remove_shape(self, shape: VectorShape) -> None:
         assert shape in self._shapes, f'No such shape: {shape}'
 
         self.shape_about_to_remove.emit(shape)
@@ -69,5 +69,5 @@ class Vector(Data):
     def contains_shape(self, shape: VectorShape) -> bool:
         return shape in self._shapes
 
-    def _adopt_shape(self, shape: VectorShape):
+    def _adopt_shape(self, shape: VectorShape) -> None:
         shape.setParent(self)

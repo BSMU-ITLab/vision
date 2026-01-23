@@ -120,6 +120,12 @@ class UndoManager(QObject):
     def push(self, command: UndoCommand):
         self._undo_group.activeStack().push(command)
 
+    def begin_macro(self, text: str):
+        self._undo_group.activeStack().beginMacro(text)
+
+    def end_macro(self):
+        self._undo_group.activeStack().endMacro()
+
     def index(self) -> int:
         return self._undo_group.activeStack().index()
 

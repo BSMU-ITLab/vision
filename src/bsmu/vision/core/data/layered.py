@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Signal
 
 from bsmu.vision.core.data import Data
-from bsmu.vision.core.layers import Layer, RasterLayer
+from bsmu.vision.core.data.vector import Vector
+from bsmu.vision.core.layers import Layer, RasterLayer, VectorLayer
 
 if TYPE_CHECKING:
     from typing import Type
@@ -83,7 +84,12 @@ class LayeredData(Data):
             self._set_base_layer(layer)
 
     def add_layer_from_image(
-            self, image: Raster | None, name: str = '', path: Path = None, visibility: Visibility = None) -> RasterLayer:
+            self,
+            image: Raster | None,
+            name: str = '',
+            path: Path | None = None,
+            visibility: Visibility | None = None
+    ) -> RasterLayer:
         image_layer = RasterLayer(image, name, path, visibility)
         self.add_layer(image_layer)
         return image_layer
@@ -127,6 +133,18 @@ class LayeredData(Data):
         if layer_index == 0:
             new_base_layer = self._layers[0] if self._layers else None
             self._set_base_layer(new_base_layer)
+
+    def get_or_create_vector_layer(self, name: str, visibility: Visibility | None = None) -> VectorLayer:
+        """Returns an existing VectorLayer with the given name, or creates a new one."""
+        layer = self.layer_by_name(name)
+        if layer is None:
+            new_layer = VectorLayer(Vector(), name, visibility=visibility)
+            self.add_layer(new_layer)
+            return new_layer
+        elif not isinstance(layer, VectorLayer):
+            raise TypeError(f'Layer {name} exists but is not a VectorLayer')
+        else:
+            return layer
 
     def _set_base_layer(self, layer: Layer | None) -> None:
         if self._base_layer == layer:

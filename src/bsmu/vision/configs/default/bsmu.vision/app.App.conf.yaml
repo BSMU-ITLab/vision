@@ -20,10 +20,10 @@ plugins:
   - bsmu.vision.plugins.writers.image.common.CommonImageFileWriterPlugin
 
   - bsmu.vision.plugins.tools.manager.ViewerToolManagerPlugin
-  - bsmu.vision.plugins.tools.hand.HandImageViewerToolPlugin
-#  - bsmu.vision.plugins.tools.smart_brush.SmartBrushImageViewerToolPlugin
-  - bsmu.vision.plugins.tools.wsi_smart_brush.WsiSmartBrushImageViewerToolPlugin
-#  - bsmu.vision.plugins.tools.polyline.PolylineViewerToolPlugin
+  - bsmu.vision.plugins.tools.hand.HandToolPlugin
+#  - bsmu.vision.plugins.tools.smart_brush.SmartBrushToolPlugin
+  - bsmu.vision.plugins.tools.wsi_smart_brush.WsiSmartBrushToolPlugin
+#  - bsmu.vision.plugins.tools.polyline.PolylineToolPlugin
 
   - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
 #  - bsmu.vision.plugins.walkers.mask_auto_save.MaskAutoSaveOnWalkPlugin

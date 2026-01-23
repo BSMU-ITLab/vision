@@ -9,9 +9,8 @@ from PySide6.QtWidgets import QMessageBox
 
 from bsmu.vision.core.data.layered import LayeredData
 from bsmu.vision.core.data.raster import MaskDrawMode
-from bsmu.vision.core.layers import RasterLayer
 from bsmu.vision.widgets.actors.layer import LayerActor
-from bsmu.vision.widgets.actors.registry import create_layer_actor
+from bsmu.vision.widgets.actors.layer.registry import create_layer_actor
 from bsmu.vision.widgets.viewers.graphics import GraphicsViewer
 
 if TYPE_CHECKING:
@@ -22,7 +21,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.core.data.raster import Raster
-    from bsmu.vision.core.layers import Layer
+    from bsmu.vision.core.layers import Layer, RasterLayer, VectorLayer
     from bsmu.vision.core.palette import Palette
     from bsmu.vision.core.visibility import Visibility
     from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
@@ -90,13 +89,17 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
     def add_layer(self, layer: Layer) -> None:
         self.data.add_layer(layer)
 
-    def add_layer_from_image(self, raster: Raster, name: str = '') -> Layer:
-        layer = RasterLayer(raster, name)
-        self.add_layer(layer)
-        return layer
+    def add_layer_from_image(
+            self,
+            raster: Raster,
+            name: str = '',
+            path: Path | None = None,
+            visibility: Visibility | None = None
+    ) -> RasterLayer:
+        return self.data.add_layer_from_image(raster, name, path, visibility)
 
     def add_layer_or_modify_image(
-            self, name: str, raster: Raster, path: Path = None, visibility: Visibility = None) -> Layer:
+            self, name: str, raster: Raster, path: Path = None, visibility: Visibility = None) -> RasterLayer:
         return self.data.add_layer_or_modify_image(name, raster, path, visibility)
 
     def add_layer_or_modify_pixels(
@@ -107,11 +110,14 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
             palette: Palette | None = None,
             path: Path | None = None,
             visibility: Visibility | None = None,
-    ) -> Layer:
+    ) -> RasterLayer:
         return self.data.add_layer_or_modify_pixels(name, pixels, raster_type, palette, path, visibility)
 
     def remove_layer(self, layer: Layer) -> None:
         self.data.remove_layer(layer)
+
+    def get_or_create_vector_layer(self, name: str, visibility: Visibility | None = None) -> VectorLayer:
+        return self.data.get_or_create_vector_layer(name, visibility)
 
     def contains_layer(self, name: str) -> bool:
         return self.data.contains_layer(name)
@@ -148,7 +154,7 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         """Map viewport position to discrete pixel array indices"""
         return self.map_viewport_to_pixel_coords(viewport_pos, layer).round().astype(np.int_)
 
-    def _data_about_to_change(self, new_data: LayeredData | None):
+    def _data_about_to_change(self, new_data: LayeredData | None) -> None:
         if self.data is None:
             return
 
@@ -159,7 +165,7 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         for layer_index, layer in enumerate(self.layers):
             self._on_layer_about_to_remove(layer, layer_index)
 
-    def _data_changed(self):
+    def _data_changed(self) -> None:
         if self.data is None:
             return
 
@@ -172,7 +178,7 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
 
         self.data_name_changed.emit(self.data.display_name)
 
-    def _on_layer_added(self, layer: Layer, layer_index: int):
+    def _on_layer_added(self, layer: Layer, layer_index: int) -> None:
         actor = create_layer_actor(layer)
         if actor is None:
             return
@@ -187,7 +193,7 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
 
         self.layer_actor_added.emit(actor, layer_index)
 
-    def _on_layer_about_to_remove(self, layer: Layer, layer_index: int):
+    def _on_layer_about_to_remove(self, layer: Layer, layer_index: int) -> None:
         actor = self._layer_to_actor.get(layer)
         if actor is None:
             return
@@ -203,10 +209,10 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         self.layer_actor_removed.emit(actor, layer_index)
         actor.deleteLater()
 
-    def print_layers(self):
+    def print_layers(self) -> None:
         self.data.print_layers()
 
-    def print_layer_actors(self):
+    def print_layer_actors(self) -> None:
         for index, layer_actor in enumerate(self.layer_actors):
             print(f'Layer {index}: {layer_actor.name} opacity={layer_actor.opacity}')
 

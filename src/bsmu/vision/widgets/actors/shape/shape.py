@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from PySide6.QtCore import Qt, QRectF
-from PySide6.QtGui import QBrush, QPen
+from PySide6.QtGui import QBrush, QColor, QPainterPath, QPen
 from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsEllipseItem
 
@@ -39,7 +39,7 @@ class PointActor(VectorShapeActor[Point, QGraphicsEllipseItem]):
 
         self._handle: InteractiveHandle | None = None
 
-    def _create_graphics_item(self) -> ItemT:
+    def _create_graphics_item(self) -> QGraphicsEllipseItem:
         item = QGraphicsEllipseItem(-3, -3, 6, 6)
         item.setPen(QPen(Qt.GlobalColor.black, 1))
         item.setBrush(QBrush(Qt.GlobalColor.transparent))
@@ -85,8 +85,76 @@ class PointActor(VectorShapeActor[Point, QGraphicsEllipseItem]):
 
 
 class PolylineActor(VectorShapeActor[Polyline, QGraphicsPathItem]):
-    def __init__(self, model: Polyline | None, parent: QObject | None = None):
+    DEFAULT_FINISHED_COLOR = QColor(106, 255, 13)
+
+    def __init__(self, model: Polyline | None, finished_color: QColor = None, parent: QObject | None = None):
+        self._path: QPainterPath | None = None
+
         super().__init__(model, parent)
+
+        self.model.point_appended.connect(self._on_point_appended)
+        self.model.end_point_removed.connect(self._on_end_point_removed)
+        self.model.completed.connect(self._on_completed)
+
+        self._finished_color = finished_color or self.DEFAULT_FINISHED_COLOR
+
+        self._node_views: list[NodeView] = []
+
+    def _create_graphics_item(self) -> QGraphicsPathItem:
+        graphics_item = QGraphicsPathItem()
+
+        self._path = QPainterPath()
+        graphics_item.setPath(self._path)
+
+        pen = QPen(Qt.GlobalColor.blue, 3)
+        pen.setCosmetic(True)
+        graphics_item.setPen(pen)
+        return graphics_item
+
+    @property
+    def polyline(self) -> Polyline | None:
+        return self.model
+
+    @property
+    def end_point(self) -> QPointF:
+        return self.model.end_point
+
+    def append_point(self, point: QPointF):
+        self.model.append_point(point)
+
+    def remove_end_point(self):
+        self.model.remove_end_point()
+
+    def _on_completed(self):
+        pen = self.graphics_item.pen()
+        pen.setColor(self._finished_color)
+        self.graphics_item.setPen(pen)
+
+    def _on_point_appended(self, point: QPointF):
+        if not self._path.elementCount():  # If no points exist, move to the first one
+            self._path.moveTo(point)
+        else:
+            self._path.lineTo(point)
+        self.graphics_item.setPath(self._path)
+
+        # node = NodeView(point, self._finished_color, self)
+        # self._node_views.append(node)
+
+    def _on_end_point_removed(self):
+        self._rebuild_path()
+
+        # end_node = self._node_views.pop()
+        # self.scene().removeItem(end_node)
+
+    def _rebuild_path(self):
+        self._path = QPainterPath()  # Avoid using self._path.clear(),
+        # as it does not clear moveTo element in PySide 6.8.0.2
+        if self.model.points:
+            self._path.moveTo(self.model.points[0])
+            for point in self.model.points[1:]:
+                self._path.lineTo(point)
+        self.graphics_item.setPath(self._path)
+
 
 
 class InteractiveHandle(QGraphicsEllipseItem):

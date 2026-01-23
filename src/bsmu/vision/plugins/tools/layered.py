@@ -4,27 +4,28 @@ from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import QPointF
 
-from bsmu.vision.core.layers import Layer
+from bsmu.vision.core.layers import Layer, VectorLayer
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools import CursorConfig, ViewerToolSettings
 from bsmu.vision.plugins.tools.graphics import GraphicsViewerTool
-from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
+from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 if TYPE_CHECKING:
     import numpy as np
     from PySide6.QtCore import QPoint
 
     from bsmu.vision.core.config.united import UnitedConfig
-    from bsmu.vision.core.image import Image, FlatImage
-    from bsmu.vision.core.image.layered import ImageLayer
+    from bsmu.vision.core.data.raster import Raster
     from bsmu.vision.core.layers import RasterLayer
+    from bsmu.vision.core.visibility import Visibility
     from bsmu.vision.plugins.palette.settings import PalettePackSettings
     from bsmu.vision.plugins.undo import UndoManager
+
 
 LAYER_NAME_PROPERTY_KEY = 'name'
 
 
-class LayeredImageViewerToolSettings(ViewerToolSettings):
+class LayeredDataViewerToolSettings(ViewerToolSettings):
     def __init__(
             self,
             layers_props: dict,
@@ -51,46 +52,55 @@ class LayeredImageViewerToolSettings(ViewerToolSettings):
     def tool_mask_palette(self) -> Palette:
         return self._tool_mask_palette
 
+    @property
+    def vector_layer_name(self) -> str:
+        DEFAULT_VECTOR_LAYER_NAME = 'vectors'
+        vector_layer_config = self._layers_props.get('vector')
+        if vector_layer_config is not None:
+            return vector_layer_config.get('name', DEFAULT_VECTOR_LAYER_NAME)
+        return DEFAULT_VECTOR_LAYER_NAME
+
     @staticmethod
     def layers_props_from_config(config: UnitedConfig) -> dict:
         return config.value('layers')
 
     @classmethod
     def from_config(
-            cls, config: UnitedConfig, palette_pack_settings: PalettePackSettings) -> LayeredImageViewerToolSettings:
+            cls, config: UnitedConfig, palette_pack_settings: PalettePackSettings) -> LayeredDataViewerToolSettings:
         return cls(cls.layers_props_from_config(config), palette_pack_settings)
 
 
-class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
-    viewer_type: type[LayeredImageViewer] = LayeredImageViewer
+class LayeredDataViewerTool(GraphicsViewerTool[LayeredDataViewer]):
+    viewer_type: type[LayeredDataViewer] = LayeredDataViewer
 
     def __init__(
             self,
-            viewer: LayeredImageViewer,
+            viewer: LayeredDataViewer,
             undo_manager: UndoManager,
-            settings: LayeredImageViewerToolSettings,
+            settings: LayeredDataViewerToolSettings,
     ):
         super().__init__(viewer, undo_manager, settings)
 
         self.image_layer_view = None
 
-        self._mask_layer: ImageLayer | None = None
-        self._tool_mask_layer: ImageLayer | None = None
+        self._mask_layer: RasterLayer | None = None
+        self._tool_mask_layer: RasterLayer | None = None
+        self._vector_layer: VectorLayer | None = None
 
     @property
-    def settings(self) -> LayeredImageViewerToolSettings:
-        return cast(LayeredImageViewerToolSettings, self._settings)
+    def settings(self) -> LayeredDataViewerToolSettings:
+        return cast(LayeredDataViewerToolSettings, self._settings)
 
     @property
-    def image(self) -> FlatImage:
+    def image(self) -> Raster | None:
         return self.image_layer_view and self.image_layer_view.current_slice
 
     @property
-    def mask(self) -> FlatImage:
+    def mask(self) -> Raster | None:
         return self.viewer.actor_by_layer(self._mask_layer).current_slice
 
     @property
-    def tool_mask(self) -> FlatImage:
+    def tool_mask(self) -> Raster | None:
         return self.viewer.actor_by_layer(self._tool_mask_layer).current_slice
 
     @property
@@ -100,6 +110,12 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
     @property
     def tool_mask_layer(self) -> RasterLayer:
         return self._tool_mask_layer
+
+    @property
+    def vector_layer(self) -> VectorLayer:
+        if self._vector_layer is None:
+            self._vector_layer = self._get_or_create_vector_layer(self.settings.vector_layer_name)
+        return self._vector_layer
 
     @property
     def mask_palette(self) -> Palette:
@@ -120,11 +136,11 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
         else:
             image_layer_name = image_layer_props.get(LAYER_NAME_PROPERTY_KEY)
             if image_layer_name is not None:
-                self.image_layer_view = self.viewer.layer_view_by_name(image_layer_name)
+                self.image_layer_view = self.viewer.actor_by_name(image_layer_name)
             else:
                 image_layer_number = image_layer_props.get('number')
                 if image_layer_number is not None:
-                    self.image_layer_view = self.viewer.layer_views[image_layer_number]
+                    self.image_layer_view = self.viewer.layer_actors[image_layer_number]
                 else:
                     assert False, f'Unknown image layer properties: {image_layer_props}'
 
@@ -145,7 +161,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
 
         self.viewer.enable_panning()
 
-    def _set_mask_layer(self, new_mask_layer: ImageLayer | None):
+    def _set_mask_layer(self, new_mask_layer: RasterLayer | None):
         if self._mask_layer == new_mask_layer:
             return
 
@@ -157,7 +173,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
         if self._mask_layer is not None:
             self._mask_layer.data_changed.connect(self._update_masks)
 
-    def _set_tool_mask_layer(self, new_tool_mask_layer: ImageLayer | None):
+    def _set_tool_mask_layer(self, new_tool_mask_layer: RasterLayer | None):
         if self._tool_mask_layer == new_tool_mask_layer:
             return
 
@@ -170,7 +186,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
             self._tool_mask_layer.data_changed.connect(self._update_tool_mask)
 
     def _create_nonexistent_layer_with_zeros_mask(
-            self, layer_key: str, name_property_key: str, image: Image, palette: Palette) -> ImageLayer:
+            self, layer_key: str, name_property_key: str, image: Raster, palette: Palette) -> RasterLayer:
         layer_props = self.layers_props[layer_key]
         layer_name = layer_props[name_property_key]
         layer = self.viewer.layer_by_name(layer_name)
@@ -193,7 +209,7 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
 
         self._update_masks()
 
-    def _configured_mask_layer(self) -> ImageLayer:
+    def _configured_mask_layer(self) -> RasterLayer:
         mask_layer_props = self.layers_props['mask']
         if mask_layer_props.get('use_active_indexed_layer', True):
             active_layer = self.viewer.active_layer_actor.layer
@@ -233,3 +249,6 @@ class LayeredImageViewerTool(GraphicsViewerTool[LayeredImageViewer]):
 
     def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, layer: RasterLayer) -> np.ndarray:
         return self.viewer.map_viewport_to_pixel_indices(viewport_pos, layer)
+
+    def _get_or_create_vector_layer(self, name: str, visibility: Visibility | None = None) -> VectorLayer:
+        return self.viewer.get_or_create_vector_layer(name, visibility)

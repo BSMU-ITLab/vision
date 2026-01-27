@@ -112,9 +112,7 @@ class LayeredDataViewerTool(GraphicsViewerTool[LayeredDataViewer]):
         return self._tool_mask_layer
 
     @property
-    def vector_layer(self) -> VectorLayer:
-        if self._vector_layer is None:
-            self._vector_layer = self._get_or_create_vector_layer(self.settings.vector_layer_name)
+    def vector_layer(self) -> VectorLayer | None:
         return self._vector_layer
 
     @property

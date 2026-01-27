@@ -26,7 +26,9 @@ class CreatePolylineCommand(UndoCommand):
         self._polyline: Polyline | None = None
 
     @property
-    def polyline(self) -> Polyline | None:
+    def created_polyline(self) -> Polyline:
+        if self._polyline is None:
+            raise RuntimeError('Command must be pushed to UndoStack before accessing result.')
         return self._polyline
 
     def redo(self):
@@ -40,3 +42,29 @@ class CreatePolylineCommand(UndoCommand):
         assert self._polyline is not None
 
         self._vector.remove_shape(self._polyline)
+
+
+class AddPolylinePointCommand(UndoCommand):
+    def __init__(
+            self,
+            polyline: Polyline,
+            point: QPointF,
+            text: str = 'Add Polyline Point',
+            parent: UndoCommand | None = None,
+    ):
+        super().__init__(text, parent)
+
+        self._polyline = polyline
+        self._point = point
+
+    def redo(self):
+        self._polyline.append_point(self._point)
+
+    def undo(self):
+        if self._polyline.is_empty:
+            raise ValueError('Polyline is empty. Cannot undo.')
+
+        if self._polyline.end_point is not self._point:
+            raise ValueError('End point does not match the point being undone.')
+
+        self._polyline.remove_end_point()

@@ -15,7 +15,7 @@ class CreateVectorLayerCommand(UndoCommand):
         self,
         layered_data: LayeredData,
         layer_name: str,
-        text: str = 'Add Vector Layer',
+        text: str = 'Create Vector Layer',
         parent: UndoCommand | None = None,
     ):
         super().__init__(text, parent)
@@ -26,6 +26,10 @@ class CreateVectorLayerCommand(UndoCommand):
         self._created_layer: VectorLayer | None = None
 
     def redo(self):
+        if self._created_layer is not None:
+            self._layered_data.add_layer(self._created_layer)
+            return
+
         layer = self._layered_data.layer_by_name(self._layer_name)
         if layer is None:
             self._created_layer = VectorLayer(Vector(), self._layer_name)
@@ -36,7 +40,6 @@ class CreateVectorLayerCommand(UndoCommand):
     def undo(self):
         if self._created_layer is not None:
             self._layered_data.remove_layer(self._created_layer)
-            self._created_layer = None
 
 
 # class CreateLayerCommand

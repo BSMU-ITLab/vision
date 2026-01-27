@@ -37,7 +37,7 @@ class Point(VectorShape):
 class ClosestPolylinePointInfo:
     point: QPointF | None = None
     segment_index: int | None = None
-    squared_distance: float | None = None
+    squared_distance: float | None = None  # Squared distance from the query point to the closest point on the polyline
 
 
 class Polyline(VectorShape):
@@ -94,16 +94,16 @@ class Polyline(VectorShape):
             for i in range(len(self._points) - 1)
         )
 
-    def append_point(self, point: QPointF):
+    def append_point(self, point: QPointF) -> None:
         self._points.append(point)
         self.point_appended.emit(point)
 
-    def remove_end_point(self):
+    def remove_end_point(self) -> None:
         if self._points:
             end_point = self._points.pop()
             self.end_point_removed.emit(end_point)
 
-    def complete(self):
+    def complete(self) -> None:
         if not self._is_completed:
             self._is_completed = True
             self.completed.emit()

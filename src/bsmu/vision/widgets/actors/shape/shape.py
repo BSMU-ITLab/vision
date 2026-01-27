@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from PySide6.QtCore import Qt, QRectF
-from PySide6.QtGui import QBrush, QColor, QPainterPath, QPen
+from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsEllipseItem
 
@@ -12,12 +12,13 @@ from bsmu.vision.widgets.actors import GraphicsActor, ItemT
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject, QPointF
+    from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
 ShapeT = TypeVar('ShapeT', bound=VectorShape)
 
 
 class VectorShapeActor(Generic[ShapeT, ItemT], GraphicsActor[ShapeT, ItemT]):
-    def __init__(self, model: ShapeT | None, parent: QObject | None = None):
+    def __init__(self, model: ShapeT | None = None, parent: QObject | None = None):
         super().__init__(model, parent)
 
     @property
@@ -34,7 +35,7 @@ class VectorShapeActor(Generic[ShapeT, ItemT], GraphicsActor[ShapeT, ItemT]):
 
 
 class PointActor(VectorShapeActor[Point, QGraphicsEllipseItem]):
-    def __init__(self, model: Point | None, parent: QObject | None = None):
+    def __init__(self, model: Point | None = None, parent: QObject | None = None):
         super().__init__(model, parent)
 
         self._handle: InteractiveHandle | None = None
@@ -84,32 +85,64 @@ class PointActor(VectorShapeActor[Point, QGraphicsEllipseItem]):
         pass
 
 
-class PolylineActor(VectorShapeActor[Polyline, QGraphicsPathItem]):
-    DEFAULT_FINISHED_COLOR = QColor(106, 255, 13)
+class AntialiasedGraphicsPathItem(QGraphicsPathItem):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            super().paint(painter, option, widget)
 
-    def __init__(self, model: Polyline | None, finished_color: QColor = None, parent: QObject | None = None):
+
+class GraphicsNodeItem(QGraphicsEllipseItem):
+    def __init__(
+            self,
+            pos: QPointF,
+            radius: float = 5,
+            brush: QBrush | None = None,
+            parent: QGraphicsItem | None = None
+    ):
+        super().__init__(QRectF(-radius, -radius, 2 * radius, 2 * radius), parent)
+
+        self.setPos(pos)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+        if brush is not None:
+            self.setBrush(brush)
+
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        super().paint(painter, option, widget)
+
+
+class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
+    DEFAULT_COMPLETED_COLOR = QColor(106, 255, 13)
+    DEFAULT_DRAFT_COLOR = Qt.GlobalColor.blue
+
+    def __init__(
+            self,
+            model: Polyline | None = None,
+            completed_color: QColor | None = None,
+            draft_color: QColor | None = None,
+            parent: QObject | None = None,
+    ):
         self._path: QPainterPath | None = None
+
+        self._completed_color = completed_color or self.DEFAULT_COMPLETED_COLOR
+        self._draft_color = draft_color or self.DEFAULT_DRAFT_COLOR
+
+        self._node_items: list[GraphicsNodeItem] = []
 
         super().__init__(model, parent)
 
-        self.model.point_appended.connect(self._on_point_appended)
-        self.model.end_point_removed.connect(self._on_end_point_removed)
-        self.model.completed.connect(self._on_completed)
-
-        self._finished_color = finished_color or self.DEFAULT_FINISHED_COLOR
-
-        self._node_views: list[NodeView] = []
-
-    def _create_graphics_item(self) -> QGraphicsPathItem:
-        graphics_item = QGraphicsPathItem()
-
-        self._path = QPainterPath()
-        graphics_item.setPath(self._path)
-
-        pen = QPen(Qt.GlobalColor.blue, 3)
+    def _create_graphics_item(self) -> AntialiasedGraphicsPathItem:
+        graphics_item = AntialiasedGraphicsPathItem()
+        pen = QPen()
+        pen.setWidth(3)
         pen.setCosmetic(True)
         graphics_item.setPen(pen)
         return graphics_item
+
+    def _update_graphics_item(self) -> None:
+        self._rebuild_path()
+        self._rebuild_node_items()
+        self._update_color()
 
     @property
     def polyline(self) -> Polyline | None:
@@ -119,42 +152,80 @@ class PolylineActor(VectorShapeActor[Polyline, QGraphicsPathItem]):
     def end_point(self) -> QPointF:
         return self.model.end_point
 
-    def append_point(self, point: QPointF):
+    def append_point(self, point: QPointF) -> None:
         self.model.append_point(point)
 
-    def remove_end_point(self):
+    def remove_end_point(self) -> None:
         self.model.remove_end_point()
 
-    def _on_completed(self):
+    def _model_about_to_change(self, new_model: Polyline | None) -> None:
+        if self.model is not None:
+            self.model.point_appended.disconnect(self._on_point_appended)
+            self.model.end_point_removed.disconnect(self._on_end_point_removed)
+            self.model.completed.disconnect(self._on_completed)
+
+        super()._model_about_to_change(new_model)
+
+    def _model_changed(self) -> None:
+        super()._model_changed()
+
+        if self.model is not None:
+            self.model.point_appended.connect(self._on_point_appended)
+            self.model.end_point_removed.connect(self._on_end_point_removed)
+            self.model.completed.connect(self._on_completed)
+
+    def _on_completed(self) -> None:
+        self._update_color()
+
+    def _update_color(self) -> None:
+        if self.model is None:
+            return
+
         pen = self.graphics_item.pen()
-        pen.setColor(self._finished_color)
+        color = self._completed_color if self.model.is_completed else self._draft_color
+        pen.setColor(color)
         self.graphics_item.setPen(pen)
 
-    def _on_point_appended(self, point: QPointF):
+    def _on_point_appended(self, point: QPointF) -> None:
         if not self._path.elementCount():  # If no points exist, move to the first one
             self._path.moveTo(point)
         else:
             self._path.lineTo(point)
         self.graphics_item.setPath(self._path)
 
-        # node = NodeView(point, self._finished_color, self)
-        # self._node_views.append(node)
+        self._create_node_for_point(point)
 
-    def _on_end_point_removed(self):
+    def _create_node_for_point(self, point: QPointF) -> GraphicsNodeItem:
+        node = GraphicsNodeItem(point, brush=self._completed_color, parent=self.graphics_item)
+        self._node_items.append(node)
+        return node
+
+    def _on_end_point_removed(self) -> None:
         self._rebuild_path()
 
-        # end_node = self._node_views.pop()
-        # self.scene().removeItem(end_node)
+        end_node = self._node_items.pop()
+        end_node.scene().removeItem(end_node)
 
-    def _rebuild_path(self):
+    def _rebuild_path(self) -> None:
         self._path = QPainterPath()  # Avoid using self._path.clear(),
         # as it does not clear moveTo element in PySide 6.8.0.2
-        if self.model.points:
+        if self.model is not None and self.model.points:
             self._path.moveTo(self.model.points[0])
             for point in self.model.points[1:]:
                 self._path.lineTo(point)
         self.graphics_item.setPath(self._path)
 
+    def _rebuild_node_items(self) -> None:
+        # Remove all existing node items
+        scene = self.graphics_item.scene()
+        for node in self._node_items:
+            scene.removeItem(node)
+        self._node_items.clear()
+
+        # Recreate nodes for current points
+        if self.model is not None:
+            for point in self.model.points:
+                self._create_node_for_point(point)
 
 
 class InteractiveHandle(QGraphicsEllipseItem):

@@ -13,8 +13,8 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QPoint, QPointF
     from PySide6.QtWidgets import QGraphicsItem, QWidget
 
+    from bsmu.vision.actors import GraphicsActor
     from bsmu.vision.core.config import UnitedConfig
-    from bsmu.vision.widgets.actors import GraphicsActor
     from bsmu.vision.widgets.viewers.graphics_view import NormalizedViewRegion
 
 

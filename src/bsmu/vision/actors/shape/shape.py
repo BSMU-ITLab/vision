@@ -7,8 +7,8 @@ from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsEllipseItem
 
+from bsmu.vision.actors import GraphicsActor, ItemT
 from bsmu.vision.core.data.vector.shapes import VectorShape, Point, Polyline
-from bsmu.vision.widgets.actors import GraphicsActor, ItemT
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject, QPointF

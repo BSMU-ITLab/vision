@@ -7,10 +7,10 @@ import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QMessageBox
 
+from bsmu.vision.actors.layer import LayerActor
+from bsmu.vision.actors.layer.registry import create_layer_actor
 from bsmu.vision.core.data.layered import LayeredData
 from bsmu.vision.core.data.raster import MaskDrawMode
-from bsmu.vision.widgets.actors.layer import LayerActor
-from bsmu.vision.widgets.actors.layer.registry import create_layer_actor
 from bsmu.vision.widgets.viewers.graphics import GraphicsViewer
 
 if TYPE_CHECKING:

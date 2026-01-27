@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 
-from bsmu.vision.widgets.actors.layer import RasterLayerActor
+from bsmu.vision.actors.layer import RasterLayerActor
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 

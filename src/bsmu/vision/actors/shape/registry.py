@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from bsmu.vision.actors.shape import VectorShapeActor, PointActor, PolylineActor
 from bsmu.vision.core.data.vector.shapes import VectorShape, Point, Polyline
-from bsmu.vision.widgets.actors.shape import VectorShapeActor, PointActor, PolylineActor
 
 
 ShapeType = type[VectorShape]

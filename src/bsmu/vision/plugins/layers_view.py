@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Qt, QModelIndex
 from PySide6.QtWidgets import QTableView, QDockWidget
 
+from bsmu.vision.actors.layer import LayerActor
 from bsmu.vision.core.models.table import RecordTableModel, TableColumn
 from bsmu.vision.core.plugins import Plugin
-from bsmu.vision.widgets.actors.layer import LayerActor
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
 from bsmu.vision.widgets.visibility_v2 import Visibility, VisibilityDelegate
 

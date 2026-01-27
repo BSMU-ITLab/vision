@@ -9,11 +9,11 @@ from PySide6.QtGui import QPixmap, QImage, QTransform
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem
 
 import bsmu.vision.core.converters.image as image_converter
+from bsmu.vision.actors import GraphicsActor, ItemT
+from bsmu.vision.actors.shape.registry import create_shape_actor
 from bsmu.vision.core.data.raster import Raster
 from bsmu.vision.core.image import FlatImage
 from bsmu.vision.core.layers import Layer, RasterLayer, VectorLayer
-from bsmu.vision.widgets.actors import GraphicsActor, ItemT
-from bsmu.vision.widgets.actors.shape.registry import create_shape_actor
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -22,11 +22,11 @@ if TYPE_CHECKING:
     from PySide6.QtGui import QPainter
     from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
+    from bsmu.vision.actors.shape import VectorShapeActor
     from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.data import Data
     from bsmu.vision.core.data.vector.shapes import VectorShape
     from bsmu.vision.core.palette import Palette
-    from bsmu.vision.widgets.actors.shape import VectorShapeActor
 
 LayerT = TypeVar('LayerT', bound=Layer)
 

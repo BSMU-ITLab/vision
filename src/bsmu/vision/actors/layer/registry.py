@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from bsmu.vision.actors.layer import LayerActor, RasterLayerActor, VectorLayerActor
 from bsmu.vision.core.layers import Layer, RasterLayer, VectorLayer
-from bsmu.vision.widgets.actors.layer import LayerActor, RasterLayerActor, VectorLayerActor
 
 
 LayerType = type[Layer]

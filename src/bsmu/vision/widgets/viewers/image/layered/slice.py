@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.image import Image
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
+    from bsmu.vision.core.selection import SelectionManager
     from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
 
 
@@ -91,6 +92,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
             plane_axis: PlaneAxis,
             slice_number: int | None = None,
             data: LayeredImage = None,
+            selection_manager: SelectionManager | None = None,
             settings: ImageViewerSettings = None,
             parent: QWidget | None = None,
     ):
@@ -102,7 +104,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
 
         self.slice_number = slice_number
 
-        super().__init__(data, settings, parent)
+        super().__init__(data, selection_manager, settings, parent)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> VolumeSliceImageLayerView:
         if isinstance(image_layer.image, VolumeImage):

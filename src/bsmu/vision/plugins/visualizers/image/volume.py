@@ -4,6 +4,7 @@ import logging
 
 from bsmu.vision.core.constants import PlaneAxis
 from bsmu.vision.core.image import VolumeImage
+from bsmu.vision.core.selection import SelectionManager
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.plugins.visualizers import DataVisualizerPlugin, DataVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow
@@ -25,8 +26,9 @@ class VolumeImageVisualizer(DataVisualizer):
         layered_image.add_layer_from_image(data, name=data.dir_name)
 
         viewer_sub_windows = []
+        selection_manager = SelectionManager()
         for plane_axis in PlaneAxis:
-            image_viewer = VolumeSliceImageViewer(plane_axis, None, layered_image)
+            image_viewer = VolumeSliceImageViewer(plane_axis, None, layered_image, selection_manager)
             sub_window = VolumeSliceImageViewerSubWindow(image_viewer)
             self.mdi.add_sub_window(sub_window)
             sub_window.show()

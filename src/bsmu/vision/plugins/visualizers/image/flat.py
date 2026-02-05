@@ -30,7 +30,7 @@ class FlatImageVisualizer(ImageVisualizer):
 
         layered_image = LayeredImage()
         layered_image.add_layer_from_image(data, name=data.dir_name)
-        image_viewer = LayeredFlatImageViewer(layered_image, self.settings)
+        image_viewer = LayeredFlatImageViewer(layered_image, settings=self.settings)
         sub_window = LayeredImageViewerSubWindow(image_viewer)
         image_viewer.data_name_changed.connect(sub_window.setWindowTitle)
         self.mdi.add_sub_window(sub_window)

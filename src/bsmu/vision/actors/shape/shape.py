@@ -3,12 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from PySide6.QtCore import Qt, QRectF
-from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QGraphicsItem
-from PySide6.QtWidgets import QGraphicsPathItem, QGraphicsEllipseItem
+from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPainterPathStroker
+from PySide6.QtWidgets import QGraphicsItem, QGraphicsPathItem, QGraphicsEllipseItem
 
-from bsmu.vision.actors import GraphicsActor, ItemT
-from bsmu.vision.core.data.vector.shapes import VectorShape, Point, Polyline
+from bsmu.vision.actors import GraphicsActor, ModelT, ItemT
+from bsmu.vision.core.data.vector.shapes import VectorShape, VectorNode, Point, Polyline
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject, QPointF
@@ -17,13 +16,30 @@ if TYPE_CHECKING:
 ShapeT = TypeVar('ShapeT', bound=VectorShape)
 
 
-class VectorShapeActor(Generic[ShapeT, ItemT], GraphicsActor[ShapeT, ItemT]):
+class VectorActor(GraphicsActor[ModelT, ItemT], Generic[ModelT, ItemT]):
+        pass
+
+
+class VectorShapeActor(VectorActor[ShapeT, ItemT], Generic[ShapeT, ItemT]):
     def __init__(self, model: ShapeT | None = None, parent: QObject | None = None):
         super().__init__(model, parent)
 
     @property
     def shape(self) -> ShapeT | None:
         return self.model
+
+    def update_visual_state(
+            self,
+            is_selected: bool = False,
+            selected_nodes: set[VectorNode] | None = None,
+    ) -> None:
+        """
+        Update the visual representation of the shape based on its current interaction state.
+
+        :param is_selected: Whether the shape itself is selected.
+        :param selected_nodes: Set of this shape's nodes that are currently selected.
+        """
+        raise NotImplementedError
 
     def _model_about_to_change(self, new_model: ShapeT | None) -> None:
         if self.model is not None:
@@ -34,74 +50,15 @@ class VectorShapeActor(Generic[ShapeT, ItemT], GraphicsActor[ShapeT, ItemT]):
             self.model.changed.connect(self._update_graphics_item)
 
 
-class PointActor(VectorShapeActor[Point, QGraphicsEllipseItem]):
-    def __init__(self, model: Point | None = None, parent: QObject | None = None):
-        super().__init__(model, parent)
-
-        self._handle: InteractiveHandle | None = None
-
-    def _create_graphics_item(self) -> QGraphicsEllipseItem:
-        item = QGraphicsEllipseItem(-3, -3, 6, 6)
-        item.setPen(QPen(Qt.GlobalColor.black, 1))
-        item.setBrush(QBrush(Qt.GlobalColor.transparent))
-        item.setZValue(5)
-        return item
-
-    def _update_graphics_item(self):
-        if self.model is not None:
-            self.graphics_item.setPos(self.model.pos)
-            self._update_handle_position()
-        else:
-            self.graphics_item.setPos(0, 0)
-
-    def enter_edit_mode(self):
-        """Show interactive handle."""
-        if self._handle is None:
-            self._handle = InteractiveHandle(radius=5.0)
-            self._handle._on_moved = self._on_handle_moved
-            self._handle._on_selected = self._on_handle_selected
-
-        scene = self.graphics_item.scene()
-        if self._handle.scene() is None and scene:
-            scene.addItem(self._handle)
-        self._update_handle_position()
-
-    def exit_edit_mode(self):
-        """Hide interactive handle."""
-        if self._handle.scene():
-            self._handle.scene().removeItem(self._handle)
-
-    def _update_handle_position(self):
-        if self.model and self._handle and self._handle.scene():  # TODO: just keep: if self.model and self._handle
-            self._handle.setPos(self.model.pos)
-
-    def _on_handle_moved(self, new_pos: QPointF):
-        if self.model:
-            self.model.pos = new_pos  # emits model.changed -> updates graphics item
-
-    def _on_handle_selected(self) -> None:
-        # Emit selection signal if you define one in PointActor
-        # self.selected.emit()
-        pass
-
-
-class AntialiasedGraphicsPathItem(QGraphicsPathItem):
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            super().paint(painter, option, widget)
-
-
 class GraphicsNodeItem(QGraphicsEllipseItem):
     def __init__(
             self,
-            pos: QPointF,
             radius: float = 5,
             brush: QBrush | None = None,
             parent: QGraphicsItem | None = None
     ):
         super().__init__(QRectF(-radius, -radius, 2 * radius, 2 * radius), parent)
 
-        self.setPos(pos)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
         if brush is not None:
             self.setBrush(brush)
@@ -109,6 +66,117 @@ class GraphicsNodeItem(QGraphicsEllipseItem):
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         super().paint(painter, option, widget)
+
+
+class VectorNodeActor(VectorActor[VectorNode, GraphicsNodeItem]):
+    """Actor for a single editable node (control point) of a vector shape."""
+
+    def __init__(
+            self,
+            model: VectorNode | None = None,
+            radius: float = 5.0,
+            brush: QBrush | None = None,
+            parent: QObject | None = None,
+    ):
+        self._radius = radius
+        self._brush = brush
+
+        super().__init__(model, parent)
+
+    @property
+    def node(self) -> VectorNode | None:
+        return self.model
+
+    def update_visual_state(self, is_selected: bool = False) -> None:
+        brush = QBrush(Qt.GlobalColor.yellow) if is_selected else self._brush
+        self.graphics_item.setBrush(brush)
+
+    def _create_graphics_item(self) -> GraphicsNodeItem:
+        return GraphicsNodeItem(radius=self._radius, brush=self._brush)
+
+    def _model_about_to_change(self, new_model: VectorNode | None) -> None:
+        if self.model is not None:
+            self.model.pos_changed.disconnect(self._on_pos_changed)
+
+    def _model_changed(self) -> None:
+        if self.model is not None:
+            self.model.pos_changed.connect(self._on_pos_changed)
+
+    def _on_pos_changed(self, _pos: QPointF) -> None:
+        self._update_pos()
+
+    def _update_graphics_item(self) -> None:
+        if self.model is not None:
+            self._update_pos()
+
+    def _update_pos(self) -> None:
+        self.graphics_item.setPos(self.model.pos)
+
+
+class PointActor(VectorShapeActor[Point, GraphicsNodeItem]):
+    def __init__(self, model: Point | None = None, parent: QObject | None = None):
+        super().__init__(model, parent)
+
+    def update_visual_state(
+            self,
+            is_selected: bool = False,
+            selected_nodes: set[VectorNode] | None = None,
+    ) -> None:
+        color = Qt.GlobalColor.yellow if is_selected else Qt.GlobalColor.red
+        self.graphics_item.setBrush(QBrush(color))
+
+    def _create_graphics_item(self) -> GraphicsNodeItem:
+        item = GraphicsNodeItem(radius=6, brush=QBrush(Qt.GlobalColor.red))
+        # item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        return item
+
+    def _model_about_to_change(self, new_model: Point | None) -> None:
+        if self.model is not None:
+            self.model.pos_changed.disconnect(self._on_pos_changed)
+
+    def _model_changed(self) -> None:
+        if self.model is not None:
+            self.model.pos_changed.connect(self._on_pos_changed)
+
+    def _on_pos_changed(self, _pos: QPointF) -> None:
+        self._update_pos()
+
+    def _update_graphics_item(self) -> None:
+        if self.model is not None:
+            self._update_pos()
+
+    def _update_pos(self) -> None:
+        self.graphics_item.setPos(self.model.pos)
+
+
+class AntialiasedGraphicsPathItem(QGraphicsPathItem):
+    def __init__(self, path: QPainterPath | None = None, parent: QGraphicsItem | None = None):
+        super().__init__(path, parent)
+
+        self._cached_shape: QPainterPath | None = None
+
+        self._stroker = QPainterPathStroker()
+        self._stroker.setWidth(1.0)
+        self._stroker.setCapStyle(Qt.PenCapStyle.FlatCap)
+        self._stroker.setJoinStyle(Qt.PenJoinStyle.BevelJoin)
+
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            super().paint(painter, option, widget)
+
+    def setPath(self, path: QPainterPath) -> None:
+        # Note: QGraphicsPathItem::setPath() is not virtual in C++.
+        # This redefinition only works if called through Python.
+        # If the path is mutated externally (e.g., via C++ or shared reference),
+        # the cache won't be invalidated - always update via this method.
+        super().setPath(path)
+        self._cached_shape = None
+
+    def shape(self) -> QPainterPath:
+        # Override to avoid false hits (using QGraphicsScene.items method) inside open paths (e.g., crescents).
+        if self._cached_shape is None:
+            self._cached_shape = self._stroker.createStroke(self.path())
+        return self._cached_shape
 
 
 class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
@@ -127,7 +195,7 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
         self._completed_color = completed_color or self.DEFAULT_COMPLETED_COLOR
         self._draft_color = draft_color or self.DEFAULT_DRAFT_COLOR
 
-        self._node_items: list[GraphicsNodeItem] = []
+        self._node_actors: list[VectorNodeActor] = []
 
         super().__init__(model, parent)
 
@@ -141,7 +209,7 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
 
     def _update_graphics_item(self) -> None:
         self._rebuild_path()
-        self._rebuild_node_items()
+        self._rebuild_node_actors()
         self._update_color()
 
     @property
@@ -149,19 +217,34 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
         return self.model
 
     @property
-    def end_point(self) -> QPointF:
-        return self.model.end_point
+    def last_node(self) -> VectorNode:
+        return self.model.last_node
 
-    def append_point(self, point: QPointF) -> None:
-        self.model.append_point(point)
+    def add_node(self, pos: QPointF) -> VectorNode:
+        return self.model.add_node(pos)
 
-    def remove_end_point(self) -> None:
-        self.model.remove_end_point()
+    def remove_last_node(self) -> VectorNode | None:
+        self.model.remove_last_node()
+
+    def update_visual_state(
+            self,
+            is_selected: bool = False,
+            selected_nodes: set[VectorNode] | None = None,
+    ) -> None:
+        pen = self.graphics_item.pen()
+        color = Qt.GlobalColor.yellow if is_selected else Qt.GlobalColor.black
+        pen.setColor(color)
+        self.graphics_item.setPen(pen)
+
+        selected_nodes = selected_nodes or set()
+        for node_actor in self._node_actors:
+            is_node_selected = node_actor.node in selected_nodes
+            node_actor.update_visual_state(is_node_selected)
 
     def _model_about_to_change(self, new_model: Polyline | None) -> None:
         if self.model is not None:
-            self.model.point_appended.disconnect(self._on_point_appended)
-            self.model.end_point_removed.disconnect(self._on_end_point_removed)
+            self.model.node_added.disconnect(self._on_node_added)
+            self.model.last_node_removed.disconnect(self._on_last_node_removed)
             self.model.completed.disconnect(self._on_completed)
 
         super()._model_about_to_change(new_model)
@@ -170,8 +253,8 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
         super()._model_changed()
 
         if self.model is not None:
-            self.model.point_appended.connect(self._on_point_appended)
-            self.model.end_point_removed.connect(self._on_end_point_removed)
+            self.model.node_added.connect(self._on_node_added)
+            self.model.last_node_removed.connect(self._on_last_node_removed)
             self.model.completed.connect(self._on_completed)
 
     def _on_completed(self) -> None:
@@ -186,78 +269,43 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
         pen.setColor(color)
         self.graphics_item.setPen(pen)
 
-    def _on_point_appended(self, point: QPointF) -> None:
-        if not self._path.elementCount():  # If no points exist, move to the first one
-            self._path.moveTo(point)
+    def _on_node_added(self, node: VectorNode) -> None:
+        if not self._path.elementCount():  # If no nodes exist, move to the first one
+            self._path.moveTo(node.pos)
         else:
-            self._path.lineTo(point)
+            self._path.lineTo(node.pos)
         self.graphics_item.setPath(self._path)
 
-        self._create_node_for_point(point)
+        self._create_node_actor(node)
 
-    def _create_node_for_point(self, point: QPointF) -> GraphicsNodeItem:
-        node = GraphicsNodeItem(point, brush=self._completed_color, parent=self.graphics_item)
-        self._node_items.append(node)
-        return node
+    def _create_node_actor(self, node: VectorNode) -> VectorNodeActor:
+        node_actor = VectorNodeActor(node, brush=self._completed_color, parent=self)
+        self._node_actors.append(node_actor)
+        node_actor.graphics_item.setParentItem(self.graphics_item)
+        return node_actor
 
-    def _on_end_point_removed(self) -> None:
+    def _on_last_node_removed(self) -> None:
         self._rebuild_path()
 
-        end_node = self._node_items.pop()
-        end_node.scene().removeItem(end_node)
+        last_node_actor = self._node_actors.pop()
+        last_node_actor._remove_from_scene()
 
     def _rebuild_path(self) -> None:
         self._path = QPainterPath()  # Avoid using self._path.clear(),
         # as it does not clear moveTo element in PySide 6.8.0.2
-        if self.model is not None and self.model.points:
-            self._path.moveTo(self.model.points[0])
-            for point in self.model.points[1:]:
-                self._path.lineTo(point)
+        if self.model is not None and self.model.nodes:
+            self._path.moveTo(self.model.nodes[0].pos)
+            for node in self.model.nodes[1:]:
+                self._path.lineTo(node.pos)
         self.graphics_item.setPath(self._path)
 
-    def _rebuild_node_items(self) -> None:
-        # Remove all existing node items
-        scene = self.graphics_item.scene()
-        for node in self._node_items:
-            scene.removeItem(node)
-        self._node_items.clear()
+    def _rebuild_node_actors(self) -> None:
+        # Clean up old node actors
+        for node_actor in self._node_actors:
+            node_actor._remove_from_scene()
+        self._node_actors.clear()
 
-        # Recreate nodes for current points
+        # Create new node actors
         if self.model is not None:
-            for point in self.model.points:
-                self._create_node_for_point(point)
-
-
-class InteractiveHandle(QGraphicsEllipseItem):
-    """Lightweight, draggable edit handle for vector shapes."""
-    def __init__(self, radius: float = 5.0, brush: QBrush = None, parent: QGraphicsItem = None):
-        super().__init__(QRectF(-radius, -radius, 2 * radius, 2 * radius), parent)
-
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
-        if brush is not None:
-            self.setBrush(brush)
-
-        ######---------
-        self.setFlag(QGraphicsEllipseItem.ItemIsMovable)
-        self.setFlag(QGraphicsEllipseItem.ItemSendsGeometryChanges)
-        self.setBrush(QBrush(Qt.red))
-        self.setPen(QPen(Qt.black, 1))
-        self.setCursor(Qt.PointingHandCursor)
-        self.setZValue(10)  # appear above other items
-        ######
-
-    def itemChange(self, change, value):
-        if change == QGraphicsEllipseItem.ItemPositionHasChanged:
-            self._on_moved(value)
-        return super().itemChange(change, value)
-
-    def mousePressEvent(self, event):
-        self._on_selected()
-        super().mousePressEvent(event)
-
-    # To be overridden by subclasses or patched
-    def _on_moved(self, new_pos):
-        pass
-
-    def _on_selected(self):
-        pass
+            for node in self.model.nodes:
+                self._create_node_actor(node)

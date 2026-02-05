@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from bsmu.vision.core.constants import PlaneAxis
 from bsmu.vision.core.image import VolumeImage
 from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.selection import SelectionManager
 from bsmu.vision.plugins.visualizers import DataVisualizerPlugin, DataVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow, LayeredImageViewerSubWindow
 from bsmu.vision.widgets.viewers.image.layered.flat import LayeredFlatImageViewer
@@ -30,14 +31,15 @@ class LayeredImageVisualizer(DataVisualizer):
     def _visualize_data(self, data: LayeredImage):
         logging.info('Visualize layered image')
 
+        selection_manager = SelectionManager()
         viewer_sub_windows = []
         if data.base_layer.image.n_dims == VolumeImage.n_dims:
             viewers = [
-                VolumeSliceImageViewer(plane_axis, None, data, self.settings)
+                VolumeSliceImageViewer(plane_axis, None, data, selection_manager, self.settings)
                 for plane_axis in PlaneAxis
             ]
         else:
-            viewers = [LayeredFlatImageViewer(data, self.settings)]
+            viewers = [LayeredFlatImageViewer(data, selection_manager, self.settings)]
 
         for viewer in viewers:
             if isinstance(viewer, VolumeSliceImageViewer):

@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import weakref
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QGraphicsItem
 
-ModelT = TypeVar('ModelT', bound=QObject)
-ItemT = TypeVar('ItemT', bound=QGraphicsItem)
-
 if TYPE_CHECKING:
     from PySide6.QtCore import QPointF
 
+ModelT = TypeVar('ModelT', bound=QObject)
+ItemT = TypeVar('ItemT', bound=QGraphicsItem)
+
 
 class GraphicsActor(QObject, Generic[ModelT, ItemT]):
+    ACTOR_KEY: int = 0
+
     model_about_to_change = Signal(QObject, QObject)
     model_changed = Signal(QObject)
 
@@ -23,6 +26,7 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
 
         self._model: ModelT | None = None
         self._graphics_item: ItemT | None = self._create_graphics_item()
+        self._graphics_item.setData(self.ACTOR_KEY, weakref.ref(self))
 
         if model is not None:
             self.model = model
@@ -65,3 +69,6 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
     def _update_graphics_item(self) -> None:
         """Override to update graphics_item based on model state."""
         pass
+
+    def _remove_from_scene(self):
+        self._graphics_item.scene().removeItem(self._graphics_item)

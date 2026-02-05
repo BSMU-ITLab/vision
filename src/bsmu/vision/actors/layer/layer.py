@@ -343,6 +343,10 @@ class VectorLayerActor(LayerActor[VectorLayer, GraphicsContainerItem]):
     def shapes(self) -> list[VectorShape]:
         return self.layer.shapes if self.layer is not None else []
 
+    @property
+    def shape_actors(self) -> list[VectorShapeActor]:
+        return list(self._shape_to_actor.values())
+
     def actor_by_shape(self, shape: VectorShape) -> VectorShapeActor | None:
         return self._shape_to_actor.get(shape)
 

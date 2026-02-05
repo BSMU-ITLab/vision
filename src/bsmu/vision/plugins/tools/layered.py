@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.config.united import UnitedConfig
     from bsmu.vision.core.data.raster import Raster
     from bsmu.vision.core.layers import RasterLayer
+    from bsmu.vision.core.selection import SelectionManager
     from bsmu.vision.core.visibility import Visibility
     from bsmu.vision.plugins.palette.settings import PalettePackSettings
     from bsmu.vision.plugins.undo import UndoManager
@@ -90,6 +91,10 @@ class LayeredDataViewerTool(GraphicsViewerTool[LayeredDataViewer]):
     @property
     def settings(self) -> LayeredDataViewerToolSettings:
         return cast(LayeredDataViewerToolSettings, self._settings)
+
+    @property
+    def selection_manager(self) -> SelectionManager:
+        return self.viewer.selection_manager
 
     @property
     def image(self) -> Raster | None:

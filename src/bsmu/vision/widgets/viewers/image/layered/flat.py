@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.core.image import FlatImage
+    from bsmu.vision.core.selection import SelectionManager
     from bsmu.vision.core.image.layered import ImageLayer, LayeredImage
     from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
 
@@ -29,8 +30,14 @@ class FlatImageLayerView(ImageLayerView):
 
 
 class LayeredFlatImageViewer(LayeredImageViewer):
-    def __init__(self, data: LayeredImage = None, settings: ImageViewerSettings = None, parent: QWidget | None = None):
-        super().__init__(data, settings, parent)
+    def __init__(
+            self,
+            data: LayeredImage = None,
+            selection_manager: SelectionManager | None = None,
+            settings: ImageViewerSettings = None,
+            parent: QWidget | None = None,
+    ):
+        super().__init__(data, selection_manager, settings, parent)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> FlatImageLayerView:
         layer_view = FlatImageLayerView(image_layer, image_layer.visibility.visible, image_layer.visibility.opacity)

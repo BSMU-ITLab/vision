@@ -5,15 +5,18 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtWidgets import QGraphicsScene
 
+from bsmu.vision.actors import GraphicsActor
+from bsmu.vision.actors.shape import VectorActor
 from bsmu.vision.core.settings import Settings
 from bsmu.vision.widgets.viewers.data import DataT, DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView, GraphicsViewSettings, ZoomSettings
 
 if TYPE_CHECKING:
+    from typing import Callable, Iterator
+
     from PySide6.QtCore import QPoint, QPointF
     from PySide6.QtWidgets import QGraphicsItem, QWidget
 
-    from bsmu.vision.actors import GraphicsActor
     from bsmu.vision.core.config import UnitedConfig
     from bsmu.vision.widgets.viewers.graphics_view import NormalizedViewRegion
 
@@ -109,6 +112,58 @@ class GraphicsViewer(DataViewer[DataT]):
         # From self._graphics_view pos to self.viewport pos
         viewport_pos = self.viewport.mapFrom(self._graphics_view, graphics_view_pos)
         return self.map_viewport_to_actor(viewport_pos, actor)
+
+    def _vector_actors_near(
+            self,
+            scene_pos: QPointF | QPoint,
+            screen_tolerance: float = 5.0,
+            mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
+            order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
+    ) -> Iterator[VectorActor]:
+        """Yield vector actors (shapes or nodes) near `scene_pos` within a screen-space tolerance."""
+        transform = self._graphics_view.transform()
+        scale_x = transform.m11()
+        scale_y = transform.m22()
+        if scale_x == 0 or scale_y == 0:
+            return
+
+        scene_tolerance_x = screen_tolerance / scale_x
+        scene_tolerance_y = screen_tolerance / scale_y
+        search_area = QRectF(
+            scene_pos.x() - scene_tolerance_x, scene_pos.y() - scene_tolerance_y,
+            scene_tolerance_x * 2, scene_tolerance_y * 2,
+        )
+        for item in self._graphics_scene.items(search_area, mode, order):
+            actor_weakref = item.data(GraphicsActor.ACTOR_KEY)
+            if actor_weakref and isinstance(actor := actor_weakref(), VectorActor):
+                yield actor
+
+    def vector_actors_near(
+            self,
+            scene_pos: QPointF | QPoint,
+            screen_tolerance: float = 5.0,
+            mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
+            order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
+    ) -> list[VectorActor]:
+        """Return vector actors (shapes or nodes) near `scene_pos` within a screen-space tolerance."""
+        return list(self._vector_actors_near(scene_pos, screen_tolerance, mode, order))
+
+    def vector_actor_near(
+            self,
+            scene_pos: QPointF | QPoint,
+            screen_tolerance: float = 5.0,
+            mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
+            order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
+            predicate: Callable[[VectorActor], bool] | None = None,
+    ) -> VectorActor | None:
+        """
+        Return the first vector actor (shape or node) near `scene_pos` within a screen-space tolerance,
+        optionally filtered by `predicate`.
+        """
+        for actor in self._vector_actors_near(scene_pos, screen_tolerance, mode, order):
+            if predicate is None or predicate(actor):
+                return actor
+        return None
 
     @property
     def top_level_bounding_rect(self) -> QRectF:

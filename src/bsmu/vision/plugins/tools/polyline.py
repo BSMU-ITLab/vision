@@ -9,20 +9,19 @@ from PySide6.QtWidgets import QGraphicsLineItem
 
 from bsmu.vision.core.layers import VectorLayer
 from bsmu.vision.plugins.tools import (
-    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerToolSettings, CursorConfig)
-from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool
-from bsmu.vision.undo.data.vector.polyline import CreatePolylineCommand, AddPolylinePointCommand
+    ViewerToolPlugin, ViewerToolSettingsWidget, CursorConfig)
+from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
+from bsmu.vision.undo.data.vector.polyline import CreatePolylineCommand, AddPolylineNodeCommand
 from bsmu.vision.undo.layer import CreateVectorLayerCommand
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QPointF
     from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
-    from bsmu.vision.core.data.vector.shapes import Polyline
+    from bsmu.vision.core.data.vector.shapes import Polyline, VectorNode
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
-    from bsmu.vision.plugins.tools.layered import LayeredDataViewerToolSettings
-    from bsmu.vision.plugins.tools import ViewerTool
+    from bsmu.vision.plugins.tools import ViewerTool, ViewerToolSettings
     from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
     from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
     from bsmu.vision.plugins.windows.main import MainWindowPlugin
@@ -76,8 +75,7 @@ class PolylineTool(LayeredDataViewerTool):
         if not isinstance(event, QMouseEvent):
             return super().eventFilter(watched_obj, event)
 
-        event_type = event.type()
-        match event_type:
+        match event.type():
             case QEvent.Type.MouseButtonPress:
                 match event.button():
                     case Qt.MouseButton.LeftButton:
@@ -107,7 +105,7 @@ class PolylineTool(LayeredDataViewerTool):
         if self._state is PolylineToolState.IDLE:
             self._start_new_polyline_drawing(pos)
         else:
-            command = AddPolylinePointCommand(self._curr_polyline, pos)
+            command = AddPolylineNodeCommand(self._curr_polyline, pos)
             self._undo_manager.push(command)
 
             self._clear_preview_segment()
@@ -127,7 +125,7 @@ class PolylineTool(LayeredDataViewerTool):
 
         self._create_preview_segment()
 
-        self._curr_polyline.end_point_removed.connect(self._on_polyline_end_point_removed)
+        self._curr_polyline.last_node_removed.connect(self._on_polyline_last_node_removed)
 
         self._state = PolylineToolState.DRAWING
 
@@ -143,14 +141,14 @@ class PolylineTool(LayeredDataViewerTool):
         self._preview_segment.hide()
 
     def _update_preview_segment(self, pos: QPointF) -> None:
-        self._preview_segment.setLine(QLineF(self._curr_polyline.end_point, pos))
+        self._preview_segment.setLine(QLineF(self._curr_polyline.last_node.pos, pos))
         self._show_preview_segment()
 
     def _update_preview_segment_to_cursor_pos(self) -> None:
         scene_pos = self.viewer.map_global_to_scene(QCursor.pos())
         self._update_preview_segment(scene_pos)
 
-    def _on_polyline_end_point_removed(self, _removed_point: QPointF) -> None:
+    def _on_polyline_last_node_removed(self, _removed_node: VectorNode) -> None:
         if self._curr_polyline.is_empty:
             self._complete_drawing()
             return
@@ -182,7 +180,7 @@ class PolylineTool(LayeredDataViewerTool):
         if self._state is PolylineToolState.IDLE:
             return
 
-        self._curr_polyline.end_point_removed.disconnect(self._on_polyline_end_point_removed)
+        self._curr_polyline.last_node_removed.disconnect(self._on_polyline_last_node_removed)
         self.viewer.remove_graphics_item(self._preview_segment)
         self._preview_segment = None
 
@@ -199,14 +197,15 @@ POLYLINE_CURSOR_CONFIG = CursorConfig(
 )
 
 
-class PolylineToolSettings(ViewerToolSettings):
+class PolylineToolSettings(LayeredDataViewerToolSettings):
     def __init__(
             self,
+            layers_props: dict,
             palette_pack_settings: PalettePackSettings,
             cursor_config: CursorConfig = POLYLINE_CURSOR_CONFIG,
             action_icon_file_name: str = ':/icons/polyline-action.svg',
     ):
-        super().__init__(palette_pack_settings, cursor_config, action_icon_file_name)
+        super().__init__(layers_props, palette_pack_settings, cursor_config, action_icon_file_name)
 
 
 class PolylineToolPlugin(ViewerToolPlugin):

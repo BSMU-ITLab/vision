@@ -7,10 +7,11 @@ import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QMessageBox
 
-from bsmu.vision.actors.layer import LayerActor
+from bsmu.vision.actors.layer import LayerActor, VectorLayerActor
 from bsmu.vision.actors.layer.registry import create_layer_actor
 from bsmu.vision.core.data.layered import LayeredData
 from bsmu.vision.core.data.raster import MaskDrawMode
+from bsmu.vision.core.selection import SelectionManager
 from bsmu.vision.widgets.viewers.graphics import GraphicsViewer
 
 if TYPE_CHECKING:
@@ -39,6 +40,7 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
     def __init__(
             self,
             data: LayeredData | None = None,
+            selection_manager: SelectionManager | None = None,
             settings: ImageViewerSettings | None = None,
             parent: QWidget | None = None,
     ):
@@ -46,7 +48,12 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
 
         self._active_layer_actor = None
 
+        self._selection_manager = (
+            selection_manager if selection_manager is not None else SelectionManager(parent=self))
+
         super().__init__(data, settings, parent)
+
+        self._selection_manager.selection_changed.connect(self.on_selection_changed)
 
     @property
     def layers(self) -> list[Layer]:
@@ -70,6 +77,10 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
     @property
     def active_layer(self) -> Layer | None:
         return None if self._active_layer_actor is None else self._active_layer_actor.layer
+
+    @property
+    def selection_manager(self) -> SelectionManager:
+        return self._selection_manager
 
     def layer_by_name(self, name: str) -> Layer | None:
         return self.data.layer_by_name(name)
@@ -215,6 +226,16 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
     def print_layer_actors(self) -> None:
         for index, layer_actor in enumerate(self.layer_actors):
             print(f'Layer {index}: {layer_actor.name} opacity={layer_actor.opacity}')
+
+    def on_selection_changed(self) -> None:
+        for layer_actor in self._layer_to_actor.values():
+            if not isinstance(layer_actor, VectorLayerActor):
+                continue
+
+            for shape_actor in layer_actor.shape_actors:
+                is_shape_selected = self.selection_manager.is_shape_selected(shape_actor.shape)
+                selected_shape_nodes = self.selection_manager.selected_shape_nodes(shape_actor.shape)
+                shape_actor.update_visual_state(is_shape_selected, selected_shape_nodes)
 
 
 @runtime_checkable

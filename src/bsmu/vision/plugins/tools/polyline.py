@@ -7,18 +7,20 @@ from PySide6.QtCore import QObject, Qt, QEvent, QLineF
 from PySide6.QtGui import QMouseEvent, QPen, QPainter, QCursor
 from PySide6.QtWidgets import QGraphicsLineItem
 
+from bsmu.vision.core.data.vector.shapes import Polyline
 from bsmu.vision.core.layers import VectorLayer
 from bsmu.vision.plugins.tools import (
     ViewerToolPlugin, ViewerToolSettingsWidget, CursorConfig)
 from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
-from bsmu.vision.undo.data.vector.polyline import CreatePolylineCommand, AddPolylineNodeCommand
+from bsmu.vision.undo.data.vector.shape import CreateNodeBasedShapeCommand, InsertNodeCommand
 from bsmu.vision.undo.layer import CreateVectorLayerCommand
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QPointF
     from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
-    from bsmu.vision.core.data.vector.shapes import Polyline, VectorNode
+    from bsmu.vision.core.data.vector import Vector
+    from bsmu.vision.core.data.vector.shapes import VectorNode, VectorShape
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
     from bsmu.vision.plugins.tools import ViewerTool, ViewerToolSettings
@@ -52,6 +54,7 @@ class PolylineTool(LayeredDataViewerTool):
         super().__init__(viewer, undo_manager, settings)
 
         self._curr_polyline: Polyline | None = None
+        self._curr_vector: Vector | None = None  # Vector to where we are adding polyline shape
 
         self._preview_segment: QGraphicsLineItem | None = None
 
@@ -105,7 +108,7 @@ class PolylineTool(LayeredDataViewerTool):
         if self._state is PolylineToolState.IDLE:
             self._start_new_polyline_drawing(pos)
         else:
-            command = AddPolylineNodeCommand(self._curr_polyline, pos)
+            command = InsertNodeCommand(self.viewer.data, self._curr_polyline, pos, text='Add Polyline Node')
             self._undo_manager.push(command)
 
             self._clear_preview_segment()
@@ -118,14 +121,16 @@ class PolylineTool(LayeredDataViewerTool):
         vector_layer = self.viewer.layer_by_name(vector_layer_name)
         assert vector_layer is not None and isinstance(vector_layer, VectorLayer)
         assert vector_layer.data is not None
-        create_polyline_command = CreatePolylineCommand(vector_layer.data, pos)
+        self._curr_vector = vector_layer.data
+        create_polyline_command = CreateNodeBasedShapeCommand(self.viewer.data, self._curr_vector, Polyline, [pos])
         self._undo_manager.push(create_polyline_command)
-        self._curr_polyline = create_polyline_command.created_polyline
+        self._curr_polyline = create_polyline_command.created_shape
         self._undo_manager.end_macro()
 
         self._create_preview_segment()
 
-        self._curr_polyline.last_node_removed.connect(self._on_polyline_last_node_removed)
+        self._curr_polyline.node_removed.connect(self._on_polyline_node_removed)
+        self._curr_vector.shape_removed.connect(self._on_vector_shape_removed)
 
         self._state = PolylineToolState.DRAWING
 
@@ -141,20 +146,26 @@ class PolylineTool(LayeredDataViewerTool):
         self._preview_segment.hide()
 
     def _update_preview_segment(self, pos: QPointF) -> None:
-        self._preview_segment.setLine(QLineF(self._curr_polyline.last_node.pos, pos))
+        self._preview_segment.setLine(QLineF(self._curr_polyline.last_node.scene_pos, pos))
         self._show_preview_segment()
 
     def _update_preview_segment_to_cursor_pos(self) -> None:
         scene_pos = self.viewer.map_global_to_scene(QCursor.pos())
         self._update_preview_segment(scene_pos)
 
-    def _on_polyline_last_node_removed(self, _removed_node: VectorNode) -> None:
+    def _on_polyline_node_removed(self, _node: VectorNode, index: int) -> None:
         if self._curr_polyline.is_empty:
             self._complete_drawing()
             return
 
-        if self.is_drawing:
+        is_end_node_removed = (index == len(self._curr_polyline.nodes))
+        if self.is_drawing and is_end_node_removed:
             self._update_preview_segment_to_cursor_pos()
+
+    def _on_vector_shape_removed(self, shape: VectorShape) -> None:
+        """React when the shape we're drawing is deleted (e.g., via undo)."""
+        if shape is self._curr_polyline:
+            self._reset_tool_state()
 
     def _show_preview_segment(self) -> None:
         if not self._preview_segment.isVisible():
@@ -176,18 +187,33 @@ class PolylineTool(LayeredDataViewerTool):
 
         self._state = PolylineToolState.DRAWING
 
+    def _cancel_drawing(self) -> None:
+        if self._state is PolylineToolState.IDLE:
+            return
+
+        self._curr_vector.remove_shape(self._curr_polyline)  # TODO: use UndoCommand to remove the shape
+
+    def _reset_tool_state(self) -> None:
+        """Clear preview, reset state."""
+        if self._state is PolylineToolState.IDLE:
+            return
+
+        self._curr_polyline.node_removed.disconnect(self._on_polyline_node_removed)
+        self._curr_vector.shape_removed.disconnect(self._on_vector_shape_removed)
+
+        self.viewer.remove_graphics_item(self._preview_segment)
+        self._preview_segment = None
+
+        self._curr_polyline = None
+        self._curr_vector = None
+        self._state = PolylineToolState.IDLE
+
     def _complete_drawing(self) -> None:
         if self._state is PolylineToolState.IDLE:
             return
 
-        self._curr_polyline.last_node_removed.disconnect(self._on_polyline_last_node_removed)
-        self.viewer.remove_graphics_item(self._preview_segment)
-        self._preview_segment = None
-
         self._curr_polyline.complete()
-        self._curr_polyline = None
-
-        self._state = PolylineToolState.IDLE
+        self._reset_tool_state()
 
 
 POLYLINE_CURSOR_CONFIG = CursorConfig(

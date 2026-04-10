@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtWidgets import QGraphicsScene
 
 from bsmu.vision.actors import GraphicsActor
-from bsmu.vision.actors.shape import VectorActor
+from bsmu.vision.actors.shape import VectorElementActor
 from bsmu.vision.core.settings import Settings
 from bsmu.vision.widgets.viewers.data import DataT, DataViewer
 from bsmu.vision.widgets.viewers.graphics_view import GraphicsView, GraphicsViewSettings, ZoomSettings
@@ -119,7 +119,7 @@ class GraphicsViewer(DataViewer[DataT]):
             screen_tolerance: float = 5.0,
             mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
-    ) -> Iterator[VectorActor]:
+    ) -> Iterator[VectorElementActor]:
         """Yield vector actors (shapes or nodes) near `scene_pos` within a screen-space tolerance."""
         transform = self._graphics_view.transform()
         scale_x = transform.m11()
@@ -135,7 +135,7 @@ class GraphicsViewer(DataViewer[DataT]):
         )
         for item in self._graphics_scene.items(search_area, mode, order):
             actor_weakref = item.data(GraphicsActor.ACTOR_KEY)
-            if actor_weakref and isinstance(actor := actor_weakref(), VectorActor):
+            if actor_weakref and isinstance(actor := actor_weakref(), VectorElementActor):
                 yield actor
 
     def vector_actors_near(
@@ -144,7 +144,7 @@ class GraphicsViewer(DataViewer[DataT]):
             screen_tolerance: float = 5.0,
             mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
-    ) -> list[VectorActor]:
+    ) -> list[VectorElementActor]:
         """Return vector actors (shapes or nodes) near `scene_pos` within a screen-space tolerance."""
         return list(self._vector_actors_near(scene_pos, screen_tolerance, mode, order))
 
@@ -154,8 +154,8 @@ class GraphicsViewer(DataViewer[DataT]):
             screen_tolerance: float = 5.0,
             mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
-            predicate: Callable[[VectorActor], bool] | None = None,
-    ) -> VectorActor | None:
+            predicate: Callable[[VectorElementActor], bool] | None = None,
+    ) -> VectorElementActor | None:
         """
         Return the first vector actor (shape or node) near `scene_pos` within a screen-space tolerance,
         optionally filtered by `predicate`.

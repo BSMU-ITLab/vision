@@ -2,88 +2,147 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from PySide6.QtCore import QObject, QPointF, Signal
 
 from bsmu.vision.core.utils.geometry import GeometryUtils
 
 
-class VectorShape(QObject):
-    changed = Signal()  # Emitted when geometry changes
+class VectorElement(QObject):
+    changed = Signal()  # Emitted when the element's internal state is modified
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
 
 
-class VectorNode(QObject):
-    pos_changed = Signal(QPointF)  # Emit new position
+class VectorShape(VectorElement):
+    transform_changed = Signal()  # Origin/transform changed
+    geometry_changed = Signal()  # Node positions changed
+    structure_changed = Signal()  # Nodes added/removed
 
-    def __init__(self, parent_shape: VectorShape, pos: QPointF, parent: QObject | None = None):
+    def __init__(self, origin: QPointF | None = None, parent: QObject | None = None):
+        super().__init__(parent)
+
+        self._origin = QPointF(origin) if origin is not None else QPointF(0, 0)
+
+    @property
+    def origin(self) -> QPointF:
+        return QPointF(self._origin)
+
+    @origin.setter
+    def origin(self, value: QPointF):
+        if self._origin != value:
+            self._origin = QPointF(value)
+            self.transform_changed.emit()
+
+    def move_by(self, offset: QPointF) -> None:
+        self.origin += offset
+
+    def local_to_scene(self, local_pos: QPointF) -> QPointF:
+        """Convert local coordinate to scene coordinate."""
+        return self._origin + local_pos
+
+    def scene_to_local(self, scene_pos: QPointF) -> QPointF:
+        """Convert scene coordinate to local coordinate."""
+        return scene_pos - self._origin
+
+
+class VectorNode(VectorElement):
+    """Node stores position relative to parent shape's origin."""
+
+    parent_shape_changed = Signal(VectorShape)
+
+    def __init__(
+            self,
+            parent_shape: VectorShape,
+            local_pos: QPointF,
+            parent: QObject | None = None,
+    ):
         super().__init__(parent)
 
         self._parent_shape = parent_shape
-        self._pos = QPointF(pos)
+        self._local_pos = QPointF(local_pos)
+
+    @classmethod
+    def from_scene_pos(cls, parent_shape: VectorShape, scene_pos: QPointF, parent: QObject | None = None) -> VectorNode:
+        """Create a node from a scene (absolute) position."""
+        return cls(parent_shape, parent_shape.scene_to_local(scene_pos), parent)
+
+    @classmethod
+    def from_local_pos(cls, parent_shape: VectorShape, local_pos: QPointF, parent: QObject | None = None) -> VectorNode:
+        """Create a node from a local (relative) position."""
+        return cls(parent_shape, local_pos, parent)
 
     @property
     def parent_shape(self) -> VectorShape:
         return self._parent_shape
 
-    @property
-    def pos(self) -> QPointF:
-        return QPointF(self._pos)  # Return copy to prevent external mutation
+    @parent_shape.setter
+    def parent_shape(self, value: VectorShape | None):
+        if self._parent_shape is not value:
+            self._parent_shape = value
+            self.parent_shape_changed.emit(value)
 
-    @pos.setter
-    def pos(self, value: QPointF):
-        if self._pos != value:
-            self._pos = QPointF(value)
-            self.pos_changed.emit(self._pos)
+    @property
+    def scene_pos(self) -> QPointF:
+        return self._parent_shape.local_to_scene(self._local_pos)
+
+    @scene_pos.setter
+    def scene_pos(self, value: QPointF):
+        self.local_pos = self._parent_shape.scene_to_local(value)
+
+    @property
+    def local_pos(self) -> QPointF:
+        """Position relative to parent shape's origin (local)."""
+        return QPointF(self._local_pos)
+
+    @local_pos.setter
+    def local_pos(self, value: QPointF):
+        if self._local_pos != value:
+            self._local_pos = QPointF(value)
+            self.changed.emit()
+            self._parent_shape.geometry_changed.emit()
+
+    def move_by(self, offset: QPointF) -> None:
+        self.local_pos += offset
 
 
 class Point(VectorShape):
-    pos_changed = Signal(QPointF)
-
     def __init__(self, pos: QPointF, parent: QObject | None = None):
-        super().__init__(parent)
-
-        self._pos = QPointF(pos)
+        # Origin is the point position.
+        super().__init__(origin=pos, parent=parent)
 
     @property
     def pos(self) -> QPointF:
-        return QPointF(self._pos)
+        return self.origin
 
     @pos.setter
     def pos(self, value: QPointF):
-        if self._pos != value:
-            self._pos = QPointF(value)
-            self.pos_changed.emit(self._pos)
-            self.changed.emit()
+        self.origin = value
 
 
-@dataclass(frozen=True)
-class ClosestPolylinePointInfo:
-    point: QPointF | None = None
-    segment_index: int | None = None
-    squared_distance: float | None = None  # Squared distance from the query point to the closest point on the polyline
+class NodeBasedShape(VectorShape):
+    """Base class for shapes defined by a sequence of editable VectorNodes."""
 
-
-class Polyline(VectorShape):
-    node_added = Signal(VectorNode)
-    last_node_removed = Signal(VectorNode)
-    completed = Signal()
+    node_about_to_add = Signal(VectorNode, int)  # Node and its insertion index
+    node_added = Signal(VectorNode, int)
+    node_about_to_remove = Signal(VectorNode, int)
+    node_removed = Signal(VectorNode, int)
 
     def __init__(
             self,
-            points: Iterable[QPointF] = (),
-            parent: QObject | None = None,
+            points: Sequence[QPointF] = (),
+            origin: QPointF | None = None,
+            parent: QObject | None = None
     ):
-        super().__init__(parent)
+        super().__init__(origin=origin, parent=parent)
 
         self._nodes: list[VectorNode] = []
         for point in points:
-            self._append_node(point)
-
-        self._is_completed = False
+            # Initialize without signals to avoid overhead during construction
+            node = VectorNode.from_scene_pos(self, point, parent=self)
+            self._nodes.append(node)
 
     @property
     def nodes(self) -> Sequence[VectorNode]:
@@ -91,20 +150,18 @@ class Polyline(VectorShape):
         return self._nodes
 
     @property
-    def points(self) -> list[QPointF]:
-        return [node.pos for node in self._nodes]
+    def scene_points(self) -> list[QPointF]:
+        """Return node positions in scene coordinates."""
+        return [node.scene_pos for node in self._nodes]
+
+    @property
+    def local_points(self) -> list[QPointF]:
+        """Return node positions in local coordinates."""
+        return [node.local_pos for node in self._nodes]
 
     @property
     def is_empty(self) -> bool:
         return not self._nodes
-
-    @property
-    def is_completed(self) -> bool:
-        return self._is_completed
-
-    @property
-    def is_draft(self) -> bool:
-        return not self._is_completed
 
     @property
     def last_node(self) -> VectorNode:
@@ -116,26 +173,89 @@ class Polyline(VectorShape):
             return 0.0
 
         return sum(
-            GeometryUtils.distance(self._nodes[i].pos, self._nodes[i + 1].pos)
+            GeometryUtils.distance(self._nodes[i].local_pos, self._nodes[i + 1].local_pos)
             for i in range(len(self._nodes) - 1)
         )
 
-    def add_node(self, pos: QPointF) -> VectorNode:
-        node = self._append_node(pos)
-        self.node_added.emit(node)
+    def create_node(self, scene_pos: QPointF, index: int | None = None) -> VectorNode:
+        """Create and insert node at index (appends if None)."""
+        node = VectorNode.from_scene_pos(self, scene_pos, parent=self)
+        self._insert_node(node, index)
         return node
 
-    def _append_node(self, pos: QPointF) -> VectorNode:
-        node = VectorNode(self, pos, parent=self)
-        self._nodes.append(node)
+    def create_node_local(self, local_pos: QPointF, index: int | None = None) -> VectorNode:
+        """Create and insert node using local coordinates."""
+        node = VectorNode.from_local_pos(self, local_pos, parent=self)
+        self._insert_node(node, index)
         return node
 
-    def remove_last_node(self) -> VectorNode | None:
-        if self._nodes:
-            node = self._nodes.pop()
-            self.last_node_removed.emit(node)
-            return node
-        return None
+    def _insert_node(self, node: VectorNode, index: int | None = None) -> None:
+        """Insert node and emit signals."""
+        if index is None:
+            index = len(self._nodes)
+
+        self.node_about_to_add.emit(node, index)
+        self._nodes.insert(index, node)
+        self.node_added.emit(node, index)
+
+        self.structure_changed.emit()
+
+    def remove_node(self, node: VectorNode) -> None:
+        """Remove specific node by reference."""
+        index = self._nodes.index(node)
+        self.pop_node(index)
+
+    def pop_node(self, index: int = -1) -> VectorNode:
+        """Remove and return a node by index. Defaults to last node."""
+        if not self._nodes:
+            raise IndexError('Cannot pop node from empty shape.')
+
+        if index == -1:
+            index = len(self._nodes) - 1
+
+        self.node_about_to_remove.emit(self._nodes[index], index)
+        node = self._nodes.pop(index)
+
+        node.parent_shape = None
+        node.setParent(None)
+
+        self.node_removed.emit(node, index)
+        self.structure_changed.emit()
+        return node
+
+    def clear_nodes(self) -> None:
+        """Remove all nodes."""
+        while self._nodes:
+            self.pop_node()
+
+
+@dataclass(frozen=True)
+class ClosestPolylinePointInfo:
+    point: QPointF | None = None
+    segment_index: int | None = None
+    squared_distance: float | None = None  # Squared distance from the query point to the closest point on the polyline
+
+
+class Polyline(NodeBasedShape):
+    completed = Signal()
+
+    def __init__(
+            self,
+            points: Sequence[QPointF] = (),
+            origin: QPointF | None = None,
+            parent: QObject | None = None,
+    ):
+        super().__init__(points, origin=origin, parent=parent)
+
+        self._is_completed = False
+
+    @property
+    def is_completed(self) -> bool:
+        return self._is_completed
+
+    @property
+    def is_draft(self) -> bool:
+        return not self._is_completed
 
     def complete(self) -> None:
         if not self._is_completed:
@@ -172,7 +292,7 @@ class Polyline(VectorShape):
             return ClosestPolylinePointInfo()
 
         if len(self._nodes) == 1:
-            return ClosestPolylinePointInfo(point=self.last_node.pos, segment_index=0)
+            return ClosestPolylinePointInfo(point=self.last_node.scene_pos, segment_index=0)
 
         closest_point: QPointF | None = None
         segment_index: int | None = None
@@ -180,8 +300,8 @@ class Polyline(VectorShape):
 
         # Check each segment of the polyline
         for i in range(len(self._nodes) - 1):
-            segment_start = self._nodes[i].pos
-            segment_end = self._nodes[i + 1].pos
+            segment_start = self._nodes[i].scene_pos
+            segment_end = self._nodes[i + 1].scene_pos
 
             segment_closest_point = GeometryUtils.closest_point_on_segment(segment_start, segment_end, point)
             squared_distance = GeometryUtils.squared_distance(point, segment_closest_point)

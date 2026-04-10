@@ -32,14 +32,16 @@ class SelectionManager(QObject):
             self.selection_changed.emit()
 
     def select_shape(self, shape: VectorShape) -> None:
-        self._selected_shapes = { shape }
-        self._selected_nodes.clear()
-        self.selection_changed.emit()
+        if shape not in self._selected_shapes:
+            self._selected_shapes = { shape }
+            self._selected_nodes.clear()
+            self.selection_changed.emit()
 
     def select_node(self, node: VectorNode) -> None:
-        self._selected_nodes = { node }
-        self._selected_shapes = { node.parent_shape }
-        self.selection_changed.emit()
+        if node not in self._selected_nodes:
+            self._selected_nodes = { node }
+            self._selected_shapes = { node.parent_shape }
+            self.selection_changed.emit()
 
     def toggle_shape_selection(self, shape: VectorShape) -> None:
         if shape in self._selected_shapes:

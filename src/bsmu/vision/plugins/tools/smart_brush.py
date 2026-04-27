@@ -11,7 +11,7 @@ from PySide6.QtCore import QEvent, Qt
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.palette import Palette
-from bsmu.vision.plugins.tools import ViewerToolPlugin, ViewerToolSettingsWidget
+from bsmu.vision.plugins.tools import CursorConfig, ViewerToolPlugin, ViewerToolSettingsWidget
 from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
 
 if TYPE_CHECKING:
@@ -36,14 +36,22 @@ DEFAULT_RADIUS = 22
 MIN_RADIUS = 2
 
 
+BRUSH_CURSOR_CONFIG = CursorConfig(
+    icon_file_name=':/icons/brush-cursor.svg',
+    hot_x=0.323,
+    hot_y=0.095,
+)
+
+
 class SmartBrushToolSettings(LayeredDataViewerToolSettings):
     def __init__(
             self,
             layers_props: dict,
             palette_pack_settings: PalettePackSettings,
-            icon_file_name: str = ':/icons/brush.svg',
+            cursor_config: CursorConfig = BRUSH_CURSOR_CONFIG,
+            action_icon_file_name: str = ':/icons/brush-action.svg',
     ):
-        super().__init__(layers_props, palette_pack_settings, icon_file_name)
+        super().__init__(layers_props, palette_pack_settings, cursor_config, action_icon_file_name)
 
 
 class SmartBrushTool(LayeredDataViewerTool):

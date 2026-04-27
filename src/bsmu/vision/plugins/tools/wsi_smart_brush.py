@@ -67,6 +67,13 @@ class RepaintingConfig(Config):
     custom_class: int = 1
 
 
+BRUSH_CURSOR_CONFIG = CursorConfig(
+    icon_file_name=':/icons/brush-cursor.svg',
+    hot_x=0.323,
+    hot_y=0.095,
+)
+
+
 class WsiSmartBrushToolSettings(LayeredDataViewerToolSettings):
     radius_changed = Signal(float)
     smart_mode_enabled_changed = Signal(bool)
@@ -90,8 +97,8 @@ class WsiSmartBrushToolSettings(LayeredDataViewerToolSettings):
             painted_cluster: str | int,
             paint_connected_component: bool,
             draw_on_mouse_move: bool,
-            cursor_config: CursorConfig = CursorConfig(':/icons/brush.svg'),
-            action_icon_file_name: str = '',
+            cursor_config: CursorConfig = BRUSH_CURSOR_CONFIG,
+            action_icon_file_name: str = ':/icons/brush-action.svg',
     ):
         super().__init__(layers_props, palette_pack_settings, cursor_config, action_icon_file_name)
 

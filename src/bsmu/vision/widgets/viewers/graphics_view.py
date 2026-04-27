@@ -9,9 +9,11 @@ from PySide6.QtWidgets import QGraphicsView
 
 from bsmu.vision.core.input.acceleration import StepAccelerator, StepAcceleratorConfig
 from bsmu.vision.core.settings import Settings
+from bsmu.vision.widgets.cursors import create_cursor
+from bsmu.vision.widgets.images import icons_rc  # noqa: F401
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import QPaintEvent, QResizeEvent
+    from PySide6.QtGui import QCursor, QPaintEvent, QResizeEvent
     from PySide6.QtWidgets import QGraphicsScene
 
 
@@ -244,8 +246,8 @@ class GraphicsView(QGraphicsView):
     def _on_pan_finished(self):
         self._refresh_viewport_region()
 
-    def set_cursor(self, cursor_shape: Qt.CursorShape):
-        self.viewport().setCursor(cursor_shape)
+    def set_cursor(self, cursor: QCursor | Qt.CursorShape):
+        self.viewport().setCursor(cursor)
 
     def _calculate_scale(self) -> float:
         cur_transform = self.transform()
@@ -532,15 +534,16 @@ class _ViewPan(QObject):
         self._old_pos = None
         self._view.viewport().unsetCursor()
 
-    def _set_cursor(self, cursor_shape: Qt.CursorShape):
-        self._view.set_cursor(cursor_shape)
+    def _set_cursor(self, cursor: QCursor | Qt.CursorShape):
+        self._view.set_cursor(cursor)
 
     def update_cursor(self):
         if not self._view.is_using_base_cursor:
             return
 
         if self._view.is_scrollable:
-            cursor_shape = Qt.CursorShape.ClosedHandCursor if self.is_panning else Qt.CursorShape.OpenHandCursor
+            cursor_icon_name = ':/icons/hand-grab-cursor.svg' if self.is_panning else ':/icons/hand-open-cursor.svg'
         else:
-            cursor_shape = Qt.CursorShape.ArrowCursor
-        self._set_cursor(cursor_shape)
+            cursor_icon_name = ':/icons/hand-cursor.svg'
+        cursor = create_cursor(cursor_icon_name, hot_x=0.514, hot_y=0.566)
+        self._set_cursor(cursor)

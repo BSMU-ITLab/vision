@@ -9,7 +9,7 @@ from PySide6.QtGui import QMouseEvent, QKeyEvent
 from bsmu.vision.actors.shape import VectorShapeActor, VectorNodeActor, VectorElementActor
 from bsmu.vision.core.data.vector.shapes import VectorShape, VectorNode
 from bsmu.vision.plugins.tools import (
-    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerToolSettings)
+    ViewerToolPlugin, ViewerToolSettingsWidget, ViewerToolSettings, CursorConfig)
 from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
 from bsmu.vision.undo.data.vector.shape import MoveShapesCommand, MoveNodesCommand
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
@@ -188,15 +188,22 @@ class PointerTool(LayeredDataViewerTool):
         return False
 
 
+POINTER_CURSOR_CONFIG = CursorConfig(
+    icon_file_name=':/icons/pointer-cursor.svg',
+    hot_x=0.332,
+    hot_y=0.204,
+)
+
+
 class PointerToolSettings(LayeredDataViewerToolSettings):
     def __init__(
             self,
             layers_props: dict,
             palette_pack_settings: PalettePackSettings,
-#            cursor_config: CursorConfig = POLYLINE_CURSOR_CONFIG,
-#            action_icon_file_name: str = ':/icons/polyline-action.svg',
+            cursor_config: CursorConfig = POINTER_CURSOR_CONFIG,
+            action_icon_file_name: str = ':/icons/pointer-action.svg',
     ):
-        super().__init__(layers_props, palette_pack_settings)#, cursor_config, action_icon_file_name)
+        super().__init__(layers_props, palette_pack_settings, cursor_config, action_icon_file_name)
 
 
 class PointerToolPlugin(ViewerToolPlugin):

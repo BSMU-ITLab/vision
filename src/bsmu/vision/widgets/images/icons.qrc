@@ -17,6 +17,9 @@ pyside6-rcc icons.qrc -o icons_rc.py
     <file>icons/eye-crossed-out.svg</file>
     <file>icons/eye-outlined.svg</file>
     <file>icons/eye-outlined-crossed-out.svg</file>
+    <file>icons/hand-cursor.svg</file>
+    <file>icons/hand-grab-cursor.svg</file>
+    <file>icons/hand-open-cursor.svg</file>
     <file>icons/vision.svg</file>
 </qresource>
 </RCC>

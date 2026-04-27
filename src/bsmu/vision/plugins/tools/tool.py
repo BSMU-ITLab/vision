@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from PySide6.QtCore import Qt, QEvent, QObject, Signal
-from PySide6.QtGui import QCursor, QPixmap, QAction, QIcon
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QWidget, QDockWidget
 
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.tools.images import icons_rc  # noqa: F401
 from bsmu.vision.plugins.windows.main import ToolsMenu
+from bsmu.vision.widgets.cursors import CursorConfig, create_cursor_from_config
 from bsmu.vision.widgets.viewers.data import DataViewer
 
 if TYPE_CHECKING:
+    from PySide6.QtGui import QAction, QCursor
     from PySide6.QtWidgets import QMdiSubWindow
 
     from bsmu.vision.core.config.united import UnitedConfig
@@ -235,24 +236,18 @@ class MdiViewerTool(QObject):
         return viewer_tool
 
 
-@dataclass
-class CursorConfig:
-    icon_file_name: str = ''
-    # Normalized hotspot coordinates (range: [0.0; 1.0]), relative to SVG width and height
-    hot_x: float = 0.0
-    hot_y: float = 0.0
-
-
 class ViewerToolSettings(QObject):
     def __init__(
             self,
             palette_pack_settings: PalettePackSettings,
-            cursor_config: CursorConfig = CursorConfig(),
+            cursor_config: CursorConfig | None = None,
             action_icon_file_name: str = ''
     ):
         super().__init__()
 
         self._palette_pack_settings = palette_pack_settings
+        if cursor_config is None:
+            cursor_config = CursorConfig()
         self._cursor_config = cursor_config
 
         self._action_icon_file_name = action_icon_file_name or cursor_config.icon_file_name
@@ -274,10 +269,7 @@ class ViewerToolSettings(QObject):
     @property
     def cursor(self) -> QCursor | None:
         if self._cursor is None and self._cursor_config.icon_file_name:
-            cursor_icon = QPixmap(self._cursor_config.icon_file_name, format=b'svg')
-            hot_x = int(cursor_icon.width() * self._cursor_config.hot_x)
-            hot_y = int(cursor_icon.height() * self._cursor_config.hot_y)
-            self._cursor = QCursor(cursor_icon, hotX=hot_x, hotY=hot_y)
+            self._cursor = create_cursor_from_config(self._cursor_config)
         return self._cursor
 
     @classmethod

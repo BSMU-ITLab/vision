@@ -25,7 +25,7 @@ class HandToolSettings(ViewerToolSettings):
             self,
             palette_pack_settings: PalettePackSettings,
             cursor_config: CursorConfig = CursorConfig(),
-            action_icon_file_name: str = ':/icons/hand.svg',
+            action_icon_file_name: str = ':/icons/hand-action.svg',
     ):
         super().__init__(palette_pack_settings, cursor_config, action_icon_file_name)
 

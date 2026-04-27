@@ -31,7 +31,7 @@ class LayeredDataViewerToolSettings(ViewerToolSettings):
             self,
             layers_props: dict,
             palette_pack_settings: PalettePackSettings,
-            cursor_config: CursorConfig = CursorConfig(),
+            cursor_config: CursorConfig | None = None,
             action_icon_file_name: str = '',
     ):
         super().__init__(palette_pack_settings, cursor_config, action_icon_file_name)

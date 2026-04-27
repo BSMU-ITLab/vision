@@ -6,8 +6,11 @@ To generate a *.py file use the next command in the terminal:
 <!DOCTYPE RCC>
 <RCC version="1.0">
 <qresource>
-    <file>icons/hand.svg</file>
-    <file>icons/brush.svg</file>
+    <file>icons/brush-action.svg</file>
+    <file>icons/brush-cursor.svg</file>
+    <file>icons/hand-action.svg</file>
+    <file>icons/pointer-action.svg</file>
+    <file>icons/pointer-cursor.svg</file>
     <file>icons/polyline-action.svg</file>
     <file>icons/polyline-cursor.svg</file>
 </qresource>

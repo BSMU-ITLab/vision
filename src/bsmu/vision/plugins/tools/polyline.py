@@ -218,8 +218,8 @@ class PolylineTool(LayeredDataViewerTool):
 
 POLYLINE_CURSOR_CONFIG = CursorConfig(
     icon_file_name=':/icons/polyline-cursor.svg',
-    hot_x=0.278,
-    hot_y=0.214,
+    hot_x=0.332,
+    hot_y=0.204,
 )
 
 
@@ -245,7 +245,7 @@ class PolylineToolPlugin(ViewerToolPlugin):
             tool_settings_cls: type[ViewerToolSettings] = PolylineToolSettings,
             tool_settings_widget_cls: type[ViewerToolSettingsWidget] = None,
             action_name: str = QObject.tr('Polyline'),
-            action_shortcut: Qt.Key = Qt.Key.Key_6,
+            action_shortcut: Qt.Key = Qt.Key.Key_4,
     ):
         super().__init__(
             main_window_plugin,

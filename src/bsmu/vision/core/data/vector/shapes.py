@@ -122,6 +122,14 @@ class Point(VectorShape):
         self.origin = value
 
 
+@dataclass(frozen=True)
+class EdgeHitInfo:
+    closest_point: QPointF | None = None
+    edge_index: int | None = None             # Index of the starting node of the edge
+    edge_normalized_pos: float | None = None  # Normalized position [0, 1] along the edge
+    squared_distance: float | None = None
+
+
 class NodeBasedShape(VectorShape):
     """Base class for shapes defined by a sequence of editable VectorNodes."""
 
@@ -228,6 +236,38 @@ class NodeBasedShape(VectorShape):
         while self._nodes:
             self.pop_node()
 
+    def closest_edge(
+            self,
+            scene_pos: QPointF,
+            max_tolerance: float = math.inf,
+    ) -> EdgeHitInfo | None:
+        """Find the closest edge point to a scene point.
+        Returns None if shape has < 2 nodes or exceeds tolerance."""
+        if len(self._nodes) < 2:
+            return None
+
+        closest_hit: EdgeHitInfo | None = None
+        min_squared_distance = max_tolerance ** 2
+
+        for i in range(len(self._nodes) - 1):
+            node_start_pos = self._nodes[i].scene_pos
+            node_end_pos = self._nodes[i + 1].scene_pos
+
+            closest_point, normalized_pos = GeometryUtils.closest_point_on_segment(
+                node_start_pos, node_end_pos, scene_pos)
+            current_squared_distance = GeometryUtils.squared_distance(scene_pos, closest_point)
+
+            if current_squared_distance < min_squared_distance:
+                min_squared_distance = current_squared_distance
+                closest_hit = EdgeHitInfo(
+                    closest_point=closest_point,
+                    edge_index=i,
+                    edge_normalized_pos=normalized_pos,
+                    squared_distance=current_squared_distance,
+                )
+
+        return closest_hit
+
 
 @dataclass(frozen=True)
 class ClosestPolylinePointInfo:
@@ -303,7 +343,7 @@ class Polyline(NodeBasedShape):
             segment_start = self._nodes[i].scene_pos
             segment_end = self._nodes[i + 1].scene_pos
 
-            segment_closest_point = GeometryUtils.closest_point_on_segment(segment_start, segment_end, point)
+            segment_closest_point, _ = GeometryUtils.closest_point_on_segment(segment_start, segment_end, point)
             squared_distance = GeometryUtils.squared_distance(point, segment_closest_point)
 
             if squared_distance < min_squared_distance:

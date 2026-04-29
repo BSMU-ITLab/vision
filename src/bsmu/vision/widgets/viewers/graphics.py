@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from bsmu.vision.widgets.viewers.graphics_view import NormalizedViewRegion
 
 
+SCREEN_TOLERANCE = 8.0
+
+
 class ImageViewerSettings(Settings):
     def __init__(self, graphics_view_settings: GraphicsViewSettings):
         super().__init__()
@@ -113,27 +116,36 @@ class GraphicsViewer(DataViewer[DataT]):
         viewport_pos = self.viewport.mapFrom(self._graphics_view, graphics_view_pos)
         return self.map_viewport_to_actor(viewport_pos, actor)
 
+    def _get_view_scale(self) -> float:
+        """Returns the maximum isotropic scale of the current view transform."""
+        transform = self._graphics_view.transform()
+        return max(transform.m11(), transform.m22())
+
+    def screen_to_scene_tolerance(self, screen_tolerance: float = SCREEN_TOLERANCE) -> float:
+        """Convert screen/pixel tolerance to scene units using isotropic scaling."""
+        scale = self._get_view_scale()
+        if scale <= 0.0:
+            return screen_tolerance  # Safe fallback
+        return screen_tolerance / scale
+
     def _vector_actors_near(
             self,
             scene_pos: QPointF | QPoint,
-            screen_tolerance: float = 5.0,
+            screen_tolerance: float = SCREEN_TOLERANCE,
             mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
     ) -> Iterator[VectorElementActor]:
         """Yield vector actors (shapes or nodes) near `scene_pos` within a screen-space tolerance."""
-        transform = self._graphics_view.transform()
-        scale_x = transform.m11()
-        scale_y = transform.m22()
-        if scale_x == 0 or scale_y == 0:
-            return
-
-        scene_tolerance_x = screen_tolerance / scale_x
-        scene_tolerance_y = screen_tolerance / scale_y
+        scene_tolerance = self.screen_to_scene_tolerance(screen_tolerance)
         search_area = QRectF(
-            scene_pos.x() - scene_tolerance_x, scene_pos.y() - scene_tolerance_y,
-            scene_tolerance_x * 2, scene_tolerance_y * 2,
+            scene_pos.x() - scene_tolerance,
+            scene_pos.y() - scene_tolerance,
+            scene_tolerance * 2,
+            scene_tolerance * 2,
         )
-        for item in self._graphics_scene.items(search_area, mode, order):
+        # `device_transform` is needed for ItemIgnoresTransformations items to hit-test correctly
+        device_transform = self._graphics_view.viewportTransform()
+        for item in self._graphics_scene.items(search_area, mode, order, device_transform):
             actor_weakref = item.data(GraphicsActor.ACTOR_KEY)
             if actor_weakref and isinstance(actor := actor_weakref(), VectorElementActor):
                 yield actor
@@ -141,7 +153,7 @@ class GraphicsViewer(DataViewer[DataT]):
     def vector_actors_near(
             self,
             scene_pos: QPointF | QPoint,
-            screen_tolerance: float = 5.0,
+            screen_tolerance: float = SCREEN_TOLERANCE,
             mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
     ) -> list[VectorElementActor]:
@@ -151,7 +163,7 @@ class GraphicsViewer(DataViewer[DataT]):
     def vector_actor_near(
             self,
             scene_pos: QPointF | QPoint,
-            screen_tolerance: float = 5.0,
+            screen_tolerance: float = SCREEN_TOLERANCE,
             mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
             predicate: Callable[[VectorElementActor], bool] | None = None,

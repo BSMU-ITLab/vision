@@ -1,1 +1,1 @@
-from .shape import VectorElementActor, VectorShapeActor, VectorNodeActor, PointActor, PolylineActor
+from .shape import VectorElementActor, VectorShapeActor, VectorNodeActor, PointActor, NodeBasedShapeActor, PolylineActor

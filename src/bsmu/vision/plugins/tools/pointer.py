@@ -6,16 +6,20 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Qt, QEvent, QPointF
 from PySide6.QtGui import QMouseEvent, QKeyEvent
 
+from bsmu.vision.actors.shape import NodeBasedShapeActor
 from bsmu.vision.actors.shape import VectorShapeActor, VectorNodeActor, VectorElementActor
 from bsmu.vision.core.data.vector.shapes import VectorShape, VectorNode
 from bsmu.vision.plugins.tools import (
     ViewerToolPlugin, ViewerToolSettingsWidget, ViewerToolSettings, CursorConfig)
 from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
-from bsmu.vision.undo.data.vector.shape import MoveShapesCommand, MoveNodesCommand
+from bsmu.vision.undo.data.vector.shape import InsertNodeCommand, MoveShapesCommand, MoveNodesCommand
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 if TYPE_CHECKING:
     from bsmu.vision.plugins.undo import UndoManager
+
+
+DOUBLE_CLICK_SCREEN_TOLERANCE = 10.0
 
 
 class PointerToolMode(Enum):
@@ -43,7 +47,8 @@ class PointerTool(LayeredDataViewerTool):
     **Editing**
     - Drag a selected shape -> move all selected shapes together.
     - Drag a selected node -> move all selected nodes (within their respective shapes).
-    - Double-click on a selected shape edge -> insert a new node (planned feature).
+    - Double-click on shape edge -> insert node at closest point.
+      Auto-selects shape if unselected (Shift for multi-select).
     - Press Delete -> remove selected shapes (if any); otherwise, remove selected nodes.
     """
 
@@ -89,7 +94,7 @@ class PointerTool(LayeredDataViewerTool):
                     return self._on_mouse_release()
             case QEvent.Type.MouseButtonDblClick:
                 if event.button() == Qt.MouseButton.LeftButton:
-                    return self._on_double_click(scene_pos)
+                    return self._on_double_click(scene_pos, event.modifiers())
 
         return False
 
@@ -178,9 +183,49 @@ class PointerTool(LayeredDataViewerTool):
         self._dragged_shapes = None
         self._dragged_nodes = None
 
-    def _on_double_click(self, scene_pos: QPointF) -> bool:
-        # TODO: Insert node on edge if shape is selected
-        return False
+    def _on_double_click(self, scene_pos: QPointF, modifiers: Qt.KeyboardModifier) -> bool:
+        return self._try_insert_node_on_edge(scene_pos, modifiers)
+
+    def _try_insert_node_on_edge(self, scene_pos: QPointF, modifiers: Qt.KeyboardModifier) -> bool:
+        # Find nearest actor
+        actor = self.viewer.vector_actor_near(scene_pos)
+        if not isinstance(actor, NodeBasedShapeActor):
+            return False
+
+        # Find the closest edge within reasonable tolerance
+        shape = actor.shape
+        scene_tolerance = self.viewer.screen_to_scene_tolerance(DOUBLE_CLICK_SCREEN_TOLERANCE)
+        hit_info = shape.closest_edge(scene_pos, max_tolerance=scene_tolerance)
+        if hit_info is None:
+            return False
+
+        self._ensure_shape_selected_for_edit(shape, modifiers)
+
+        # Insert node & push undo command
+        insert_index = hit_info.edge_index + 1  # Insert between the two edge nodes
+        insert_node_command = InsertNodeCommand(
+            layered_data=self.viewer.data,
+            shape=shape,
+            pos=hit_info.closest_point,
+            index=insert_index,
+            text=f'Insert Node in {type(shape).__name__}'
+        )
+        self._undo_manager.push(insert_node_command)
+        return True
+
+    def _ensure_shape_selected_for_edit(
+            self,
+            shape: VectorShape,
+            modifiers: Qt.KeyboardModifier,
+    ) -> None:
+        """Select the shape if not already selected, preserving Shift behavior."""
+        if shape in self.selection_manager.selected_shapes:
+            return
+
+        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+            self.selection_manager.toggle_shape_selection(shape)
+        else:
+            self.selection_manager.select_shape(shape)
 
     def _delete_selected(self) -> bool:
         # TODO: Implement delete with undo support

@@ -7,7 +7,7 @@ from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPainter
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPathItem, QGraphicsEllipseItem
 
 from bsmu.vision.actors import GraphicsActor, ItemT
-from bsmu.vision.core.data.vector.shapes import VectorElement, VectorShape, VectorNode, Point, Polyline
+from bsmu.vision.core.data.vector.shapes import VectorElement, VectorShape, VectorNode, Point, NodeBasedShape, Polyline
 
 if TYPE_CHECKING:
     from PySide6.QtCore import QObject, QPointF
@@ -81,6 +81,8 @@ class VectorNodeActor(VectorElementActor[VectorNode, GraphicsNodeItem]):
             parent: QObject | None = None,
     ):
         self._radius = radius
+        if brush is None:
+            brush = QBrush(Qt.GlobalColor.green)
         self._brush = brush
 
         super().__init__(model, parent)
@@ -163,43 +165,25 @@ class AntialiasedGraphicsPathItem(QGraphicsPathItem):
         return self._cached_shape
 
 
-class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
-    DEFAULT_COMPLETED_COLOR = QColor(106, 255, 13)
-    DEFAULT_DRAFT_COLOR = Qt.GlobalColor.blue
+NodeBasedShapeT = TypeVar('NodeBasedShapeT', bound=NodeBasedShape)
+AntialiasedGraphicsPathItemT = TypeVar('AntialiasedGraphicsPathItemT', bound=AntialiasedGraphicsPathItem)
 
+class NodeBasedShapeActor(
+    VectorShapeActor[NodeBasedShapeT, AntialiasedGraphicsPathItemT],
+    Generic[NodeBasedShapeT, AntialiasedGraphicsPathItemT]
+):
     def __init__(
             self,
-            model: Polyline | None = None,
-            completed_color: QColor | None = None,
-            draft_color: QColor | None = None,
+            model: NodeBasedShape | None = None,
+            node_radius: float = 5.0,
+            node_default_brush: QBrush | None = None,
             parent: QObject | None = None,
     ):
-        self._path: QPainterPath | None = None
-
-        self._completed_color = completed_color or self.DEFAULT_COMPLETED_COLOR
-        self._draft_color = draft_color or self.DEFAULT_DRAFT_COLOR
-
+        self._node_radius = node_radius
+        self._node_default_brush = node_default_brush
         self._node_actors: list[VectorNodeActor] = []
 
         super().__init__(model, parent)
-
-    def _create_graphics_item(self) -> AntialiasedGraphicsPathItem:
-        graphics_item = AntialiasedGraphicsPathItem()
-        pen = QPen()
-        pen.setWidth(3)
-        pen.setCosmetic(True)
-        graphics_item.setPen(pen)
-        return graphics_item
-
-    def _update_graphics_item(self) -> None:
-        self._update_item_pos()
-        self._rebuild_path()
-        self._rebuild_node_actors()
-        self._update_color()
-
-    @property
-    def polyline(self) -> Polyline | None:
-        return self.model
 
     @property
     def last_node(self) -> VectorNode:
@@ -211,28 +195,12 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
     def pop_node(self, index: int = -1) -> VectorNode:
         return self.model.pop_node(index)
 
-    def update_visual_state(
-            self,
-            is_selected: bool = False,
-            selected_nodes: set[VectorNode] | None = None,
-    ) -> None:
-        pen = self.graphics_item.pen()
-        color = Qt.GlobalColor.yellow if is_selected else Qt.GlobalColor.black
-        pen.setColor(color)
-        self.graphics_item.setPen(pen)
-
-        selected_nodes = selected_nodes or set()
-        for node_actor in self._node_actors:
-            is_node_selected = node_actor.node in selected_nodes
-            node_actor.update_visual_state(is_node_selected)
-
-    def _model_about_to_change(self, new_model: Polyline | None) -> None:
+    def _model_about_to_change(self, new_model: NodeBasedShape | None) -> None:
         if self.model is not None:
             self.model.transform_changed.disconnect(self._on_transform_changed)
             self.model.geometry_changed.disconnect(self._on_geometry_changed)
             self.model.node_added.disconnect(self._on_node_added)
             self.model.node_removed.disconnect(self._on_node_removed)
-            self.model.completed.disconnect(self._on_completed)
 
         super()._model_about_to_change(new_model)
 
@@ -244,7 +212,6 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
             self.model.geometry_changed.connect(self._on_geometry_changed)
             self.model.node_added.connect(self._on_node_added)
             self.model.node_removed.connect(self._on_node_removed)
-            self.model.completed.connect(self._on_completed)
 
     def _on_transform_changed(self) -> None:
         self._update_item_pos()
@@ -254,21 +221,129 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
 
     def _on_geometry_changed(self) -> None:
         self._rebuild_path()
-        # Node actors update their positions autonomously via model signals
+        # Node actors update their positions autonomously via their own model signals
 
-    def _on_completed(self) -> None:
-        self._update_color()
+    def _on_node_added(self, node: VectorNode, index: int) -> None:
+        self._create_node_actor(node, index)
+        self._on_nodes_changed()
 
-    def _update_color(self) -> None:
+    def _on_node_removed(self, node: VectorNode, index: int) -> None:
+        self._remove_node_actor(index)
+        self._on_nodes_changed()
+
+    def _on_nodes_changed(self) -> None:
+        """Called after node addition/removal. Defaults to full path rebuild."""
+        self._rebuild_path()
+
+    def _create_node_actor(self, node: VectorNode, index: int | None = None) -> VectorNodeActor:
+        node_actor = VectorNodeActor(node, radius=self._node_radius, brush=self._node_default_brush, parent=self)
+        if index is None:
+            index = len(self._node_actors)
+        self._node_actors.insert(index, node_actor)
+        node_actor.graphics_item.setParentItem(self.graphics_item)
+        return node_actor
+
+    def _remove_node_actor(self, index: int) -> None:
+        node_actor = self._node_actors.pop(index)
+        node_actor.cleanup()
+
+    def _rebuild_node_actors(self) -> None:
+        # Clean up old node actors
+        for node_actor in self._node_actors:
+            node_actor.cleanup()
+        self._node_actors.clear()
+
+        # Create new node actors
+        if self.model is not None:
+            for node in self.model.nodes:
+                self._create_node_actor(node)
+
+    def _update_graphics_item(self) -> None:
+        self._update_item_pos()
+        self._rebuild_path()
+        self._rebuild_node_actors()
+        self._update_graphics_item_visual_state(is_selected=False)
+
+    def _rebuild_path(self) -> None:
+        """Define how the shape's QPainterPath is constructed."""
+        raise NotImplementedError
+
+    def _update_graphics_item_visual_state(self, is_selected: bool) -> None:
+        """Define shape-specific styling (pen color, width, etc.)."""
+        raise NotImplementedError
+
+    def update_visual_state(
+            self,
+            is_selected: bool = False,
+            selected_nodes: set[VectorNode] | None = None,
+    ) -> None:
+        self._update_graphics_item_visual_state(is_selected)
+        selected_nodes = selected_nodes or set()
+        for node_actor in self._node_actors:
+            is_node_selected = node_actor.node in selected_nodes
+            node_actor.update_visual_state(is_node_selected)
+
+
+class PolylineActor(NodeBasedShapeActor[Polyline, AntialiasedGraphicsPathItem]):
+    DEFAULT_COMPLETED_COLOR = QColor(106, 255, 13)
+    DEFAULT_DRAFT_COLOR = Qt.GlobalColor.blue
+
+    def __init__(
+            self,
+            model: Polyline | None = None,
+            node_radius: float = 5.0,
+            completed_color: QColor | None = None,
+            draft_color: QColor | None = None,
+            parent: QObject | None = None,
+    ):
+        self._completed_color = completed_color or self.DEFAULT_COMPLETED_COLOR
+        self._draft_color = draft_color or self.DEFAULT_DRAFT_COLOR
+
+        self._path: QPainterPath | None = None
+
+        super().__init__(model, node_radius=node_radius, parent=parent)
+
+    def _create_graphics_item(self) -> AntialiasedGraphicsPathItem:
+        graphics_item = AntialiasedGraphicsPathItem()
+        pen = QPen()
+        pen.setWidth(3)
+        pen.setCosmetic(True)
+        graphics_item.setPen(pen)
+        return graphics_item
+
+    @property
+    def polyline(self) -> Polyline | None:
+        return self.model
+
+    def _update_graphics_item_visual_state(self, is_selected: bool) -> None:
         if self.model is None:
             return
 
         pen = self.graphics_item.pen()
-        color = self._completed_color if self.model.is_completed else self._draft_color
+        if is_selected:
+            color = Qt.GlobalColor.yellow
+        else:
+            color = self._completed_color if self.model.is_completed else self._draft_color
         pen.setColor(color)
         self.graphics_item.setPen(pen)
 
+    def _model_about_to_change(self, new_model: Polyline | None) -> None:
+        if self.model is not None:
+            self.model.completed.disconnect(self._on_completed)
+
+        super()._model_about_to_change(new_model)
+
+    def _model_changed(self) -> None:
+        super()._model_changed()
+
+        if self.model is not None:
+            self.model.completed.connect(self._on_completed)
+
+    def _on_completed(self) -> None:
+        self._update_graphics_item_visual_state(is_selected=False)
+
     def _on_node_added(self, node: VectorNode, index: int) -> None:
+        """Optimization override to avoid full path rebuild when appending a node."""
         # When appending a node, extend the path with a line segment.
         # For insertion elsewhere, rebuild the entire path.
         if self.model.last_node is node:
@@ -282,20 +357,6 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
 
         self._create_node_actor(node, index)
 
-    def _create_node_actor(self, node: VectorNode, index: int | None = None) -> VectorNodeActor:
-        node_actor = VectorNodeActor(node, brush=self._completed_color, parent=self)
-        if index is None:
-            index = len(self._node_actors)
-        self._node_actors.insert(index, node_actor)
-        node_actor.graphics_item.setParentItem(self.graphics_item)
-        return node_actor
-
-    def _on_node_removed(self, _node: VectorNode, index: int) -> None:
-        self._rebuild_path()
-
-        node_actor = self._node_actors.pop(index)
-        node_actor.cleanup()
-
     def _rebuild_path(self) -> None:
         self._path = QPainterPath()  # Avoid using self._path.clear(),
         # as it does not clear moveTo element in PySide 6.8.0.2
@@ -304,14 +365,3 @@ class PolylineActor(VectorShapeActor[Polyline, AntialiasedGraphicsPathItem]):
             for node in self.model.nodes[1:]:
                 self._path.lineTo(node.local_pos)
         self.graphics_item.setPath(self._path)
-
-    def _rebuild_node_actors(self) -> None:
-        # Clean up old node actors
-        for node_actor in self._node_actors:
-            node_actor.cleanup()
-        self._node_actors.clear()
-
-        # Create new node actors
-        if self.model is not None:
-            for node in self.model.nodes:
-                self._create_node_actor(node)

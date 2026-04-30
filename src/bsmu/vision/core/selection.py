@@ -40,7 +40,7 @@ class SelectionManager(QObject):
     def select_node(self, node: VectorNode) -> None:
         if node not in self._selected_nodes:
             self._selected_nodes = { node }
-            self._selected_shapes = { node.parent_shape }
+            self._selected_shapes.clear()
             self.selection_changed.emit()
 
     def toggle_shape_selection(self, shape: VectorShape) -> None:
@@ -55,8 +55,6 @@ class SelectionManager(QObject):
             self._selected_nodes.discard(node)
         else:
             self._selected_nodes.add(node)
-            self._selected_shapes.add(node.parent_shape)
-        # Optional: if no nodes of a shape remain selected, maybe deselect shape? (UX choice)
         self.selection_changed.emit()
 
     def is_shape_selected(self, shape: VectorShape) -> bool:

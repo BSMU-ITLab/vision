@@ -41,14 +41,14 @@ class PointerTool(LayeredDataViewerTool):
     - Click on empty canvas -> deselect all shapes and nodes.
     - Click on a shape (not on a node) -> select that shape; deselect others.
     - Shift + click on a shape -> toggle its selection (add/remove from current selection).
-    - Click on a node -> select that node and its parent shape; deselect others.
+    - Click on a node -> select that node; deselect others.
     - Shift + click on a node -> toggle node selection.
 
     **Editing**
     - Drag a selected shape -> move all selected shapes together.
     - Drag a selected node -> move all selected nodes (within their respective shapes).
     - Double-click on shape edge -> insert node at closest point.
-      Auto-selects shape if unselected (Shift for multi-select).
+      Selects the new node (Shift to toggle selection).
     - Press Delete -> remove selected shapes (if any); otherwise, remove selected nodes.
     """
 
@@ -199,8 +199,6 @@ class PointerTool(LayeredDataViewerTool):
         if hit_info is None:
             return False
 
-        self._ensure_shape_selected_for_edit(shape, modifiers)
-
         # Insert node & push undo command
         insert_index = hit_info.edge_index + 1  # Insert between the two edge nodes
         insert_node_command = InsertNodeCommand(
@@ -211,6 +209,16 @@ class PointerTool(LayeredDataViewerTool):
             text=f'Insert Node in {type(shape).__name__}'
         )
         self._undo_manager.push(insert_node_command)
+
+        # Auto-select the newly created node (respects Shift modifier)
+        new_node = shape.nodes[insert_index]
+        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+            self.selection_manager.toggle_node_selection(new_node)
+            # Revert shape toggle from preceding press (Qt fires press before double-click)
+            self.selection_manager.toggle_shape_selection(shape)
+        else:
+            self.selection_manager.select_node(new_node)
+
         return True
 
     def _ensure_shape_selected_for_edit(

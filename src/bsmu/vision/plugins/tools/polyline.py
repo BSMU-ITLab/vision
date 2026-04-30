@@ -4,7 +4,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, QEvent, QLineF
-from PySide6.QtGui import QMouseEvent, QPen, QPainter, QCursor
+from PySide6.QtGui import QMouseEvent, QPen, QPainter, QCursor, QColor
 from PySide6.QtWidgets import QGraphicsLineItem
 
 from bsmu.vision.core.data.vector.shapes import Polyline
@@ -136,7 +136,7 @@ class PolylineTool(LayeredDataViewerTool):
 
     def _create_preview_segment(self) -> None:
         self._preview_segment = PreviewSegment()
-        pen = QPen(Qt.GlobalColor.red, 3)
+        pen = QPen(QColor('#ed3030'), 3)
         pen.setCosmetic(True)
         self._preview_segment.setPen(pen)
         self.viewer.add_graphics_item(self._preview_segment)

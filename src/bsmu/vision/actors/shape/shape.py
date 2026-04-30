@@ -82,7 +82,7 @@ class VectorNodeActor(VectorElementActor[VectorNode, GraphicsNodeItem]):
     ):
         self._radius = radius
         if brush is None:
-            brush = QBrush(Qt.GlobalColor.green)
+            brush = QBrush(QColor(106, 255, 13))
         self._brush = brush
 
         super().__init__(model, parent)
@@ -91,8 +91,8 @@ class VectorNodeActor(VectorElementActor[VectorNode, GraphicsNodeItem]):
     def node(self) -> VectorNode | None:
         return self.model
 
-    def update_visual_state(self, is_selected: bool = False) -> None:
-        brush = QBrush(Qt.GlobalColor.yellow) if is_selected else self._brush
+    def update_visual_state(self, color: QColor | None = None) -> None:
+        brush = QBrush(color) if color is not None else self._brush
         self.graphics_item.setBrush(brush)
 
     def cleanup(self) -> None:
@@ -172,15 +172,28 @@ class NodeBasedShapeActor(
     VectorShapeActor[NodeBasedShapeT, AntialiasedGraphicsPathItemT],
     Generic[NodeBasedShapeT, AntialiasedGraphicsPathItemT]
 ):
+    DEFAULT_DRAFT_COLOR = QColor('#94ed64')
+    DEFAULT_COMPLETED_COLOR = QColor('#6495ed')
+    DEFAULT_SUBSELECTED_COLOR = QColor('#93baff')  # '#bd64ed'
+    DEFAULT_SELECTED_COLOR = QColor('#ffc867')  # '#edbd64'
+
     def __init__(
             self,
             model: NodeBasedShape | None = None,
             node_radius: float = 5.0,
             node_default_brush: QBrush | None = None,
+            draft_color: QColor | None = None,
+            completed_color: QColor | None = None,
+            subselected_color: QColor | None = None,
+            selected_color: QColor | None = None,
             parent: QObject | None = None,
     ):
         self._node_radius = node_radius
-        self._node_default_brush = node_default_brush
+        self._node_default_brush = node_default_brush or self.DEFAULT_DRAFT_COLOR
+        self._draft_color = draft_color or self.DEFAULT_DRAFT_COLOR
+        self._completed_color = completed_color or self.DEFAULT_COMPLETED_COLOR
+        self._subselected_color = subselected_color or self.DEFAULT_SUBSELECTED_COLOR
+        self._selected_color = selected_color or self.DEFAULT_SELECTED_COLOR
         self._node_actors: list[VectorNodeActor] = []
 
         super().__init__(model, parent)
@@ -201,6 +214,7 @@ class NodeBasedShapeActor(
             self.model.geometry_changed.disconnect(self._on_geometry_changed)
             self.model.node_added.disconnect(self._on_node_added)
             self.model.node_removed.disconnect(self._on_node_removed)
+            self.model.completed.disconnect(self._on_completed)
 
         super()._model_about_to_change(new_model)
 
@@ -212,6 +226,7 @@ class NodeBasedShapeActor(
             self.model.geometry_changed.connect(self._on_geometry_changed)
             self.model.node_added.connect(self._on_node_added)
             self.model.node_removed.connect(self._on_node_removed)
+            self.model.completed.connect(self._on_completed)
 
     def _on_transform_changed(self) -> None:
         self._update_item_pos()
@@ -222,6 +237,9 @@ class NodeBasedShapeActor(
     def _on_geometry_changed(self) -> None:
         self._rebuild_path()
         # Node actors update their positions autonomously via their own model signals
+
+    def _on_completed(self) -> None:
+        self.update_visual_state()
 
     def _on_node_added(self, node: VectorNode, index: int) -> None:
         self._create_node_actor(node, index)
@@ -262,46 +280,68 @@ class NodeBasedShapeActor(
         self._update_item_pos()
         self._rebuild_path()
         self._rebuild_node_actors()
-        self._update_graphics_item_visual_state(is_selected=False)
+        self._update_graphics_item_visual_state()
 
     def _rebuild_path(self) -> None:
         """Define how the shape's QPainterPath is constructed."""
         raise NotImplementedError
 
-    def _update_graphics_item_visual_state(self, is_selected: bool) -> None:
+    def _update_graphics_item_visual_state(self, is_selected: bool = False, has_selected_nodes: bool = False) -> None:
         """Define shape-specific styling (pen color, width, etc.)."""
-        raise NotImplementedError
+        if self.model is None:
+            return
+
+        pen = self.graphics_item.pen()
+        if is_selected:
+            color = self._selected_color
+        else:
+            if self.model.is_completed:
+                color = self._subselected_color if has_selected_nodes else self._completed_color
+            else:
+                color = self._draft_color
+        pen.setColor(color)
+        self.graphics_item.setPen(pen)
 
     def update_visual_state(
             self,
             is_selected: bool = False,
             selected_nodes: set[VectorNode] | None = None,
     ) -> None:
-        self._update_graphics_item_visual_state(is_selected)
+        self._update_graphics_item_visual_state(is_selected, bool(selected_nodes))
         selected_nodes = selected_nodes or set()
         for node_actor in self._node_actors:
             is_node_selected = node_actor.node in selected_nodes
-            node_actor.update_visual_state(is_node_selected)
+            if is_node_selected:
+                node_color = self._selected_color
+            else:
+                node_color = self._completed_color if self.model.is_completed else self._draft_color
+            node_actor.update_visual_state(node_color)
 
 
 class PolylineActor(NodeBasedShapeActor[Polyline, AntialiasedGraphicsPathItem]):
-    DEFAULT_COMPLETED_COLOR = QColor(106, 255, 13)
-    DEFAULT_DRAFT_COLOR = Qt.GlobalColor.blue
-
     def __init__(
             self,
             model: Polyline | None = None,
             node_radius: float = 5.0,
-            completed_color: QColor | None = None,
+            node_default_brush: QBrush | None = None,
             draft_color: QColor | None = None,
+            completed_color: QColor | None = None,
+            subselected_color: QColor | None = None,
+            selected_color: QColor | None = None,
             parent: QObject | None = None,
     ):
-        self._completed_color = completed_color or self.DEFAULT_COMPLETED_COLOR
-        self._draft_color = draft_color or self.DEFAULT_DRAFT_COLOR
-
         self._path: QPainterPath | None = None
 
-        super().__init__(model, node_radius=node_radius, parent=parent)
+        super().__init__(
+            model,
+            node_radius=node_radius,
+            node_default_brush=node_default_brush,
+            draft_color=draft_color,
+            completed_color=completed_color,
+            subselected_color=subselected_color,
+            selected_color=selected_color,
+            parent=parent,
+        )
 
     def _create_graphics_item(self) -> AntialiasedGraphicsPathItem:
         graphics_item = AntialiasedGraphicsPathItem()
@@ -314,33 +354,6 @@ class PolylineActor(NodeBasedShapeActor[Polyline, AntialiasedGraphicsPathItem]):
     @property
     def polyline(self) -> Polyline | None:
         return self.model
-
-    def _update_graphics_item_visual_state(self, is_selected: bool) -> None:
-        if self.model is None:
-            return
-
-        pen = self.graphics_item.pen()
-        if is_selected:
-            color = Qt.GlobalColor.yellow
-        else:
-            color = self._completed_color if self.model.is_completed else self._draft_color
-        pen.setColor(color)
-        self.graphics_item.setPen(pen)
-
-    def _model_about_to_change(self, new_model: Polyline | None) -> None:
-        if self.model is not None:
-            self.model.completed.disconnect(self._on_completed)
-
-        super()._model_about_to_change(new_model)
-
-    def _model_changed(self) -> None:
-        super()._model_changed()
-
-        if self.model is not None:
-            self.model.completed.connect(self._on_completed)
-
-    def _on_completed(self) -> None:
-        self._update_graphics_item_visual_state(is_selected=False)
 
     def _on_node_added(self, node: VectorNode, index: int) -> None:
         """Optimization override to avoid full path rebuild when appending a node."""

@@ -138,6 +138,8 @@ class NodeBasedShape(VectorShape):
     node_about_to_remove = Signal(VectorNode, int)
     node_removed = Signal(VectorNode, int)
 
+    completed = Signal()
+
     def __init__(
             self,
             points: Sequence[QPointF] = (),
@@ -151,6 +153,8 @@ class NodeBasedShape(VectorShape):
             # Initialize without signals to avoid overhead during construction
             node = VectorNode.from_scene_pos(self, point, parent=self)
             self._nodes.append(node)
+
+        self._is_completed = False
 
     @property
     def nodes(self) -> Sequence[VectorNode]:
@@ -184,6 +188,19 @@ class NodeBasedShape(VectorShape):
             GeometryUtils.distance(self._nodes[i].local_pos, self._nodes[i + 1].local_pos)
             for i in range(len(self._nodes) - 1)
         )
+
+    @property
+    def is_completed(self) -> bool:
+        return self._is_completed
+
+    @property
+    def is_draft(self) -> bool:
+        return not self._is_completed
+
+    def complete(self) -> None:
+        if not self._is_completed:
+            self._is_completed = True
+            self.completed.emit()
 
     def create_node(self, scene_pos: QPointF, index: int | None = None) -> VectorNode:
         """Create and insert node at index (appends if None)."""
@@ -277,8 +294,6 @@ class ClosestPolylinePointInfo:
 
 
 class Polyline(NodeBasedShape):
-    completed = Signal()
-
     def __init__(
             self,
             points: Sequence[QPointF] = (),
@@ -286,21 +301,6 @@ class Polyline(NodeBasedShape):
             parent: QObject | None = None,
     ):
         super().__init__(points, origin=origin, parent=parent)
-
-        self._is_completed = False
-
-    @property
-    def is_completed(self) -> bool:
-        return self._is_completed
-
-    @property
-    def is_draft(self) -> bool:
-        return not self._is_completed
-
-    def complete(self) -> None:
-        if not self._is_completed:
-            self._is_completed = True
-            self.completed.emit()
 
     def closest_point(self, point: QPointF) -> QPointF | None:
         """

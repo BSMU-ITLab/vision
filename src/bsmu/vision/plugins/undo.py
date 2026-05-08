@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QUndoView, QDockWidget
 
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.windows.main import EditMenu, WindowsMenu
+from bsmu.vision.undo import UndoCommand
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QAction
@@ -16,7 +17,6 @@ if TYPE_CHECKING:
 
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
-    from bsmu.vision.undo import UndoCommand
 
 
 class UndoPlugin(Plugin):
@@ -129,8 +129,20 @@ class UndoManager(QObject):
     def index(self) -> int:
         return self._undo_group.activeStack().index()
 
-    def set_index(self, idx: int):
-        self._undo_group.activeStack().setIndex(idx)
+    def set_index(self, index: int):
+        self._undo_group.activeStack().setIndex(index)
+
+    def discard_commands_after(self, index: int) -> None:
+        """
+        Discard all commands (clear redo history) after the specified stack index.
+        Uses a dummy obsolete command to trigger stack cleanup without
+        affecting the document state.
+        """
+        self.set_index(index)
+        dummy_command = UndoCommand()
+        self.push(dummy_command)
+        dummy_command.setObsolete(True)
+        self._undo_group.undo()
 
     def _create_undo_stack(self) -> QUndoStack:
         undo_stack = QUndoStack(self._undo_group)

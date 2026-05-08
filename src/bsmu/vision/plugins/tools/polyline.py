@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Qt, QEvent, QLineF
+from PySide6.QtCore import QObject, Qt, QEvent, QLineF, QTimer
 from PySide6.QtGui import QMouseEvent, QPen, QPainter, QCursor, QColor
 from PySide6.QtWidgets import QGraphicsLineItem
 
@@ -60,6 +60,10 @@ class PolylineTool(LayeredDataViewerTool):
 
         self._state = PolylineToolState.IDLE
 
+        # Store undo stack position before starting a draft drawing operation
+        # to roll back to it if the shape is deleted/undone
+        self._drawing_undo_start_index: int | None = None
+
     def activate(self) -> None:
         super().activate()
 
@@ -115,6 +119,7 @@ class PolylineTool(LayeredDataViewerTool):
 
     def _start_new_polyline_drawing(self, pos: QPointF) -> None:
         self._undo_manager.begin_macro('Create Polyline')
+        self._drawing_undo_start_index = self._undo_manager.index()
         vector_layer_name = self.settings.vector_layer_name
         create_vector_layer_command = CreateVectorLayerCommand(self.viewer.data, vector_layer_name)
         self._undo_manager.push(create_vector_layer_command)
@@ -130,13 +135,14 @@ class PolylineTool(LayeredDataViewerTool):
         self._create_preview_segment()
 
         self._curr_polyline.node_removed.connect(self._on_polyline_node_removed)
+        self._curr_polyline.node_added.connect(self._on_polyline_node_added)
         self._curr_vector.shape_removed.connect(self._on_vector_shape_removed)
 
         self._state = PolylineToolState.DRAWING
 
     def _create_preview_segment(self) -> None:
         self._preview_segment = PreviewSegment()
-        pen = QPen(QColor('#ed3030'), 3)
+        pen = QPen(QColor('#ff3333'), 3)
         pen.setCosmetic(True)
         self._preview_segment.setPen(pen)
         self.viewer.add_graphics_item(self._preview_segment)
@@ -155,17 +161,34 @@ class PolylineTool(LayeredDataViewerTool):
 
     def _on_polyline_node_removed(self, _node: VectorNode, index: int) -> None:
         if self._curr_polyline.is_empty:
-            self._complete_drawing()
+            self._cancel_drawing()
             return
 
         is_end_node_removed = (index == len(self._curr_polyline.nodes))
         if self.is_drawing and is_end_node_removed:
             self._update_preview_segment_to_cursor_pos()
 
+    def _on_polyline_node_added(self, node: VectorNode, _index: int) -> None:
+        is_end_node_added = node is self._curr_polyline.last_node
+        if self.is_drawing and is_end_node_added:
+            self._update_preview_segment_to_cursor_pos()
+
     def _on_vector_shape_removed(self, shape: VectorShape) -> None:
         """React when the shape we're drawing is deleted (e.g., via undo)."""
-        if shape is self._curr_polyline:
-            self._reset_tool_state()
+        if shape is not self._curr_polyline:
+            return
+
+        self._reset_tool_state()
+
+        QTimer.singleShot(0, self._discard_draft_drawing_commands)
+
+    def _discard_draft_drawing_commands(self) -> None:
+        """Discard all commands created during the current draft drawing session."""
+        if self._drawing_undo_start_index is None:
+            return
+
+        self._undo_manager.discard_commands_after(self._drawing_undo_start_index)
+        self._drawing_undo_start_index = None
 
     def _show_preview_segment(self) -> None:
         if not self._preview_segment.isVisible():
@@ -191,7 +214,7 @@ class PolylineTool(LayeredDataViewerTool):
         if self._state is PolylineToolState.IDLE:
             return
 
-        self._curr_vector.remove_shape(self._curr_polyline)  # TODO: use UndoCommand to remove the shape
+        self._curr_vector.remove_shape(self._curr_polyline)
 
     def _reset_tool_state(self) -> None:
         """Clear preview, reset state."""
@@ -199,6 +222,7 @@ class PolylineTool(LayeredDataViewerTool):
             return
 
         self._curr_polyline.node_removed.disconnect(self._on_polyline_node_removed)
+        self._curr_polyline.node_added.disconnect(self._on_polyline_node_added)
         self._curr_vector.shape_removed.disconnect(self._on_vector_shape_removed)
 
         self.viewer.remove_graphics_item(self._preview_segment)

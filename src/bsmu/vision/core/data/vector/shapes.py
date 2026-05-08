@@ -198,6 +198,7 @@ class NodeBasedShape(VectorShape):
         return not self._is_completed
 
     def complete(self) -> None:
+        """Mark shape as finalized in the document. Not undoable."""
         if not self._is_completed:
             self._is_completed = True
             self.completed.emit()

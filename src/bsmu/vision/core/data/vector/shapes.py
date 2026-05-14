@@ -51,11 +51,11 @@ class VectorShape(VectorElement):
 class VectorNode(VectorElement):
     """Node stores position relative to parent shape's origin."""
 
-    parent_shape_changed = Signal(VectorShape)
+    parent_shape_changed = Signal(VectorShape)  # NodeBasedShape
 
     def __init__(
             self,
-            parent_shape: VectorShape,
+            parent_shape: NodeBasedShape,
             local_pos: QPointF,
             parent: QObject | None = None,
     ):
@@ -65,21 +65,21 @@ class VectorNode(VectorElement):
         self._local_pos = QPointF(local_pos)
 
     @classmethod
-    def from_scene_pos(cls, parent_shape: VectorShape, scene_pos: QPointF, parent: QObject | None = None) -> VectorNode:
+    def from_scene_pos(cls, parent_shape: NodeBasedShape, scene_pos: QPointF, parent: QObject | None = None) -> VectorNode:
         """Create a node from a scene (absolute) position."""
         return cls(parent_shape, parent_shape.scene_to_local(scene_pos), parent)
 
     @classmethod
-    def from_local_pos(cls, parent_shape: VectorShape, local_pos: QPointF, parent: QObject | None = None) -> VectorNode:
+    def from_local_pos(cls, parent_shape: NodeBasedShape, local_pos: QPointF, parent: QObject | None = None) -> VectorNode:
         """Create a node from a local (relative) position."""
         return cls(parent_shape, local_pos, parent)
 
     @property
-    def parent_shape(self) -> VectorShape:
+    def parent_shape(self) -> NodeBasedShape:
         return self._parent_shape
 
     @parent_shape.setter
-    def parent_shape(self, value: VectorShape | None):
+    def parent_shape(self, value: NodeBasedShape | None):
         if self._parent_shape is not value:
             self._parent_shape = value
             self.parent_shape_changed.emit(value)

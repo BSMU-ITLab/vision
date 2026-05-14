@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import TypeVar, Generic, TYPE_CHECKING
+from collections import defaultdict
+from typing import NamedTuple, TypeVar, Generic, TYPE_CHECKING
 
 from PySide6.QtCore import QPointF
 
+from bsmu.vision.core.data.vector import Vector
 from bsmu.vision.core.data.vector.shapes import NodeBasedShape
 from bsmu.vision.undo import UndoCommand
 
@@ -11,7 +13,6 @@ if TYPE_CHECKING:
     from typing import Iterable, Sequence
 
     from bsmu.vision.core.data.layered import LayeredData
-    from bsmu.vision.core.data.vector import Vector
     from bsmu.vision.core.data.vector.shapes import VectorNode, VectorShape
 
 NodeBasedShapeT = TypeVar('NodeBasedShapeT', bound=NodeBasedShape)
@@ -266,4 +267,119 @@ class InsertNodeCommand(UndoCommand):
             shape.remove_node(node)
 
 
-# class RemoveShapeCommand
+class ShapeEntry(NamedTuple):
+    shape: VectorShape
+    vector: Vector
+    index: int
+    handle: int
+    node_handles: list[int]
+
+
+class RemoveShapesCommand(UndoCommand):
+    """Removes shapes from their vectors without destroying them. Undo restores them."""
+
+    def __init__(
+        self,
+        layered_data: LayeredData,
+        shapes: Iterable[VectorShape],
+        text: str = 'Remove Shapes',
+        parent: UndoCommand | None = None,
+    ):
+        super().__init__(text, parent)
+
+        self._layered_data = layered_data
+        self._shape_entries: list[ShapeEntry] = []
+
+        for shape in shapes:
+            parent = shape.parent()
+            if not isinstance(parent, Vector):
+                raise ValueError(f'Expected Vector parent, got {type(parent).__name__}')
+
+            handle = layered_data.shape_registry.get_handle(shape)
+
+            if isinstance(shape, NodeBasedShape):
+                node_handles = [layered_data.node_registry.get_handle(n) for n in shape.nodes]
+            else:
+                node_handles = []
+
+            self._shape_entries.append(ShapeEntry(
+                shape=shape,
+                vector=parent,  # Store vectors of shapes for undo (shape.parent() becomes None after removal)
+                index=parent.shapes.index(shape),  # Store original indices of shapes in vector
+                handle=handle,
+                node_handles=node_handles,
+            ))
+
+    def redo(self) -> None:
+        for shape_entry in self._shape_entries:
+            shape_entry.vector.remove_shape(shape_entry.shape)
+
+    def undo(self) -> None:
+        # Restore in ascending index order to prevent insertion collisions
+        for shape_entry in sorted(self._shape_entries, key=lambda e: e.index):
+            shape_entry.vector.insert_shape(shape_entry.shape, shape_entry.index)
+            self._layered_data.shape_registry.register(shape_entry.shape, shape_entry.handle)
+
+            if isinstance(shape_entry.shape, NodeBasedShape):
+                for node, node_handle in zip(shape_entry.shape.nodes, shape_entry.node_handles):
+                    self._layered_data.node_registry.register(node, node_handle)
+
+
+class NodeEntry(NamedTuple):
+    handle: int
+    local_pos: QPointF
+    index: int
+
+
+class DeleteNodesCommand(UndoCommand):
+    """Permanently deletes nodes and recreates them on undo."""
+
+    def __init__(
+        self,
+        layered_data: LayeredData,
+        nodes: Iterable[VectorNode],
+        text: str = 'Delete Nodes',
+        parent: UndoCommand | None = None,
+    ):
+        super().__init__(text, parent)
+
+        self._layered_data = layered_data
+
+        shape_handle_to_node_entries: dict[int, list[NodeEntry]] = defaultdict(list)
+
+        for node in nodes:
+            shape = node.parent_shape
+            shape_handle = layered_data.shape_registry.get_handle(shape)
+            node_handle = layered_data.node_registry.get_handle(node)
+            if shape_handle is None or node_handle is None:
+                raise ValueError('Shape or node not registered')
+
+            shape_handle_to_node_entries[shape_handle].append(NodeEntry(
+                handle=node_handle,
+                local_pos=node.local_pos,
+                index=shape.nodes.index(node),
+            ))
+
+        # Sort within each shape by descending index
+        self._shape_handle_to_node_entries = {
+            shape_handle: sorted(node_entries, key=lambda e: e.index, reverse=True)
+            for shape_handle, node_entries in shape_handle_to_node_entries.items()
+        }
+
+    def redo(self) -> None:
+        for shape_handle, node_entries in self._shape_handle_to_node_entries.items():
+            shape = self._layered_data.shape_registry.resolve(shape_handle)
+            assert isinstance(shape, NodeBasedShape)
+            for node_entry in node_entries:
+                node = self._layered_data.node_registry.resolve(node_entry.handle)
+                assert node is not None
+                shape.remove_node(node)
+
+    def undo(self) -> None:
+        for shape_handle, node_entries in self._shape_handle_to_node_entries.items():
+            shape = self._layered_data.shape_registry.resolve(shape_handle)
+            assert isinstance(shape, NodeBasedShape)
+            # Reverse to restore in ascending index order
+            for node_entry in reversed(node_entries):
+                new_node = shape.create_node_local(node_entry.local_pos, node_entry.index)
+                self._layered_data.node_registry.register(new_node, node_entry.handle)

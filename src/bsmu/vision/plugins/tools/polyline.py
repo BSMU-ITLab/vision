@@ -237,6 +237,7 @@ class PolylineTool(LayeredDataViewerTool):
             return
 
         self._curr_polyline.complete()
+        self.viewer.selection_manager.select_shape(self._curr_polyline)
         self._reset_tool_state()
 
 

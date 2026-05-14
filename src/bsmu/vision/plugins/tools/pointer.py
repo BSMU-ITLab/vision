@@ -12,7 +12,8 @@ from bsmu.vision.core.data.vector.shapes import VectorShape, VectorNode
 from bsmu.vision.plugins.tools import (
     ViewerToolPlugin, ViewerToolSettingsWidget, ViewerToolSettings, CursorConfig)
 from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
-from bsmu.vision.undo.data.vector.shape import InsertNodeCommand, MoveShapesCommand, MoveNodesCommand
+from bsmu.vision.undo.data.vector.shape import (
+    InsertNodeCommand, MoveShapesCommand, MoveNodesCommand, RemoveShapesCommand, DeleteNodesCommand)
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 if TYPE_CHECKING:
@@ -49,7 +50,7 @@ class PointerTool(LayeredDataViewerTool):
     - Drag a selected node -> move all selected nodes (within their respective shapes).
     - Double-click on shape edge -> insert node at closest point.
       Selects the new node (Shift to toggle selection).
-    - Press Delete -> remove selected shapes (if any); otherwise, remove selected nodes.
+    - Press Delete -> remove selected shapes and nodes.
     """
 
     def __init__(
@@ -236,9 +237,30 @@ class PointerTool(LayeredDataViewerTool):
             self.selection_manager.select_shape(shape)
 
     def _delete_selected(self) -> bool:
-        # TODO: Implement delete with undo support
-        # Remove selected shapes first, then nodes if no shapes selected
-        return False
+        selected_shapes = set(self.selection_manager.selected_shapes)
+        selected_nodes = set(self.selection_manager.selected_nodes)
+
+        if not selected_shapes and not selected_nodes:
+            return False
+
+        # Filter out nodes that belong to shapes being deleted to avoid double-deletion
+        nodes_to_delete = [n for n in selected_nodes if n.parent_shape not in selected_shapes]
+
+        self._undo_manager.begin_macro('Delete Selected')
+
+        if selected_shapes:
+            delete_shapes_command = RemoveShapesCommand(self.viewer.data, selected_shapes, 'Delete Shapes')
+            self._undo_manager.push(delete_shapes_command)
+
+        if nodes_to_delete:
+            delete_nodes_command = DeleteNodesCommand(self.viewer.data, nodes_to_delete)
+            self._undo_manager.push(delete_nodes_command)
+
+        self._undo_manager.end_macro()
+
+        # Clear selection after successful deletion
+        self._clear_selection()
+        return True
 
 
 POINTER_CURSOR_CONFIG = CursorConfig(

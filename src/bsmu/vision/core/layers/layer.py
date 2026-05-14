@@ -257,10 +257,10 @@ class RasterLayer(Layer[Raster]):
 
 
 class VectorLayer(Layer[Vector]):
-    shape_about_to_add = Signal(VectorShape)
-    shape_added = Signal(VectorShape)
-    shape_about_to_remove = Signal(VectorShape)
-    shape_removed = Signal(VectorShape)
+    shape_about_to_add = Signal(VectorShape, int)
+    shape_added = Signal(VectorShape, int)
+    shape_about_to_remove = Signal(VectorShape, int)
+    shape_removed = Signal(VectorShape, int)
 
     @property
     def shapes(self) -> list[VectorShape]:

@@ -15,10 +15,10 @@ if TYPE_CHECKING:
 
 
 class Vector(Data):
-    shape_about_to_add = Signal(VectorShape)
-    shape_added = Signal(VectorShape)
-    shape_about_to_remove = Signal(VectorShape)
-    shape_removed = Signal(VectorShape)
+    shape_about_to_add = Signal(VectorShape, int)
+    shape_added = Signal(VectorShape, int)
+    shape_about_to_remove = Signal(VectorShape, int)
+    shape_removed = Signal(VectorShape, int)
     # shapes_changed = Signal()  # for bulk changes
 
     _shapes: list[VectorShape]
@@ -47,24 +47,38 @@ class Vector(Data):
         return self._shapes.copy()  # copy to prevent external mutation
 
     def add_shape(self, shape: VectorShape) -> None:
-        assert shape not in self._shapes, f'Shape: {shape} already exists'
+        self.insert_shape(shape)
 
-        self.shape_about_to_add.emit(shape)
+    def insert_shape(self, shape: VectorShape, index: int | None = None) -> None:
+        """Inserts a shape at a specific index."""
+        assert shape not in self._shapes, f'Shape: {shape} already exists in this vector'
+
+        if index is None:
+            index = len(self._shapes)
+
+        self.shape_about_to_add.emit(shape, index)
 
         self._adopt_shape(shape)
-        self._shapes.append(shape)
+        self._shapes.insert(index, shape)
 
-        self.shape_added.emit(shape)
+        self.shape_added.emit(shape, index)
 
     def remove_shape(self, shape: VectorShape) -> None:
-        assert shape in self._shapes, f'No such shape: {shape}'
+        index = self._shapes.index(shape)
+        self.pop_shape(index)
 
-        self.shape_about_to_remove.emit(shape)
+    def pop_shape(self, index: int = -1) -> VectorShape:
+        """Remove and return a shape by index. Defaults to last shape."""
+        if index == -1:
+            index = len(self._shapes) - 1
 
-        self._shapes.remove(shape)
+        self.shape_about_to_remove.emit(self._shapes[index], index)
+
+        shape = self._shapes.pop(index)
         shape.setParent(None)
 
-        self.shape_removed.emit(shape)
+        self.shape_removed.emit(shape, index)
+        return shape
 
     def contains_shape(self, shape: VectorShape) -> bool:
         return shape in self._shapes

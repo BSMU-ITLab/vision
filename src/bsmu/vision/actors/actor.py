@@ -28,6 +28,8 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
         self._graphics_item: ItemT | None = self._create_graphics_item()
         self._graphics_item.setData(self.ACTOR_KEY, weakref.ref(self))
 
+        self._current_view_scale: float = 1.0
+
         if model is not None:
             self.model = model
 
@@ -56,6 +58,18 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
 
     def map_from_scene(self, scene_pos: QPointF):
         return self._graphics_item.mapFromScene(scene_pos)
+
+    def adjust_to_view_scale(self, view_scale: float) -> None:
+        if self._current_view_scale != view_scale:
+            self._current_view_scale = view_scale
+            self._on_view_scale_changed()
+
+    def _on_view_scale_changed(self) -> None:
+        """
+        Internal hook: override in subclasses to recalculate
+        scale-dependent visual properties (pen width, node radius, etc.).
+        """
+        pass
 
     def _create_graphics_item(self) -> ItemT:
         raise NotImplementedError(f'{self.__class__.__name__} must implement _create_graphics_item()')

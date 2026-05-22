@@ -18,6 +18,8 @@ ElementT = TypeVar('ElementT',bound=VectorElement)
 ShapeT = TypeVar('ShapeT', bound=VectorShape)
 
 
+DEFAULT_OUTLINE_COLOR = QColor('#262626')
+
 DEFAULT_NODE_RADIUS: float = 5.0
 DEFAULT_NODE_COLOR = QColor(106, 255, 13)
 
@@ -96,7 +98,13 @@ class GraphicsNodeItem(QGraphicsEllipseItem):
         super().paint(painter, option, widget)
 
 
-class VectorNodeActor(VectorElementActor[VectorNode, GraphicsNodeItem]):
+VectorNodeT = TypeVar('VectorNodeT', bound=VectorNode)
+GraphicsNodeItemT = TypeVar('GraphicsNodeItemT', bound=GraphicsNodeItem)
+
+class VectorNodeActor(
+    VectorElementActor[VectorNodeT, GraphicsNodeItemT],
+    Generic[VectorNodeT, GraphicsNodeItemT],
+):
     """Actor for a single editable node (control point) of a vector shape."""
 
     DEFAULT_RADIUS = DEFAULT_NODE_RADIUS
@@ -181,19 +189,105 @@ class PointActor(VectorShapeActor[Point, GraphicsNodeItem]):
 
 
 class AntialiasedGraphicsPathItem(QGraphicsPathItem):
+    # Visually imperceptible threshold: changes < 0.5px are handled by anti-aliasing
+    _SCREEN_DELTA_THRESHOLD: float = 0.5
+
     def __init__(self, path: QPainterPath | None = None, parent: QGraphicsItem | None = None):
         super().__init__(path, parent)
 
+        self._pen_target_screen_width: float = 3.0
+        self._pen_current_scene_width: float = self.pen().widthF()
+        self._current_view_scale: float = 1.0
+
+        self._outline_target_screen_width: float = 1.0
+        self._outline_current_scene_width: float = self._outline_target_screen_width
+
         self._cached_shape: QPainterPath | None = None
 
-        self._stroker = QPainterPathStroker()
-        self._stroker.setWidth(1.0)
-        self._stroker.setCapStyle(Qt.PenCapStyle.FlatCap)
-        self._stroker.setJoinStyle(Qt.PenJoinStyle.BevelJoin)
+        self._hit_test_stroker = QPainterPathStroker()
+        self._hit_test_stroker.setWidth(1.0)
+        self._hit_test_stroker.setCapStyle(Qt.PenCapStyle.FlatCap)
+        self._hit_test_stroker.setJoinStyle(Qt.PenJoinStyle.BevelJoin)
+
+    @property
+    def pen_target_screen_width(self) -> float:
+        return self._pen_target_screen_width
+
+    @pen_target_screen_width.setter
+    def pen_target_screen_width(self, value: float) -> None:
+        if self._pen_target_screen_width != value:
+            self._pen_target_screen_width = value
+            self._recalculate_pen_scene_widths()
+
+    @property
+    def outline_target_screen_width(self) -> float:
+        return self._outline_target_screen_width
+
+    @outline_target_screen_width.setter
+    def outline_target_screen_width(self, value: float) -> None:
+        if self._outline_target_screen_width != value:
+            self._outline_target_screen_width = value
+            self._recalculate_pen_scene_widths()
+
+    def boundingRect(self) -> QRectF:
+        if self.path().isEmpty():
+            return QRectF()
+
+        pen_margin = (self._pen_current_scene_width + self._outline_current_scene_width) / 2.0
+        return self.path().boundingRect().adjusted(
+            -pen_margin, -pen_margin,
+            pen_margin, pen_margin,
+        )
+
+    def adjust_to_view_scale(self, view_scale: float) -> None:
+        if self._current_view_scale != view_scale:
+            self._current_view_scale = view_scale
+            self._recalculate_pen_scene_widths()
+
+    def _recalculate_pen_scene_widths(self) -> None:
+        view_scale = max(self._current_view_scale, 0.001)  # Prevent division by zero
+        pen_new_scene_width = self._pen_target_screen_width / view_scale
+        outline_new_scene_width = self._outline_target_screen_width / view_scale
+
+        # Convert scene-unit deltas back to screen pixels for accurate thresholding
+        pen_delta_screen = abs(self._pen_current_scene_width - pen_new_scene_width) * view_scale
+        outline_delta_screen = abs(self._outline_current_scene_width - outline_new_scene_width) * view_scale
+        # Only update if the visual change is actually perceptible on screen
+        if pen_delta_screen < self._SCREEN_DELTA_THRESHOLD and outline_delta_screen < self._SCREEN_DELTA_THRESHOLD:
+            return
+
+        self.prepareGeometryChange()
+        self._pen_current_scene_width = pen_new_scene_width
+        self._outline_current_scene_width = outline_new_scene_width
+
+        pen = self.pen()
+        pen.setWidthF(self._pen_current_scene_width)
+        self.setPen(pen)
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            super().paint(painter, option, widget)
+        if self.path().isEmpty():
+            return
+
+        main_pen = self.pen()
+        if main_pen.style() == Qt.PenStyle.NoPen:
+            return
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        if self._outline_current_scene_width > 0.0:
+            # Draw outline
+            outline_pen = QPen(main_pen)
+            outline_pen.setWidthF(self._pen_current_scene_width + self._outline_current_scene_width)
+            outline_pen.setColor(DEFAULT_OUTLINE_COLOR)
+            painter.setPen(outline_pen)
+            painter.drawPath(self.path())
+
+        # Draw main line on top
+        painter.setPen(main_pen)
+        painter.drawPath(self.path())
+
+        painter.restore()
 
     def setPath(self, path: QPainterPath) -> None:
         # Note: QGraphicsPathItem::setPath() is not virtual in C++.
@@ -206,7 +300,7 @@ class AntialiasedGraphicsPathItem(QGraphicsPathItem):
     def shape(self) -> QPainterPath:
         # Override to avoid false hits (using QGraphicsScene.items method) inside open paths (e.g., crescents).
         if self._cached_shape is None:
-            self._cached_shape = self._stroker.createStroke(self.path())
+            self._cached_shape = self._hit_test_stroker.createStroke(self.path())
         return self._cached_shape
 
 
@@ -215,7 +309,7 @@ AntialiasedGraphicsPathItemT = TypeVar('AntialiasedGraphicsPathItemT', bound=Ant
 
 class NodeBasedShapeActor(
     VectorShapeActor[NodeBasedShapeT, AntialiasedGraphicsPathItemT],
-    Generic[NodeBasedShapeT, AntialiasedGraphicsPathItemT]
+    Generic[NodeBasedShapeT, AntialiasedGraphicsPathItemT],
 ):
     DEFAULT_DRAFT_COLOR = QColor('#6495ed')
     DEFAULT_COMPLETED_COLOR = QColor('#7dab3c')
@@ -225,16 +319,21 @@ class NodeBasedShapeActor(
     def __init__(
             self,
             model: NodeBasedShape | None = None,
+            node_actor_class: type[VectorNodeActor] = VectorNodeActor,
             draft_color: QColor | None = None,
             completed_color: QColor | None = None,
             subselected_color: QColor | None = None,
             selected_color: QColor | None = None,
+            pen_screen_width: int = 3,
             parent: QObject | None = None,
     ):
+        self._node_actor_class = node_actor_class
         self._draft_color = draft_color or self.DEFAULT_DRAFT_COLOR
         self._completed_color = completed_color or self.DEFAULT_COMPLETED_COLOR
         self._subselected_color = subselected_color or self.DEFAULT_SUBSELECTED_COLOR
         self._selected_color = selected_color or self.DEFAULT_SELECTED_COLOR
+        self._pen_screen_width = pen_screen_width
+
         self._node_actors: list[VectorNodeActor] = []
 
         self._path: QPainterPath | None = None
@@ -248,6 +347,9 @@ class NodeBasedShapeActor(
     @property
     def last_node(self) -> VectorNode:
         return self.model.last_node
+
+    def _create_graphics_item(self) -> AntialiasedGraphicsPathItem:
+        return AntialiasedGraphicsPathItem()
 
     def create_node(self, pos: QPointF) -> VectorNode:
         return self.model.create_node(pos)
@@ -302,7 +404,7 @@ class NodeBasedShapeActor(
 
     def _create_node_actor(self, node: VectorNode, index: int | None = None) -> VectorNodeActor:
         node_visual_state = self._compute_node_visual_state()
-        node_actor = VectorNodeActor(node, visual_state=node_visual_state, parent=self)
+        node_actor = self._node_actor_class(node, visual_state=node_visual_state, parent=self)
         if index is None:
             index = len(self._node_actors)
         self._node_actors.insert(index, node_actor)
@@ -342,13 +444,23 @@ class NodeBasedShapeActor(
         pen = self.graphics_item.pen()
         if self._is_selected:
             color = self._selected_color
+            pen_screen_width = self._pen_screen_width + 1
+            outline_screen_width = 2
         else:
             if self.model.is_completed:
                 color = self._subselected_color if self._has_selected_nodes else self._completed_color
             else:
                 color = self._draft_color
+            pen_screen_width = self._pen_screen_width
+            outline_screen_width = 0.5
         pen.setColor(color)
         self.graphics_item.setPen(pen)
+        self.graphics_item.pen_target_screen_width = pen_screen_width
+        self.graphics_item.outline_target_screen_width = outline_screen_width
+
+    def _on_view_scale_changed(self) -> None:
+        if self.graphics_item is not None:
+            self.graphics_item.adjust_to_view_scale(self._current_view_scale)
 
     def update_visual_state(
             self,
@@ -376,7 +488,7 @@ class NodeBasedShapeActor(
         is_shape_selected = is_shape_selected if is_shape_selected is not None else self._is_selected
         has_selected_nodes = has_selected_nodes if has_selected_nodes is not None else self._has_selected_nodes
 
-        pen = QPen()
+        pen = QPen(DEFAULT_OUTLINE_COLOR)
         if is_node_selected:
             color = self._selected_color
             pen.setWidth(2)
@@ -395,28 +507,24 @@ class PolylineActor(NodeBasedShapeActor[Polyline, AntialiasedGraphicsPathItem]):
     def __init__(
             self,
             model: Polyline | None = None,
+            node_actor_class: type[VectorNodeActor] = VectorNodeActor,
             draft_color: QColor | None = None,
             completed_color: QColor | None = None,
             subselected_color: QColor | None = None,
             selected_color: QColor | None = None,
+            pen_screen_width: int = 3,
             parent: QObject | None = None,
     ):
         super().__init__(
             model,
+            node_actor_class=node_actor_class,
             draft_color=draft_color,
             completed_color=completed_color,
             subselected_color=subselected_color,
             selected_color=selected_color,
+            pen_screen_width=pen_screen_width,
             parent=parent,
         )
-
-    def _create_graphics_item(self) -> AntialiasedGraphicsPathItem:
-        graphics_item = AntialiasedGraphicsPathItem()
-        pen = QPen()
-        pen.setWidth(3)
-        pen.setCosmetic(True)
-        graphics_item.setPen(pen)
-        return graphics_item
 
     @property
     def polyline(self) -> Polyline | None:

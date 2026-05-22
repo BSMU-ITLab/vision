@@ -6,7 +6,7 @@ import numpy as np
 from PySide6.QtCore import QObject
 
 from bsmu.vision.core.config import IntList
-from bsmu.vision.core.image import Image
+from bsmu.vision.core.data.raster import Raster
 from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins import Plugin
@@ -106,7 +106,7 @@ class ImageViewerIntersectionOverlayer(QObject):
             color_property = layer_properties.get('color')
             intersection_palette_array[palette_layer_index] = color_property
             new_image = self._file_reading_manager.read_file(new_layer_image_path)
-            if not isinstance(new_image, Image):
+            if not isinstance(new_image, Raster):
                 continue
 
             layer_classes = IntList(layer_properties.get('classes', 'all'))

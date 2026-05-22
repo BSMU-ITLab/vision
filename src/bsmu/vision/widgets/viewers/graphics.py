@@ -54,6 +54,7 @@ class GraphicsViewer(DataViewer[DataT]):
 
         self._settings = settings
         self._graphics_view = GraphicsView(self._graphics_scene, self._settings.graphics_view_settings)
+        self._graphics_view.zoom_changed.connect(self._on_view_zoom_changed)
 
         super().__init__(data, parent)
 
@@ -65,6 +66,7 @@ class GraphicsViewer(DataViewer[DataT]):
 
     def add_actor(self, actor: GraphicsActor):
         actor.setParent(self)
+        actor.adjust_to_view_scale(self._graphics_view.current_scale)
         self._graphics_scene.addItem(actor.graphics_item)
 
         if actor.graphics_item.parentItem() is None:
@@ -218,3 +220,6 @@ class GraphicsViewer(DataViewer[DataT]):
         self._graphics_view.set_scrollable_scene_rect(rect)
 
         self._is_syncing_scene_rect = False
+
+    def _on_view_zoom_changed(self, view_scale: float) -> None:
+        pass

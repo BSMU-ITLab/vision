@@ -118,6 +118,8 @@ class PolylineTool(LayeredDataViewerTool):
             self._clear_preview_segment()
 
     def _start_new_polyline_drawing(self, pos: QPointF) -> None:
+        self.selection_manager.clear_selection()
+
         self._undo_manager.begin_macro('Create Polyline')
         self._drawing_undo_start_index = self._undo_manager.index()
         vector_layer_name = self.settings.vector_layer_name
@@ -127,7 +129,8 @@ class PolylineTool(LayeredDataViewerTool):
         assert vector_layer is not None and isinstance(vector_layer, VectorLayer)
         assert vector_layer.data is not None
         self._curr_vector = vector_layer.data
-        create_polyline_command = CreateNodeBasedShapeCommand(self.viewer.data, self._curr_vector, Polyline, [pos])
+        create_polyline_command = CreateNodeBasedShapeCommand(
+            self.viewer.data, self._curr_vector, Polyline, points=[pos])
         self._undo_manager.push(create_polyline_command)
         self._curr_polyline = create_polyline_command.created_shape
         self._undo_manager.end_macro()

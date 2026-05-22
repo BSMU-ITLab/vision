@@ -10,7 +10,7 @@ from bsmu.vision.core.data.vector.shapes import NodeBasedShape
 from bsmu.vision.undo import UndoCommand
 
 if TYPE_CHECKING:
-    from typing import Iterable, Sequence
+    from typing import Callable, Iterable, Sequence
 
     from bsmu.vision.core.data.layered import LayeredData
     from bsmu.vision.core.data.vector.shapes import VectorNode, VectorShape
@@ -25,20 +25,22 @@ class CreateNodeBasedShapeCommand(UndoCommand, Generic[NodeBasedShapeT]):
             self,
             layered_data: LayeredData,
             vector: Vector,
-            shape_class: type[NodeBasedShapeT],
+            shape_creator: Callable[..., NodeBasedShapeT],
             points: Sequence[QPointF],
             origin: QPointF | None = None,
+            parent_shape: VectorShape | None = None,
             text: str | None = None,
             parent: UndoCommand | None = None,
     ):
-        default_text = f'Create {shape_class.__name__}'
+        default_text = f'Create {getattr(shape_creator, "__name__", shape_creator.__class__.__name__)}'
         super().__init__(text or default_text, parent)
 
         self._layered_data = layered_data
         self._vector = vector
-        self._shape_class = shape_class
+        self._shape_creator = shape_creator
         self._points = points
         self._origin = origin
+        self._parent_shape = parent_shape
 
         self._shape: NodeBasedShapeT | None = None
         self._shape_handle: int | None = None
@@ -59,7 +61,8 @@ class CreateNodeBasedShapeCommand(UndoCommand, Generic[NodeBasedShapeT]):
     def redo(self) -> None:
         # Lazy creation: reuse instance across undo/redo cycles
         if self._shape is None:
-            self._shape = self._shape_class(self._points, self._origin)
+            self._shape = self._shape_creator(
+                points=self._points, origin=self._origin, parent_shape=self._parent_shape)
 
         self._vector.add_shape(self._shape)  # Signals auto-register shape + initial nodes
 

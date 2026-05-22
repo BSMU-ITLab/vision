@@ -51,7 +51,8 @@ class NormalizedViewRegion:
 
 
 class GraphicsView(QGraphicsView):
-    zoom_finished = Signal()
+    zoom_changed = Signal(float)   # Fires on every scale change
+    zoom_finished = Signal(float)  # Fires only when smooth zoom ends
     pan_finished = Signal()
     scrollable_invalidated = Signal()
     scrollable_changed = Signal(bool)
@@ -98,6 +99,11 @@ class GraphicsView(QGraphicsView):
         # Now we override the scrollContentsBy method instead of changing the mode to FullViewportUpdate
 
     @property
+    def current_scale(self) -> float:
+        """Current view transformation multiplier (1.0 = 100%)."""
+        return self._cur_scale
+
+    @property
     def is_scrollable(self) -> bool:
         # Returns the last computed scrollability state.
         # Note: may be stale if _is_scrollable_valid is False.
@@ -142,8 +148,8 @@ class GraphicsView(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
 
         view_smooth_zoom = _ViewSmoothZoom(self, self._settings.zoom_settings, self)
+        view_smooth_zoom.zoom_changed.connect(self.zoom_changed)
         view_smooth_zoom.zoom_finished.connect(self._on_zoom_finished)
-        view_smooth_zoom.zoom_finished.connect(self.zoom_finished)
         self.viewport().installEventFilter(view_smooth_zoom)
 
     def enable_panning(self):
@@ -264,6 +270,8 @@ class GraphicsView(QGraphicsView):
 
         self._refresh_viewport_region()
 
+        self.zoom_finished.emit(self._cur_scale)
+
     def _refresh_viewport_region(self):
         if self._is_fitting_in_anchor_rect or self._is_scene_rect_changing:
             return
@@ -326,8 +334,14 @@ class GraphicsView(QGraphicsView):
             self._anchor_rect = self._determine_anchor_rect()
 
         if self._anchor_rect is not None:
+            old_scale = self._cur_scale
+
             self.fitInView(self._anchor_rect, self._aspect_ratio_mode)
             self._update_scale()
+
+            # Emit only if the scale actually changed
+            if abs(self._cur_scale - old_scale) > 1e-4:
+                self.zoom_changed.emit(self._cur_scale)
 
         self._is_fitting_in_anchor_rect = False
 
@@ -380,6 +394,7 @@ class _ViewSmoothZoom(QObject):
         would preserve invertibility but breaks composability.
     """
 
+    zoom_changed = Signal(float)
     zoom_finished = Signal()
 
     def __init__(self, view: QGraphicsView, settings: ZoomSettings, parent: QObject = None):
@@ -409,6 +424,8 @@ class _ViewSmoothZoom(QObject):
         zoom_time_line = _ZoomTimeLine(self._view, zoom, SMOOTH_ZOOM_DURATION_MS, self)
         zoom_time_line.setUpdateInterval(SMOOTH_ZOOM_UPDATE_INTERVAL_MS)
         zoom_time_line.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        zoom_time_line.zoom_changed.connect(self.zoom_changed)
         zoom_time_line.finished.connect(self.zoom_finished)
         zoom_time_line.start()
 
@@ -420,6 +437,8 @@ class _Zoom:
 
 
 class _ZoomTimeLine(QTimeLine):
+    zoom_changed = Signal(float)
+
     def __init__(self, view: QGraphicsView, zoom: _Zoom, duration: int = 1000, parent: QObject = None):
         super().__init__(duration, parent)
 
@@ -456,6 +475,8 @@ class _ZoomTimeLine(QTimeLine):
         # Translate view so the cursor stays fixed
         delta_pos = new_pos - old_pos
         self._view.translate(delta_pos.x(), delta_pos.y())
+
+        self.zoom_changed.emit(clamped_target_scale)
 
 
 class _ViewPan(QObject):

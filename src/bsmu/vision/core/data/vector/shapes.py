@@ -17,14 +17,22 @@ class VectorElement(QObject):
 
 
 class VectorShape(VectorElement):
+    parent_shape_changed = Signal(VectorElement)  # VectorShape
+
     transform_changed = Signal()  # Origin/transform changed
     geometry_changed = Signal()  # Node positions changed
     structure_changed = Signal()  # Nodes added/removed
 
-    def __init__(self, origin: QPointF | None = None, parent: QObject | None = None):
+    def __init__(
+            self,
+            origin: QPointF | None = None,
+            parent_shape: VectorShape | None = None,
+            parent: QObject | None = None
+    ):
         super().__init__(parent)
 
         self._origin = QPointF(origin) if origin is not None else QPointF(0, 0)
+        self._parent_shape = parent_shape
 
     @property
     def origin(self) -> QPointF:
@@ -35,6 +43,16 @@ class VectorShape(VectorElement):
         if self._origin != value:
             self._origin = QPointF(value)
             self.transform_changed.emit()
+
+    @property
+    def parent_shape(self) -> VectorShape | None:
+        return self._parent_shape
+
+    @parent_shape.setter
+    def parent_shape(self, value: VectorShape | None):
+        if self._parent_shape is not value:
+            self._parent_shape = value
+            self.parent_shape_changed.emit(value)
 
     def move_by(self, offset: QPointF) -> None:
         self.origin += offset
@@ -144,9 +162,10 @@ class NodeBasedShape(VectorShape):
             self,
             points: Sequence[QPointF] = (),
             origin: QPointF | None = None,
+            parent_shape: VectorShape | None = None,
             parent: QObject | None = None
     ):
-        super().__init__(origin=origin, parent=parent)
+        super().__init__(origin=origin, parent_shape=parent_shape, parent=parent)
 
         self._nodes: list[VectorNode] = []
         for point in points:
@@ -299,9 +318,10 @@ class Polyline(NodeBasedShape):
             self,
             points: Sequence[QPointF] = (),
             origin: QPointF | None = None,
+            parent_shape: VectorShape | None = None,
             parent: QObject | None = None,
     ):
-        super().__init__(points, origin=origin, parent=parent)
+        super().__init__(points, origin=origin, parent_shape=parent_shape, parent=parent)
 
     def closest_point(self, point: QPointF) -> QPointF | None:
         """

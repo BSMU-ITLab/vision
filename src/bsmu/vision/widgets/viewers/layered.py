@@ -53,7 +53,7 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
 
         super().__init__(data, settings, parent)
 
-        self._selection_manager.selection_changed.connect(self.on_selection_changed)
+        self._selection_manager.selection_changed.connect(self._on_selection_changed)
 
     @property
     def layers(self) -> list[Layer]:
@@ -227,7 +227,7 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         for index, layer_actor in enumerate(self.layer_actors):
             print(f'Layer {index}: {layer_actor.name} opacity={layer_actor.opacity}')
 
-    def on_selection_changed(self) -> None:
+    def _on_selection_changed(self) -> None:
         for layer_actor in self._layer_to_actor.values():
             if not isinstance(layer_actor, VectorLayerActor):
                 continue
@@ -236,6 +236,15 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
                 is_shape_selected = self.selection_manager.is_shape_selected(shape_actor.shape)
                 selected_shape_nodes = self.selection_manager.selected_shape_nodes(shape_actor.shape)
                 shape_actor.update_visual_state(is_shape_selected, selected_shape_nodes)
+
+    def _on_view_zoom_changed(self, view_scale: float) -> None:
+        super()._on_view_zoom_changed(view_scale)
+
+        self._adjust_actors_to_view_scale(view_scale)
+
+    def _adjust_actors_to_view_scale(self, view_scale: float) -> None:
+        for layer_actor in self._layer_to_actor.values():
+            layer_actor.adjust_to_view_scale(view_scale)
 
 
 @runtime_checkable

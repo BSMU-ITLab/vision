@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 LayerT = TypeVar('LayerT', bound=Layer)
 
 
-class LayerActor(Generic[LayerT, ItemT], GraphicsActor[LayerT, ItemT]):
+class LayerActor(GraphicsActor[LayerT, ItemT], Generic[LayerT, ItemT]):
     visible_changed = Signal(bool)
     opacity_changed = Signal(float)
 
@@ -350,6 +350,12 @@ class VectorLayerActor(LayerActor[VectorLayer, GraphicsContainerItem]):
     def actor_by_shape(self, shape: VectorShape) -> VectorShapeActor | None:
         return self._shape_to_actor.get(shape)
 
+    def adjust_to_view_scale(self, view_scale: float) -> None:
+        super().adjust_to_view_scale(view_scale)
+
+        for shape_actor in self._shape_to_actor.values():
+            shape_actor.adjust_to_view_scale(view_scale)
+
     def _create_graphics_item(self) -> GraphicsContainerItem:
         graphics_item = GraphicsContainerItem()
         return graphics_item
@@ -382,6 +388,7 @@ class VectorLayerActor(LayerActor[VectorLayer, GraphicsContainerItem]):
         if actor is None:
             return
 
+        actor.adjust_to_view_scale(self._current_view_scale)
         self._shape_to_actor[shape] = actor
         actor.graphics_item.setParentItem(self.graphics_item)
 

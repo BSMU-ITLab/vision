@@ -8,7 +8,7 @@ from PySide6.QtGui import QMouseEvent, QKeyEvent
 
 from bsmu.vision.actors.shape import NodeBasedShapeActor
 from bsmu.vision.actors.shape import VectorShapeActor, VectorNodeActor, VectorElementActor
-from bsmu.vision.core.data.vector.shapes import VectorShape, VectorNode
+from bsmu.vision.core.data.vector.shapes import VectorShape, VectorNode, BaseShapeState
 from bsmu.vision.plugins.tools import (
     ViewerToolPlugin, ViewerToolSettingsWidget, ViewerToolSettings, CursorConfig)
 from bsmu.vision.plugins.tools.layered import LayeredDataViewerTool, LayeredDataViewerToolSettings
@@ -17,7 +17,13 @@ from bsmu.vision.undo.data.vector.shape import (
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewer
 
 if TYPE_CHECKING:
-    from bsmu.vision.plugins.undo import UndoManager
+    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
+    from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
+    from bsmu.vision.plugins.tools import ViewerTool
+    from bsmu.vision.plugins.undo import UndoManager, UndoPlugin
+    from bsmu.vision.plugins.windows.main import MainWindowPlugin
+
+GrabValue = QPointF | float
 
 
 DOUBLE_CLICK_SCREEN_TOLERANCE = 10.0
@@ -66,8 +72,14 @@ class PointerTool(LayeredDataViewerTool):
         self._drag_start_pos: QPointF | None = None
         self._pressed_actor: VectorElementActor | None = None
 
-        self._dragged_shapes: frozenset[VectorShape] | None = None
         self._dragged_nodes: frozenset[VectorNode] | None = None
+        self._node_to_initial_local_pos: dict[VectorNode, QPointF] = {}
+        self._move_nodes_command: MoveNodesCommand | None = None
+
+        self._dragged_shapes: frozenset[VectorShape] | None = None
+        self._shape_to_grab_value: dict[VectorShape, GrabValue] = {}
+        self._shape_to_initial_state: dict[VectorShape, BaseShapeState] = {}
+        self._move_shapes_command: MoveShapesCommand | None = None
 
     def deactivate(self) -> None:
         self._exit_drag_mode()
@@ -127,6 +139,15 @@ class PointerTool(LayeredDataViewerTool):
 
         self._drag_start_pos = scene_pos
         self._pressed_actor = actor
+
+        self._node_to_initial_local_pos = {node: node.local_pos for node in self.selection_manager.selected_nodes}
+
+        self._shape_to_grab_value.clear()
+        self._shape_to_initial_state.clear()
+        for shape in self.selection_manager.selected_shapes:
+            self._shape_to_grab_value[shape] = shape.calculate_grab_value(scene_pos)
+            self._shape_to_initial_state[shape] = shape.capture_state()
+
         return True
 
     def _clear_selection(self) -> None:
@@ -137,43 +158,65 @@ class PointerTool(LayeredDataViewerTool):
             return False
 
         if self._mode == PointerToolMode.IDLE:
-            # Determine what to drag based on initial pressed actor
             if isinstance(self._pressed_actor, VectorShapeActor):
                 self._enter_shape_drag_mode()
             elif isinstance(self._pressed_actor, VectorNodeActor):
                 self._enter_node_drag_mode()
 
-        delta_pos = scene_pos - self._drag_start_pos
         match self._mode:
             case PointerToolMode.MOVING_SHAPES:
-                self._drag_shapes_by(delta_pos)
+                self._drag_shapes_live(scene_pos)
             case PointerToolMode.MOVING_NODES:
-                self._drag_nodes_by(delta_pos)
+                self._drag_nodes_live(scene_pos)
 
-        self._drag_start_pos = scene_pos
         return True
 
     def _enter_shape_drag_mode(self) -> None:
         self._mode = PointerToolMode.MOVING_SHAPES
         self._dragged_shapes = self.selection_manager.selected_shapes
 
+        self._move_shapes_command = MoveShapesCommand(
+            self.viewer.data, self._dragged_shapes, self._shape_to_initial_state)
+
     def _enter_node_drag_mode(self) -> None:
         self._mode = PointerToolMode.MOVING_NODES
         self._dragged_nodes = self.selection_manager.selected_nodes
 
-    def _drag_shapes_by(self, delta_pos: QPointF) -> None:
-        if not self._dragged_shapes:
-            return
-        cmd = MoveShapesCommand(self.viewer.data, self._dragged_shapes, delta_pos)
-        self._undo_manager.push(cmd)
+        self._move_nodes_command = MoveNodesCommand(
+            self.viewer.data,
+            self._dragged_nodes,
+            self._node_to_initial_local_pos,
+        )
 
-    def _drag_nodes_by(self, delta_pos: QPointF) -> None:
+    def _drag_nodes_live(self, cursor_scene_pos: QPointF) -> None:
         if not self._dragged_nodes:
             return
-        cmd = MoveNodesCommand(self.viewer.data, self._dragged_nodes, delta_pos)
-        self._undo_manager.push(cmd)
+
+        for node in self._dragged_nodes:
+            node.update_drag_position(
+                cursor_scene_pos,
+                self._node_to_initial_local_pos[node],
+                self._drag_start_pos,
+            )
+
+    def _drag_shapes_live(self, cursor_scene_pos: QPointF) -> None:
+        if not self._dragged_shapes:
+            return
+
+        for shape in self._dragged_shapes:
+            grab_value = self._shape_to_grab_value[shape]
+            new_grab_value = shape.apply_drag(cursor_scene_pos, grab_value)
+            self._shape_to_grab_value[shape] = new_grab_value
 
     def _on_mouse_release(self) -> bool:
+        match self._mode:
+            case PointerToolMode.MOVING_NODES:
+                if self._move_nodes_command and self._move_nodes_command.has_changes:
+                    self._undo_manager.push(self._move_nodes_command)
+            case PointerToolMode.MOVING_SHAPES:
+                if self._move_shapes_command and self._move_shapes_command.has_changes:
+                    self._undo_manager.push(self._move_shapes_command)
+
         self._exit_drag_mode()
         return True
 
@@ -181,8 +224,15 @@ class PointerTool(LayeredDataViewerTool):
         self._mode = PointerToolMode.IDLE
         self._drag_start_pos = None
         self._pressed_actor = None
-        self._dragged_shapes = None
+
         self._dragged_nodes = None
+        self._node_to_initial_local_pos.clear()
+        self._move_nodes_command = None
+
+        self._dragged_shapes = None
+        self._shape_to_grab_value.clear()
+        self._shape_to_initial_state.clear()
+        self._move_shapes_command = None
 
     def _on_double_click(self, scene_pos: QPointF, modifiers: Qt.KeyboardModifier) -> bool:
         return self._try_insert_node_on_edge(scene_pos, modifiers)

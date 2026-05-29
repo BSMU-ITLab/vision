@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from typing import Sequence
+from dataclasses import dataclass, field
+from typing import NamedTuple, Sequence
 
 from PySide6.QtCore import QObject, QPointF, Signal
 
-from bsmu.vision.core.utils.geometry import GeometryUtils
+from bsmu.vision.core.utils.geometry import GeometryUtils, GEOMETRY_EPSILON
 
 
 class VectorElement(QObject):
@@ -14,6 +14,23 @@ class VectorElement(QObject):
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
+
+
+@dataclass(slots=True)
+class BaseShapeState:
+    """Abstract base class for all shape states used in Undo/Redo."""
+    pass
+
+
+@dataclass(slots=True)
+class ShapeState(BaseShapeState):
+    origin: QPointF = field(default_factory=QPointF)
+
+
+@dataclass(slots=True)
+class SnappedSpanState(BaseShapeState):
+    start_arc: float = 0.0
+    end_arc: float = 0.0
 
 
 class VectorShape(VectorElement):
@@ -27,7 +44,7 @@ class VectorShape(VectorElement):
             self,
             origin: QPointF | None = None,
             parent_shape: VectorShape | None = None,
-            parent: QObject | None = None
+            parent: QObject | None = None,
     ):
         super().__init__(parent)
 
@@ -53,6 +70,22 @@ class VectorShape(VectorElement):
         if self._parent_shape is not value:
             self._parent_shape = value
             self.parent_shape_changed.emit(value)
+
+    def capture_state(self) -> BaseShapeState:
+        return ShapeState(origin=self.origin)
+
+    def restore_state(self, state: BaseShapeState) -> None:
+        self.origin = state.origin
+
+    def calculate_grab_value(self, cursor_scene_pos: QPointF) -> QPointF:
+        """Calculate grab point for drag start."""
+        return QPointF(cursor_scene_pos)
+
+    def apply_drag(self, cursor_scene_pos: QPointF, grab_value: QPointF) -> QPointF:
+        """Apply drag and return updated grab value for next frame."""
+        delta = cursor_scene_pos - grab_value
+        self.move_by(delta)
+        return QPointF(cursor_scene_pos)
 
     def move_by(self, offset: QPointF) -> None:
         self.origin += offset
@@ -125,6 +158,18 @@ class VectorNode(VectorElement):
     def move_by(self, offset: QPointF) -> None:
         self.local_pos += offset
 
+    def update_drag_position(
+            self,
+            cursor_scene_pos: QPointF,
+            initial_local_pos: QPointF,
+            drag_start_scene_pos: QPointF,
+    ) -> None:
+        """Translate node by cursor delta in local coordinates."""
+        local_cursor = self.parent_shape.scene_to_local(cursor_scene_pos)
+        local_start = self.parent_shape.scene_to_local(drag_start_scene_pos)
+        delta = local_cursor - local_start
+        self.local_pos = initial_local_pos + delta
+
 
 class Point(VectorShape):
     def __init__(self, pos: QPointF, parent: QObject | None = None):
@@ -146,6 +191,13 @@ class EdgeHitInfo:
     edge_index: int | None = None             # Index of the starting node of the edge
     edge_normalized_pos: float | None = None  # Normalized position [0, 1] along the edge
     squared_distance: float | None = None
+
+
+class ArcParam(NamedTuple):
+    """Parametric position along an arc-length path."""
+    """Parametric representation of a point on a path."""
+    segment_index: int
+    normalized_t: float
 
 
 class NodeBasedShape(VectorShape):
@@ -278,7 +330,7 @@ class NodeBasedShape(VectorShape):
             scene_pos: QPointF,
             max_tolerance: float = math.inf,
     ) -> EdgeHitInfo | None:
-        """Find the closest edge point to a scene point.
+        """Find the closest edge point to a scene position.
         Returns None if shape has < 2 nodes or exceeds tolerance."""
         if len(self._nodes) < 2:
             return None
@@ -304,6 +356,46 @@ class NodeBasedShape(VectorShape):
                 )
 
         return closest_hit
+
+    def map_arc_length_to_param(self, arc_length: float) -> ArcParam:
+        """Convert arc-length to parametric position on path."""
+        node_count = len(self.nodes)
+        if node_count < 2:
+            return ArcParam(0, 0.0)
+
+        remaining = max(0.0, arc_length)
+        for i in range(node_count - 1):
+            p1 = self.nodes[i].local_pos
+            p2 = self.nodes[i + 1].local_pos
+            seg_len = GeometryUtils.distance(p1, p2)
+
+            if remaining <= seg_len + GEOMETRY_EPSILON:
+                t = remaining / seg_len if seg_len > GEOMETRY_EPSILON else 0.0
+                return ArcParam(i, max(0.0, min(1.0, t)))
+            remaining -= seg_len
+
+        # Arc-length exceeds total path length; clamp to end of last segment
+        return ArcParam(max(0, node_count - 2), 1.0)
+
+    def map_point_to_arc_length(self, point: QPointF) -> float:
+        """Project point onto nearest path segment and return arc-length from start."""
+        hit = self.closest_edge(point, max_tolerance=math.inf)
+        if hit is None or hit.edge_index is None or hit.edge_normalized_pos is None:
+            return 0.0
+
+        # Sum lengths of all segments before the hit segment
+        arc_len = 0.0
+        for i in range(hit.edge_index):
+            p1 = self.nodes[i].local_pos
+            p2 = self.nodes[i + 1].local_pos
+            arc_len += GeometryUtils.distance(p1, p2)
+
+        # Add partial length along the hit segment
+        p_start = self.nodes[hit.edge_index].local_pos
+        p_end = self.nodes[hit.edge_index + 1].local_pos
+        arc_len += hit.edge_normalized_pos * GeometryUtils.distance(p_start, p_end)
+
+        return arc_len
 
 
 @dataclass(frozen=True)

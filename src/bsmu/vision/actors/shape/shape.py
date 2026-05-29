@@ -325,6 +325,8 @@ class NodeBasedShapeActor(
             subselected_color: QColor | None = None,
             selected_color: QColor | None = None,
             pen_screen_width: int = 3,
+            node_radius: float = DEFAULT_NODE_RADIUS,
+            node_draft_color: QColor | None = None,
             parent: QObject | None = None,
     ):
         self._node_actor_class = node_actor_class
@@ -333,6 +335,8 @@ class NodeBasedShapeActor(
         self._subselected_color = subselected_color or self.DEFAULT_SUBSELECTED_COLOR
         self._selected_color = selected_color or self.DEFAULT_SELECTED_COLOR
         self._pen_screen_width = pen_screen_width
+        self._node_radius = node_radius
+        self._node_draft_color = node_draft_color or self.DEFAULT_DRAFT_COLOR
 
         self._node_actors: list[VectorNodeActor] = []
 
@@ -492,13 +496,13 @@ class NodeBasedShapeActor(
         if is_node_selected:
             color = self._selected_color
             pen.setWidth(2)
-            radius = DEFAULT_NODE_RADIUS + 1.0
+            radius = self._node_radius + 1.0
         else:
             if self.model.is_completed:
                 color = self._subselected_color if (has_selected_nodes or is_shape_selected) else self._completed_color
             else:
-                color = self._draft_color
-            radius = DEFAULT_NODE_RADIUS
+                color = self._node_draft_color
+            radius = self._node_radius
 
         return NodeVisualState(brush=QBrush(color), pen=pen, radius=radius)
 
@@ -513,6 +517,7 @@ class PolylineActor(NodeBasedShapeActor[Polyline, AntialiasedGraphicsPathItem]):
             subselected_color: QColor | None = None,
             selected_color: QColor | None = None,
             pen_screen_width: int = 3,
+            node_radius: float = DEFAULT_NODE_RADIUS,
             parent: QObject | None = None,
     ):
         super().__init__(
@@ -523,6 +528,7 @@ class PolylineActor(NodeBasedShapeActor[Polyline, AntialiasedGraphicsPathItem]):
             subselected_color=subselected_color,
             selected_color=selected_color,
             pen_screen_width=pen_screen_width,
+            node_radius=node_radius,
             parent=parent,
         )
 

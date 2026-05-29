@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import replace
 from typing import NamedTuple, TypeVar, Generic, TYPE_CHECKING
 
 from PySide6.QtCore import QPointF
@@ -13,10 +14,10 @@ if TYPE_CHECKING:
     from typing import Callable, Iterable, Sequence
 
     from bsmu.vision.core.data.layered import LayeredData
-    from bsmu.vision.core.data.vector.shapes import VectorNode, VectorShape
+    from bsmu.vision.core.data.vector.shapes import VectorNode, VectorShape, BaseShapeState
+
 
 NodeBasedShapeT = TypeVar('NodeBasedShapeT', bound=NodeBasedShape)
-
 
 class CreateNodeBasedShapeCommand(UndoCommand, Generic[NodeBasedShapeT]):
     """Generic command to create any NodeBasedShape."""
@@ -89,55 +90,66 @@ class CreateNodeBasedShapeCommand(UndoCommand, Generic[NodeBasedShapeT]):
 
 
 class MoveShapesCommand(UndoCommand):
-    """Move shapes by changing their origin transform."""
-
     def __init__(
         self,
         layered_data: LayeredData,
         shapes: Iterable[VectorShape],
-        offset: QPointF,
+        shape_to_initial_state: dict[VectorShape, BaseShapeState],
         text: str = 'Move Shapes',
         parent: UndoCommand | None = None,
     ):
         super().__init__(text, parent)
 
         self._layered_data = layered_data
-        self._offset = QPointF(offset)
+        self._shape_handles: list[int] = []
+        self._shape_handle_to_initial_state: dict[int, BaseShapeState] = {}
+        self._shape_handle_to_final_state: dict[int, BaseShapeState] = {}
+        self._is_final_states_captured = False
 
-        # Validate and collect handles
-        handles: list[int] = []
         for shape in shapes:
             handle = layered_data.shape_registry.get_handle(shape)
             if handle is None:
-                raise ValueError(
-                    f'Shape {type(shape).__name__} is not registered. '
-                    f'Commands can only operate on tracked objects.'
-                )
-            handles.append(handle)
-        self._shape_handles: frozenset[int] = frozenset(handles)
+                raise ValueError(f'Shape {type(shape).__name__} is not registered.')
+            self._shape_handles.append(handle)
 
-        self._shape_handle_to_initial_origin: dict[int, QPointF] | None = None
+        for shape, state in shape_to_initial_state.items():
+            handle = layered_data.shape_registry.get_handle(shape)
+            if handle is not None:
+                self._shape_handle_to_initial_state[handle] = replace(state)
+
+    @property
+    def has_changes(self) -> bool:
+        for handle in self._shape_handles:
+            initial_state = self._shape_handle_to_initial_state.get(handle)
+            shape = self._layered_data.shape_registry.resolve(handle)
+            if shape:
+                current_state = shape.capture_state()
+                if initial_state != current_state:
+                    return True
+        return False
 
     def redo(self) -> None:
-        if self._shape_handle_to_initial_origin is None:
-            self._shape_handle_to_initial_origin = {}
+        if not self._is_final_states_captured:
+            # First redo: capture current model states as final but don't apply
             for handle in self._shape_handles:
                 shape = self._layered_data.shape_registry.resolve(handle)
-                if shape is None:
-                    raise RuntimeError(f'Shape handle {handle} no longer exists. Command cannot execute.')
-                self._shape_handle_to_initial_origin[handle] = shape.origin
+                if shape:
+                    self._shape_handle_to_final_state[handle] = shape.capture_state()
+            self._is_final_states_captured = True
+            return  # Model already in final state after live drag
 
-        for handle in self._shape_handles:
-            shape = self._layered_data.shape_registry.resolve(handle)
-            if shape is not None:
-                shape.move_by(self._offset)
+        # Subsequent redos: apply final states
+        self._apply_states(self._shape_handle_to_final_state)
 
     def undo(self) -> None:
-        assert self._shape_handle_to_initial_origin is not None, 'Command must be executed before undo.'
-        for handle, initial_origin in self._shape_handle_to_initial_origin.items():
+        self._apply_states(self._shape_handle_to_initial_state)
+
+    def _apply_states(self, states: dict[int, BaseShapeState]) -> None:
+        """Apply given states to all tracked shapes."""
+        for handle, state in states.items():
             shape = self._layered_data.shape_registry.resolve(handle)
-            if shape is not None:
-                shape.origin = initial_origin
+            if shape:
+                shape.restore_state(state)
 
     def id(self) -> int:
         return self.command_type_id()
@@ -146,64 +158,75 @@ class MoveShapesCommand(UndoCommand):
         if not isinstance(other, MoveShapesCommand):
             return False
         # Only merge if moving the exact same set of shapes
-        if self._shape_handles != other._shape_handles:
+        if set(self._shape_handles) != set(other._shape_handles):
             return False
 
-        # Merge offsets
-        self._offset += other._offset
+        self._shape_handle_to_final_state.update(other._shape_handle_to_final_state)
+        self._is_final_states_captured = other._is_final_states_captured
         return True
 
 
 class MoveNodesCommand(UndoCommand):
-    """Move individual nodes by a delta offset."""
+    """Move nodes by storing initial and final positions."""
 
     def __init__(
         self,
         layered_data: LayeredData,
         nodes: Iterable[VectorNode],
-        offset: QPointF,
+        node_to_initial_local_pos: dict[VectorNode, QPointF],
         text: str = 'Move Nodes',
         parent: UndoCommand | None = None,
     ):
         super().__init__(text, parent)
 
         self._layered_data = layered_data
-        self._offset = QPointF(offset)
+        self._node_handle_to_initial_local_pos: dict[int, QPointF] = {}
+        self._node_handle_to_final_local_pos: dict[int, QPointF] = {}
+        self._is_final_positions_captured = False
 
-        # Validate and collect handles
-        handles: list[int] = []
+        # Resolve and cache handles once
+        self._node_handles: list[int] = []
         for node in nodes:
             handle = layered_data.node_registry.get_handle(node)
             if handle is None:
-                raise ValueError(
-                    f'Node {type(node).__name__} is not registered. '
-                    f'Commands can only operate on tracked objects.'
-                )
-            handles.append(handle)
-        self._node_handles: frozenset[int] = frozenset(handles)
+                raise ValueError(f'Node {type(node).__name__} is not registered.')
+            self._node_handles.append(handle)
 
-        self._node_handle_to_initial_local_pos: dict[int, QPointF] | None = None
+        for node, local_pos in node_to_initial_local_pos.items():
+            handle = layered_data.node_registry.get_handle(node)
+            if handle is not None:
+                self._node_handle_to_initial_local_pos[handle] = local_pos
+
+    @property
+    def has_changes(self) -> bool:
+        for handle in self._node_handles:
+            initial_local_pos = self._node_handle_to_initial_local_pos.get(handle)
+            node = self._layered_data.node_registry.resolve(handle)
+            if node and initial_local_pos != node.local_pos:
+                return True
+        return False
 
     def redo(self) -> None:
-        if self._node_handle_to_initial_local_pos is None:
-            self._node_handle_to_initial_local_pos = {}
+        if not self._is_final_positions_captured:
             for handle in self._node_handles:
                 node = self._layered_data.node_registry.resolve(handle)
-                if node is None:
-                    raise RuntimeError(f'Node handle {handle} no longer exists. Command cannot execute.')
-                self._node_handle_to_initial_local_pos[handle] = node.local_pos
+                if node:
+                    self._node_handle_to_final_local_pos[handle] = node.local_pos
+            self._is_final_positions_captured = True
+            return  # Skip apply on first redo
 
-        for handle in self._node_handles:
-            node = self._layered_data.node_registry.resolve(handle)
-            if node is not None:
-                node.move_by(self._offset)
+        self._apply_positions(self._node_handle_to_final_local_pos)
 
     def undo(self) -> None:
-        assert self._node_handle_to_initial_local_pos is not None, 'Command must be executed before undo.'
-        for handle, initial_local_pos in self._node_handle_to_initial_local_pos.items():
+        self._apply_positions(self._node_handle_to_initial_local_pos)
+
+    def _apply_positions(self, positions: dict[int, QPointF]) -> None:
+        """Apply given positions to all tracked nodes."""
+        for handle, local_pos in positions.items():
             node = self._layered_data.node_registry.resolve(handle)
-            if node is not None:
-                node.local_pos = initial_local_pos
+            if node is None:
+                raise RuntimeError(f'Node handle {handle} no longer exists.')
+            node.local_pos = local_pos
 
     def id(self) -> int:
         return self.command_type_id()
@@ -211,10 +234,13 @@ class MoveNodesCommand(UndoCommand):
     def mergeWith(self, other: UndoCommand) -> bool:
         if not isinstance(other, MoveNodesCommand):
             return False
-        if self._node_handles != other._node_handles:
+
+        # Order-agnostic comparison for robust merging
+        if set(self._node_handles) != set(other._node_handles):
             return False
 
-        self._offset += other._offset
+        self._node_handle_to_final_local_pos.update(other._node_handle_to_final_local_pos)
+        self._is_final_positions_captured = other._is_final_positions_captured
         return True
 
 

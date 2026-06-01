@@ -308,8 +308,6 @@ class PointerTool(LayeredDataViewerTool):
 
         self._undo_manager.end_macro()
 
-        # Clear selection after successful deletion
-        self._clear_selection()
         return True
 
 

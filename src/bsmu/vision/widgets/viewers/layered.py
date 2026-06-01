@@ -11,6 +11,7 @@ from bsmu.vision.actors.layer import LayerActor, VectorLayerActor
 from bsmu.vision.actors.layer.registry import create_layer_actor
 from bsmu.vision.core.data.layered import LayeredData
 from bsmu.vision.core.data.raster import MaskDrawMode
+from bsmu.vision.core.layers import VectorLayer
 from bsmu.vision.core.selection import SelectionManager
 from bsmu.vision.widgets.viewers.graphics import GraphicsViewer
 
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.core.data.raster import Raster
-    from bsmu.vision.core.layers import Layer, RasterLayer, VectorLayer
+    from bsmu.vision.core.layers import Layer, RasterLayer
     from bsmu.vision.core.palette import Palette
     from bsmu.vision.core.visibility import Visibility
     from bsmu.vision.widgets.viewers.graphics import ImageViewerSettings
@@ -199,6 +200,9 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         self._layer_to_actor[layer] = actor
         self.add_actor(actor)
 
+        if isinstance(layer, VectorLayer):
+            self._selection_manager.observe_layer(layer)
+
         if len(self._layer_to_actor) == 1:  # If was added the first layer actor
             self.active_layer_actor = actor
 
@@ -210,6 +214,9 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
             return
 
         self.layer_actor_about_to_remove.emit(actor, layer_index)
+
+        if isinstance(layer, VectorLayer):
+            self._selection_manager.unobserve_layer(layer)
 
         self.remove_actor(actor)
         del self._layer_to_actor[layer]

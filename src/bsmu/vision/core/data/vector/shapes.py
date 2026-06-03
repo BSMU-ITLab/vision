@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import NamedTuple, Sequence
+from typing import TYPE_CHECKING, NamedTuple, Generic, TypeVar
 
 from PySide6.QtCore import QObject, QPointF, Signal
 
 from bsmu.vision.core.utils.geometry import GeometryUtils, GEOMETRY_EPSILON
+
+if TYPE_CHECKING:
+    from typing import Sequence
 
 
 class VectorElement(QObject):
@@ -49,7 +52,12 @@ class VectorShape(VectorElement):
         super().__init__(parent)
 
         self._origin = QPointF(origin) if origin is not None else QPointF(0, 0)
-        self._parent_shape = parent_shape
+        self._parent_shape: VectorShape | None = None
+        self._child_shapes: set[VectorShape] = set()
+
+        # Set parent through setter to trigger automatic child registration
+        if parent_shape is not None:
+            self.parent_shape = parent_shape
 
     @property
     def origin(self) -> QPointF:
@@ -67,9 +75,33 @@ class VectorShape(VectorElement):
 
     @parent_shape.setter
     def parent_shape(self, value: VectorShape | None):
-        if self._parent_shape is not value:
-            self._parent_shape = value
-            self.parent_shape_changed.emit(value)
+        if self._parent_shape is value:
+            return
+
+        self._on_parent_shape_about_to_change()
+
+        if self._parent_shape is not None:
+            self._parent_shape._child_shapes.remove(self)
+
+        self._parent_shape = value
+
+        if self._parent_shape is not None:
+            self._parent_shape._child_shapes.add(self)
+
+        self._on_parent_shape_changed()
+        self.parent_shape_changed.emit(value)
+
+    def _on_parent_shape_about_to_change(self) -> None:
+        """Override to clean up before the parent shape changes."""
+        pass
+
+    def _on_parent_shape_changed(self) -> None:
+        """Override to set up after the parent shape changes."""
+        pass
+
+    @property
+    def child_shapes(self) -> set[VectorShape]:
+        return self._child_shapes.copy()
 
     def capture_state(self) -> BaseShapeState:
         return ShapeState(origin=self.origin)
@@ -97,6 +129,14 @@ class VectorShape(VectorElement):
     def scene_to_local(self, scene_pos: QPointF) -> QPointF:
         """Convert scene coordinate to local coordinate."""
         return scene_pos - self._origin
+
+    def collect_descendants(self) -> list[VectorShape]:
+        """Return all descendant shapes in post-order (children before parents)."""
+        descendants: list[VectorShape] = []
+        for child in self._child_shapes:
+            descendants.extend(child.collect_descendants())
+            descendants.append(child)
+        return descendants
 
 
 class VectorNode(VectorElement):
@@ -132,8 +172,18 @@ class VectorNode(VectorElement):
     @parent_shape.setter
     def parent_shape(self, value: NodeBasedShape | None):
         if self._parent_shape is not value:
+            self._on_parent_shape_about_to_change()
             self._parent_shape = value
+            self._on_parent_shape_changed()
             self.parent_shape_changed.emit(value)
+
+    def _on_parent_shape_about_to_change(self) -> None:
+        """Override to clean up before the parent shape changes."""
+        pass
+
+    def _on_parent_shape_changed(self) -> None:
+        """Override to set up after the parent shape changes."""
+        pass
 
     @property
     def scene_pos(self) -> QPointF:
@@ -200,7 +250,9 @@ class ArcParam(NamedTuple):
     normalized_t: float
 
 
-class NodeBasedShape(VectorShape):
+NodeT = TypeVar('NodeT', bound=VectorNode)
+
+class NodeBasedShape(VectorShape, Generic[NodeT]):
     """Base class for shapes defined by a sequence of editable VectorNodes."""
 
     node_about_to_add = Signal(VectorNode, int)  # Node and its insertion index
@@ -219,16 +271,19 @@ class NodeBasedShape(VectorShape):
     ):
         super().__init__(origin=origin, parent_shape=parent_shape, parent=parent)
 
-        self._nodes: list[VectorNode] = []
-        for point in points:
-            # Initialize without signals to avoid overhead during construction
-            node = VectorNode.from_scene_pos(self, point, parent=self)
-            self._nodes.append(node)
+        self._nodes: list[NodeT] = self._create_nodes(points)
 
         self._is_completed = False
 
+    def _create_nodes(self, points: Sequence[QPointF]) -> list[NodeT]:
+        """Override to customize node creation. Defaults to standard VectorNodes."""
+        return [
+            VectorNode.from_scene_pos(self, point, parent=self)
+            for point in points
+        ]
+
     @property
-    def nodes(self) -> Sequence[VectorNode]:
+    def nodes(self) -> Sequence[NodeT]:
         """Immutable sequence of nodes. Do not modify."""
         return self._nodes
 
@@ -247,7 +302,7 @@ class NodeBasedShape(VectorShape):
         return not self._nodes
 
     @property
-    def last_node(self) -> VectorNode:
+    def last_node(self) -> NodeT:
         return self._nodes[-1]
 
     @property
@@ -274,19 +329,19 @@ class NodeBasedShape(VectorShape):
             self._is_completed = True
             self.completed.emit()
 
-    def create_node(self, scene_pos: QPointF, index: int | None = None) -> VectorNode:
+    def create_node(self, scene_pos: QPointF, index: int | None = None) -> NodeT:
         """Create and insert node at index (appends if None)."""
         node = VectorNode.from_scene_pos(self, scene_pos, parent=self)
         self._insert_node(node, index)
         return node
 
-    def create_node_local(self, local_pos: QPointF, index: int | None = None) -> VectorNode:
+    def create_node_local(self, local_pos: QPointF, index: int | None = None) -> NodeT:
         """Create and insert node using local coordinates."""
         node = VectorNode.from_local_pos(self, local_pos, parent=self)
         self._insert_node(node, index)
         return node
 
-    def _insert_node(self, node: VectorNode, index: int | None = None) -> None:
+    def _insert_node(self, node: NodeT, index: int | None = None) -> None:
         """Insert node and emit signals."""
         if index is None:
             index = len(self._nodes)
@@ -297,12 +352,12 @@ class NodeBasedShape(VectorShape):
 
         self.structure_changed.emit()
 
-    def remove_node(self, node: VectorNode) -> None:
+    def remove_node(self, node: NodeT) -> None:
         """Remove specific node by reference."""
         index = self._nodes.index(node)
         self.pop_node(index)
 
-    def pop_node(self, index: int = -1) -> VectorNode:
+    def pop_node(self, index: int = -1) -> NodeT:
         """Remove and return a node by index. Defaults to last node."""
         if not self._nodes:
             raise IndexError('Cannot pop node from empty shape.')

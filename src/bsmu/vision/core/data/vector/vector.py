@@ -64,18 +64,30 @@ class Vector(Data):
         self.shape_added.emit(shape, index)
 
     def remove_shape(self, shape: VectorShape) -> None:
-        index = self._shapes.index(shape)
-        self.pop_shape(index)
+        """Remove shape and all children recursively."""
+        self._cascade_remove(shape)
 
     def pop_shape(self, index: int = -1) -> VectorShape:
-        """Remove and return a shape by index. Defaults to last shape."""
+        """Remove and return a shape by index (removing children recursively). Defaults to last shape."""
         if index == -1:
             index = len(self._shapes) - 1
 
-        self.shape_about_to_remove.emit(self._shapes[index], index)
+        shape = self._shapes[index]
+        return self._cascade_remove(shape)
+
+    def _cascade_remove(self, shape: VectorShape) -> VectorShape:
+        """Remove shape and all children recursively. Returns the removed shape."""
+        # Remove children first
+        for child in shape.child_shapes:
+            self._cascade_remove(child)
+
+        # Re-find index: children removal may have shifted it
+        index = self._shapes.index(shape)
+        self.shape_about_to_remove.emit(shape, index)
 
         shape = self._shapes.pop(index)
         shape.setParent(None)
+        shape.parent_shape = None  # Clears from parent's _child_shapes via setter
 
         self.shape_removed.emit(shape, index)
         return shape

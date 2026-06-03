@@ -8,6 +8,7 @@ from PySide6.QtCore import QPointF
 
 from bsmu.vision.core.data.vector import Vector
 from bsmu.vision.core.data.vector.shapes import NodeBasedShape
+from bsmu.vision.core.data.vector.utils import flatten_shapes_with_descendants
 from bsmu.vision.undo import UndoCommand
 
 if TYPE_CHECKING:
@@ -64,6 +65,8 @@ class CreateNodeBasedShapeCommand(UndoCommand, Generic[NodeBasedShapeT]):
         if self._shape is None:
             self._shape = self._shape_creator(
                 points=self._points, origin=self._origin, parent_shape=self._parent_shape)
+        else:
+            self._shape.parent_shape = self._parent_shape
 
         self._vector.add_shape(self._shape)  # Signals auto-register shape + initial nodes
 
@@ -302,10 +305,14 @@ class ShapeEntry(NamedTuple):
     index: int
     handle: int
     node_handles: list[int]
+    parent_shape: VectorShape | None
 
 
 class RemoveShapesCommand(UndoCommand):
-    """Removes shapes from their vectors without destroying them. Undo restores them."""
+    """
+    Removes shapes and their children (recursively) from their vectors without destroying them.
+    Undo restores them.
+    """
 
     def __init__(
         self,
@@ -319,33 +326,39 @@ class RemoveShapesCommand(UndoCommand):
         self._layered_data = layered_data
         self._shape_entries: list[ShapeEntry] = []
 
-        for shape in shapes:
-            parent = shape.parent()
-            if not isinstance(parent, Vector):
-                raise ValueError(f'Expected Vector parent, got {type(parent).__name__}')
+        for shape in flatten_shapes_with_descendants(shapes):
+            parent_vector = shape.parent()
+            if not isinstance(parent_vector, Vector):
+                raise ValueError(f'Expected Vector parent, got {type(parent_vector).__name__}')
 
             handle = layered_data.shape_registry.get_handle(shape)
-
-            if isinstance(shape, NodeBasedShape):
-                node_handles = [layered_data.node_registry.get_handle(n) for n in shape.nodes]
-            else:
-                node_handles = []
+            node_handles = (
+                [layered_data.node_registry.get_handle(n) for n in shape.nodes]
+                if isinstance(shape, NodeBasedShape) else []
+            )
 
             self._shape_entries.append(ShapeEntry(
                 shape=shape,
-                vector=parent,  # Store vectors of shapes for undo (shape.parent() becomes None after removal)
-                index=parent.shapes.index(shape),  # Store original indices of shapes in vector
+                vector=parent_vector,  # Store vectors of shapes for undo (shape.parent() becomes None after removal)
+                index=parent_vector.shapes.index(shape),  # Store original indices of shapes in vector
                 handle=handle,
                 node_handles=node_handles,
+                parent_shape=shape.parent_shape,
             ))
 
     def redo(self) -> None:
+        # Post-order: descendants removed before their parents
         for shape_entry in self._shape_entries:
             shape_entry.vector.remove_shape(shape_entry.shape)
 
     def undo(self) -> None:
         # Restore in ascending index order to prevent insertion collisions
         for shape_entry in sorted(self._shape_entries, key=lambda e: e.index):
+            # Explicitly restore the parent-child link.
+            # Safe to do even if parent is not yet in Vector._shapes,
+            # as it only modifies in-memory object references (_child_shapes set).
+            shape_entry.shape.parent_shape = shape_entry.parent_shape
+
             shape_entry.vector.insert_shape(shape_entry.shape, shape_entry.index)
             self._layered_data.shape_registry.register(shape_entry.shape, shape_entry.handle)
 

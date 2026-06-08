@@ -117,8 +117,11 @@ class UndoManager(QObject):
     def create_redo_action(self, parent: QObject, prefix: str = '') -> QAction:
         return self._undo_group.createRedoAction(parent, prefix)
 
-    def push(self, command: UndoCommand):
+    def push(self, command: UndoCommand) -> None:
         self._undo_group.activeStack().push(command)
+
+    def undo(self) -> None:
+        self._undo_group.undo()
 
     def begin_macro(self, text: str):
         self._undo_group.activeStack().beginMacro(text)

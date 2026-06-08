@@ -18,6 +18,11 @@ class VectorElement(QObject):
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
 
+    def squared_distance_to_scene_pos(self, scene_pos: QPointF) -> float:
+        """Must be overridden by subclasses.
+        Return infinity by default so it is never selected as the nearest element."""
+        return math.inf
+
 
 @dataclass(slots=True)
 class BaseShapeState:
@@ -39,7 +44,9 @@ class SnappedSpanState(BaseShapeState):
 class VectorShape(VectorElement):
     parent_shape_changed = Signal(VectorElement)  # VectorShape
 
-    transform_changed = Signal()  # Origin/transform changed
+    transform_changed = Signal()  # Local origin/transform changed
+    scene_transform_changed = Signal()
+
     geometry_changed = Signal()  # Node positions changed
     structure_changed = Signal()  # Nodes added/removed
 
@@ -47,13 +54,19 @@ class VectorShape(VectorElement):
             self,
             origin: QPointF | None = None,
             parent_shape: VectorShape | None = None,
+            inherit_transform: bool = True,
             parent: QObject | None = None,
     ):
         super().__init__(parent)
 
+        # The origin is stored in local coordinates.
+        # When inherit_transform is True, it represents an offset relative to the parent.
+        # When False, the shape is not affected by parent transforms, so its local
+        # coordinate system coincides with the scene and the origin acts as a scene position.
         self._origin = QPointF(origin) if origin is not None else QPointF(0, 0)
         self._parent_shape: VectorShape | None = None
         self._child_shapes: set[VectorShape] = set()
+        self._inherit_transform = inherit_transform
 
         # Set parent through setter to trigger automatic child registration
         if parent_shape is not None:
@@ -68,6 +81,7 @@ class VectorShape(VectorElement):
         if self._origin != value:
             self._origin = QPointF(value)
             self.transform_changed.emit()
+            self.scene_transform_changed.emit()
 
     @property
     def parent_shape(self) -> VectorShape | None:
@@ -81,12 +95,16 @@ class VectorShape(VectorElement):
         self._on_parent_shape_about_to_change()
 
         if self._parent_shape is not None:
+            if self._inherit_transform:
+                self._parent_shape.scene_transform_changed.disconnect(self._on_parent_scene_transform_changed)
             self._parent_shape._child_shapes.remove(self)
 
         self._parent_shape = value
 
         if self._parent_shape is not None:
             self._parent_shape._child_shapes.add(self)
+            if self._inherit_transform:
+                self._parent_shape.scene_transform_changed.connect(self._on_parent_scene_transform_changed)
 
         self._on_parent_shape_changed()
         self.parent_shape_changed.emit(value)
@@ -99,9 +117,16 @@ class VectorShape(VectorElement):
         """Override to set up after the parent shape changes."""
         pass
 
+    def _on_parent_scene_transform_changed(self):
+        self.scene_transform_changed.emit()
+
     @property
     def child_shapes(self) -> set[VectorShape]:
         return self._child_shapes.copy()
+
+    @property
+    def inherit_transform(self) -> bool:
+        return self._inherit_transform
 
     def capture_state(self) -> BaseShapeState:
         return ShapeState(origin=self.origin)
@@ -123,11 +148,22 @@ class VectorShape(VectorElement):
         self.origin += offset
 
     def local_to_scene(self, local_pos: QPointF) -> QPointF:
-        """Convert local coordinate to scene coordinate."""
-        return self._origin + local_pos
+        """
+        Convert a local coordinate to an absolute scene coordinate.
+        Recursively apply parent transforms to support arbitrary nesting depth.
+        """
+        current_pos = self._origin + local_pos
+        if self._inherit_transform and self._parent_shape is not None:
+            return self._parent_shape.local_to_scene(current_pos)
+        return current_pos
 
     def scene_to_local(self, scene_pos: QPointF) -> QPointF:
-        """Convert scene coordinate to local coordinate."""
+        """
+        Convert an absolute scene coordinate to a local coordinate.
+        Recursively unwind parent transforms.
+        """
+        if self._inherit_transform and self._parent_shape is not None:
+            scene_pos = self._parent_shape.scene_to_local(scene_pos)
         return scene_pos - self._origin
 
     def collect_descendants(self) -> list[VectorShape]:
@@ -187,7 +223,12 @@ class VectorNode(VectorElement):
 
     @property
     def scene_pos(self) -> QPointF:
-        return self._parent_shape.local_to_scene(self._local_pos)
+        """Return the scene coordinates.
+
+        Use the `local_pos` property (not the `_local_pos` field) to ensure
+        dynamic position calculations in subclasses (e.g., SnappedNode) work correctly.
+        """
+        return self._parent_shape.local_to_scene(self.local_pos)
 
     @scene_pos.setter
     def scene_pos(self, value: QPointF):
@@ -204,6 +245,9 @@ class VectorNode(VectorElement):
             self._local_pos = QPointF(value)
             self.changed.emit()
             self._parent_shape.geometry_changed.emit()
+
+    def squared_distance_to_scene_pos(self, scene_pos: QPointF) -> float:
+        return GeometryUtils.squared_distance(self.scene_pos, scene_pos)
 
     def move_by(self, offset: QPointF) -> None:
         self.local_pos += offset
@@ -222,9 +266,15 @@ class VectorNode(VectorElement):
 
 
 class Point(VectorShape):
-    def __init__(self, pos: QPointF, parent: QObject | None = None):
+    def __init__(
+            self,
+            pos: QPointF,
+            parent_shape: VectorShape | None = None,
+            inherit_transform: bool = True,
+            parent: QObject | None = None,
+    ):
         # Origin is the point position.
-        super().__init__(origin=pos, parent=parent)
+        super().__init__(origin=pos, parent_shape=parent_shape, inherit_transform=inherit_transform, parent=parent)
 
     @property
     def pos(self) -> QPointF:
@@ -244,8 +294,12 @@ class EdgeHitInfo:
 
 
 class ArcParam(NamedTuple):
-    """Parametric position along an arc-length path."""
-    """Parametric representation of a point on a path."""
+    """Parametric representation of a point along an arc-length path.
+
+    Attributes:
+        segment_index: Index of the path segment containing the point.
+        normalized_t: Normalized position (0.0 to 1.0) within that segment.
+    """
     segment_index: int
     normalized_t: float
 
@@ -267,9 +321,10 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
             points: Sequence[QPointF] = (),
             origin: QPointF | None = None,
             parent_shape: VectorShape | None = None,
+            inherit_transform: bool = True,
             parent: QObject | None = None
     ):
-        super().__init__(origin=origin, parent_shape=parent_shape, parent=parent)
+        super().__init__(origin=origin, parent_shape=parent_shape, inherit_transform=inherit_transform, parent=parent)
 
         self._nodes: list[NodeT] = self._create_nodes(points)
 
@@ -329,6 +384,18 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
             self._is_completed = True
             self.completed.emit()
 
+    def squared_distance_to_scene_pos(self, scene_pos: QPointF) -> float:
+        hit = self.closest_edge(scene_pos)
+        if hit is not None:
+            return hit.squared_distance
+
+        points = self._scene_path_points()
+        if not points:
+            return super().squared_distance_to_scene_pos(scene_pos)
+
+        # Fallback for a single point (closest_edge requires >= 2 points)
+        return GeometryUtils.squared_distance(points[0], scene_pos)
+
     def create_node(self, scene_pos: QPointF, index: int | None = None) -> NodeT:
         """Create and insert node at index (appends if None)."""
         node = VectorNode.from_scene_pos(self, scene_pos, parent=self)
@@ -380,6 +447,14 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
         while self._nodes:
             self.pop_node()
 
+    def _scene_path_points(self) -> list[QPointF]:
+        """Return scene positions defining the shape's edges for hit-testing.
+
+        Override in subclasses to customize the path geometry
+        (e.g., to follow a parent shape in SnappedSpan).
+        """
+        return [node.scene_pos for node in self._nodes]
+
     def closest_edge(
             self,
             scene_pos: QPointF,
@@ -387,15 +462,16 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
     ) -> EdgeHitInfo | None:
         """Find the closest edge point to a scene position.
         Returns None if shape has < 2 nodes or exceeds tolerance."""
-        if len(self._nodes) < 2:
+        points = self._scene_path_points()
+        if len(points) < 2:
             return None
 
         closest_hit: EdgeHitInfo | None = None
         min_squared_distance = max_tolerance ** 2
 
-        for i in range(len(self._nodes) - 1):
-            node_start_pos = self._nodes[i].scene_pos
-            node_end_pos = self._nodes[i + 1].scene_pos
+        for i in range(len(points) - 1):
+            node_start_pos = points[i]
+            node_end_pos = points[i + 1]
 
             closest_point, normalized_pos = GeometryUtils.closest_point_on_segment(
                 node_start_pos, node_end_pos, scene_pos)
@@ -414,14 +490,14 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
 
     def map_arc_length_to_param(self, arc_length: float) -> ArcParam:
         """Convert arc-length to parametric position on path."""
-        node_count = len(self.nodes)
+        node_count = len(self._nodes)
         if node_count < 2:
             return ArcParam(0, 0.0)
 
         remaining = max(0.0, arc_length)
         for i in range(node_count - 1):
-            p1 = self.nodes[i].local_pos
-            p2 = self.nodes[i + 1].local_pos
+            p1 = self._nodes[i].local_pos
+            p2 = self._nodes[i + 1].local_pos
             seg_len = GeometryUtils.distance(p1, p2)
 
             if remaining <= seg_len + GEOMETRY_EPSILON:
@@ -441,13 +517,13 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
         # Sum lengths of all segments before the hit segment
         arc_len = 0.0
         for i in range(hit.edge_index):
-            p1 = self.nodes[i].local_pos
-            p2 = self.nodes[i + 1].local_pos
+            p1 = self._nodes[i].local_pos
+            p2 = self._nodes[i + 1].local_pos
             arc_len += GeometryUtils.distance(p1, p2)
 
         # Add partial length along the hit segment
-        p_start = self.nodes[hit.edge_index].local_pos
-        p_end = self.nodes[hit.edge_index + 1].local_pos
+        p_start = self._nodes[hit.edge_index].local_pos
+        p_end = self._nodes[hit.edge_index + 1].local_pos
         arc_len += hit.edge_normalized_pos * GeometryUtils.distance(p_start, p_end)
 
         return arc_len
@@ -466,9 +542,11 @@ class Polyline(NodeBasedShape):
             points: Sequence[QPointF] = (),
             origin: QPointF | None = None,
             parent_shape: VectorShape | None = None,
+            inherit_transform: bool = True,
             parent: QObject | None = None,
     ):
-        super().__init__(points, origin=origin, parent_shape=parent_shape, parent=parent)
+        super().__init__(
+            points, origin=origin, parent_shape=parent_shape, inherit_transform=inherit_transform, parent=parent)
 
     def closest_point(self, point: QPointF) -> QPointF | None:
         """

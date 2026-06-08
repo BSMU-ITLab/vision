@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, TypeVar
 
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPainterPathStroker
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPathItem, QGraphicsEllipseItem
 
@@ -11,7 +12,7 @@ from bsmu.vision.actors import GraphicsActor, ItemT
 from bsmu.vision.core.data.vector.shapes import VectorElement, VectorShape, VectorNode, Point, NodeBasedShape, Polyline
 
 if TYPE_CHECKING:
-    from PySide6.QtCore import QObject, QPointF
+    from PySide6.QtCore import QObject
     from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
 ElementT = TypeVar('ElementT',bound=VectorElement)
@@ -36,6 +37,14 @@ class VectorElementActor(GraphicsActor[ElementT, ItemT], Generic[ElementT, ItemT
         if self.model is not None:
             self.model.changed.connect(self._update_graphics_item)
 
+    def visual_distance_to_scene_pos(self, scene_pos: QPointF) -> float:
+        """Return the Euclidean distance from the element's geometry to the scene position.
+
+        Subclasses may override this to return a signed distance for visual
+        boundary hit-testing (e.g., negative values indicating 'inside').
+        """
+        return math.sqrt(self.model.squared_distance_to_scene_pos(scene_pos))
+
 
 class VectorShapeActor(VectorElementActor[ShapeT, ItemT], Generic[ShapeT, ItemT]):
     def __init__(self, model: ShapeT | None = None, parent: QObject | None = None):
@@ -44,6 +53,34 @@ class VectorShapeActor(VectorElementActor[ShapeT, ItemT], Generic[ShapeT, ItemT]
     @property
     def shape(self) -> ShapeT | None:
         return self.model
+
+    def _model_about_to_change(self, new_model: ElementT | None) -> None:
+        if self.model is not None:
+            self.model.scene_transform_changed.disconnect(self._on_scene_transform_changed)
+
+        super()._model_about_to_change(new_model)
+
+    def _model_changed(self) -> None:
+        super()._model_changed()
+
+        if self.model is not None:
+            self.model.scene_transform_changed.connect(self._on_scene_transform_changed)
+
+    def _on_scene_transform_changed(self) -> None:
+        self._update_scene_position()
+
+    def _update_scene_position(self) -> None:
+        if self.graphics_item is None:
+            return
+        # (0,0) in local coords maps to the shape's origin in scene space.
+        # local_to_scene adds self._origin and all parent offsets internally.
+        scene_origin = self.model.local_to_scene(QPointF(0, 0))
+        # We set the scene position directly (flat item hierarchy, no parent QGraphicsItem)
+        # to retain global control over z-ordering independent of logical parenting.
+        self.graphics_item.setPos(scene_origin)
+
+    def _update_graphics_item(self) -> None:
+        self._update_scene_position()
 
     def update_visual_state(
             self,
@@ -147,6 +184,16 @@ class VectorNodeActor(
 
     def _update_pos(self) -> None:
         self.graphics_item.setPos(self.model.local_pos)
+
+    def visual_distance_to_scene_pos(self, scene_pos: QPointF) -> float:
+        """Return the signed distance to the node's visual edge.
+
+        Negative values indicate the point is inside the visual radius,
+        while positive values indicate it is outside. Ideal for hit-testing.
+        """
+        squared_distance = self.model.squared_distance_to_scene_pos(scene_pos)
+        distance_to_center = math.sqrt(squared_distance)
+        return distance_to_center - self._visual_state.radius
 
 
 class PointActor(VectorShapeActor[Point, GraphicsNodeItem]):
@@ -363,7 +410,6 @@ class NodeBasedShapeActor(
 
     def _model_about_to_change(self, new_model: NodeBasedShape | None) -> None:
         if self.model is not None:
-            self.model.transform_changed.disconnect(self._on_transform_changed)
             self.model.geometry_changed.disconnect(self._on_geometry_changed)
             self.model.node_added.disconnect(self._on_node_added)
             self.model.node_removed.disconnect(self._on_node_removed)
@@ -375,17 +421,10 @@ class NodeBasedShapeActor(
         super()._model_changed()
 
         if self.model is not None:
-            self.model.transform_changed.connect(self._on_transform_changed)
             self.model.geometry_changed.connect(self._on_geometry_changed)
             self.model.node_added.connect(self._on_node_added)
             self.model.node_removed.connect(self._on_node_removed)
             self.model.completed.connect(self._on_completed)
-
-    def _on_transform_changed(self) -> None:
-        self._update_item_pos()
-
-    def _update_item_pos(self) -> None:
-        self.graphics_item.setPos(self.model.origin)
 
     def _on_geometry_changed(self) -> None:
         self._rebuild_path()
@@ -431,7 +470,8 @@ class NodeBasedShapeActor(
                 self._create_node_actor(node)
 
     def _update_graphics_item(self) -> None:
-        self._update_item_pos()
+        super()._update_graphics_item()
+
         self._rebuild_path()
         self._rebuild_node_actors()
         self._update_graphics_item_visual_state()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QRectF
@@ -133,12 +134,11 @@ class GraphicsViewer(DataViewer[DataT]):
     def _vector_actors_near(
             self,
             scene_pos: QPointF | QPoint,
-            screen_tolerance: float = SCREEN_TOLERANCE,
+            scene_tolerance: float,
             mode: Qt.ItemSelectionMode = Qt.ItemSelectionMode.IntersectsItemShape,
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
     ) -> Iterator[VectorElementActor]:
-        """Yield vector actors (shapes or nodes) near `scene_pos` within a screen-space tolerance."""
-        scene_tolerance = self.screen_to_scene_tolerance(screen_tolerance)
+        """Yield vector actors (shapes or nodes) near `scene_pos` within a scene-space tolerance."""
         search_area = QRectF(
             scene_pos.x() - scene_tolerance,
             scene_pos.y() - scene_tolerance,
@@ -160,7 +160,8 @@ class GraphicsViewer(DataViewer[DataT]):
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
     ) -> list[VectorElementActor]:
         """Return vector actors (shapes or nodes) near `scene_pos` within a screen-space tolerance."""
-        return list(self._vector_actors_near(scene_pos, screen_tolerance, mode, order))
+        scene_tolerance = self.screen_to_scene_tolerance(screen_tolerance)
+        return list(self._vector_actors_near(scene_pos, scene_tolerance, mode, order))
 
     def vector_actor_near(
             self,
@@ -170,14 +171,35 @@ class GraphicsViewer(DataViewer[DataT]):
             order: Qt.SortOrder = Qt.SortOrder.DescendingOrder,
             predicate: Callable[[VectorElementActor], bool] | None = None,
     ) -> VectorElementActor | None:
+        """Return the topmost or nearest vector actor to the scene position.
+
+        Applies standard UX hit-testing rules using the provided screen-space tolerance:
+        1. Immediate return if the cursor is inside an element (negative distance).
+           Since iteration is top-down, the first match is guaranteed to be topmost.
+        2. Otherwise, return the closest element whose edge is within the screen tolerance.
         """
-        Return the first vector actor (shape or node) near `scene_pos` within a screen-space tolerance,
-        optionally filtered by `predicate`.
-        """
-        for actor in self._vector_actors_near(scene_pos, screen_tolerance, mode, order):
-            if predicate is None or predicate(actor):
+        scene_tolerance = self.screen_to_scene_tolerance(screen_tolerance)
+        epsilon = 1e-4  # Prevents float jitter from swapping equally close actors
+
+        nearest_outside_actor: VectorElementActor | None = None
+        min_dist = math.inf
+
+        for actor in self._vector_actors_near(scene_pos, scene_tolerance, mode, order):
+            if predicate is not None and not predicate(actor):
+                continue
+
+            visual_dist = actor.visual_distance_to_scene_pos(scene_pos)
+            if visual_dist < 0:
+                # Cursor is inside the element.
+                # Top-down iteration guarantees this is the topmost element.
                 return actor
-        return None
+
+            # Cursor is outside. Find the closest edge within tolerance.
+            if visual_dist <= scene_tolerance and visual_dist < min_dist - epsilon:
+                min_dist = visual_dist
+                nearest_outside_actor = actor
+
+        return nearest_outside_actor
 
     @property
     def top_level_bounding_rect(self) -> QRectF:

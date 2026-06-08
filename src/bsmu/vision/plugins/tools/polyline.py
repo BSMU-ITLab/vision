@@ -163,10 +163,6 @@ class PolylineTool(LayeredDataViewerTool):
         self._update_preview_segment(scene_pos)
 
     def _on_polyline_node_removed(self, _node: VectorNode, index: int) -> None:
-        if self._curr_polyline.is_empty:
-            self._cancel_drawing()
-            return
-
         is_end_node_removed = (index == len(self._curr_polyline.nodes))
         if self.is_drawing and is_end_node_removed:
             self._update_preview_segment_to_cursor_pos()
@@ -178,12 +174,8 @@ class PolylineTool(LayeredDataViewerTool):
 
     def _on_vector_shape_removed(self, shape: VectorShape) -> None:
         """React when the shape we're drawing is deleted (e.g., via undo)."""
-        if shape is not self._curr_polyline:
-            return
-
-        self._reset_tool_state()
-
-        QTimer.singleShot(0, self._discard_draft_drawing_commands)
+        if shape is self._curr_polyline:
+            self._cancel_drawing()
 
     def _discard_draft_drawing_commands(self) -> None:
         """Discard all commands created during the current draft drawing session."""
@@ -214,10 +206,10 @@ class PolylineTool(LayeredDataViewerTool):
         self._state = PolylineToolState.DRAWING
 
     def _cancel_drawing(self) -> None:
-        if self._state is PolylineToolState.IDLE:
-            return
+        if self.is_drawing:
+            self._reset_tool_state()
 
-        self._curr_vector.remove_shape(self._curr_polyline)
+            QTimer.singleShot(0, self._discard_draft_drawing_commands)
 
     def _reset_tool_state(self) -> None:
         """Clear preview, reset state."""

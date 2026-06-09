@@ -206,10 +206,12 @@ class PolylineTool(LayeredDataViewerTool):
         self._state = PolylineToolState.DRAWING
 
     def _cancel_drawing(self) -> None:
-        if self.is_drawing:
-            self._reset_tool_state()
+        if self._state is PolylineToolState.IDLE:
+            return
 
-            QTimer.singleShot(0, self._discard_draft_drawing_commands)
+        self._reset_tool_state()
+
+        QTimer.singleShot(0, self._discard_draft_drawing_commands)
 
     def _reset_tool_state(self) -> None:
         """Clear preview, reset state."""

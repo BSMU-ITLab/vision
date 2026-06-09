@@ -384,6 +384,12 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
             self._is_completed = True
             self.completed.emit()
 
+    @property
+    def can_delete_nodes_individually(self) -> bool:
+        """Return True if nodes can be deleted individually.
+        Override for shapes that require the whole shape to be deleted when a node is removed."""
+        return True
+
     def squared_distance_to_scene_pos(self, scene_pos: QPointF) -> float:
         hit = self.closest_edge(scene_pos)
         if hit is not None:

@@ -287,19 +287,25 @@ class PointerTool(LayeredDataViewerTool):
             self.selection_manager.select_shape(shape)
 
     def _delete_selected(self) -> bool:
-        selected_shapes = set(self.selection_manager.selected_shapes)
-        selected_nodes = set(self.selection_manager.selected_nodes)
+        shapes_to_delete = set(self.selection_manager.selected_shapes)
+        nodes_to_delete: list[VectorNode] = []
 
-        if not selected_shapes and not selected_nodes:
+        for node in self.selection_manager.selected_nodes:
+            parent_shape = node.parent_shape
+            if not parent_shape.can_delete_nodes_individually:
+                # Node cannot be deleted individually -> remove the whole parent shape instead
+                shapes_to_delete.add(parent_shape)
+            # Skip nodes whose parent shape is already being deleted entirely.
+            elif parent_shape not in shapes_to_delete:
+                nodes_to_delete.append(node)
+
+        if not shapes_to_delete and not nodes_to_delete:
             return False
-
-        # Filter out nodes that belong to shapes being deleted to avoid double-deletion
-        nodes_to_delete = [n for n in selected_nodes if n.parent_shape not in selected_shapes]
 
         self._undo_manager.begin_macro('Delete Selected')
 
-        if selected_shapes:
-            delete_shapes_command = RemoveShapesCommand(self.viewer.data, selected_shapes, 'Delete Shapes')
+        if shapes_to_delete:
+            delete_shapes_command = RemoveShapesCommand(self.viewer.data, shapes_to_delete, 'Delete Shapes')
             self._undo_manager.push(delete_shapes_command)
 
         if nodes_to_delete:
@@ -307,7 +313,6 @@ class PointerTool(LayeredDataViewerTool):
             self._undo_manager.push(delete_nodes_command)
 
         self._undo_manager.end_macro()
-
         return True
 
 

@@ -496,6 +496,7 @@ class NodeBasedShapeActor(
             index = len(self._node_actors)
         self._node_actors.insert(index, node_actor)
         node_actor.graphics_item.setParentItem(self.graphics_item)
+        node_actor.adjust_to_view_scale(self._current_view_scale)
         return node_actor
 
     def _remove_node_actor(self, index: int) -> None:

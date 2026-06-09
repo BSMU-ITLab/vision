@@ -24,6 +24,9 @@ DEFAULT_OUTLINE_COLOR = QColor('#262626')
 DEFAULT_NODE_RADIUS: float = 5.0
 DEFAULT_NODE_COLOR = QColor(106, 255, 13)
 
+# Visually imperceptible threshold: changes < 0.5px are handled by anti-aliasing
+_SCREEN_DELTA_THRESHOLD: float = 0.5
+
 
 class VectorElementActor(GraphicsActor[ElementT, ItemT], Generic[ElementT, ItemT]):
     def __init__(self, model: ElementT | None = None, parent: QObject | None = None):
@@ -113,19 +116,55 @@ class GraphicsNodeItem(QGraphicsEllipseItem):
 
         if visual_state is None:
             visual_state = NodeVisualState()
+        self._visual_state = visual_state
 
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+        self._current_view_scale: float = 1.0
+        self._scene_radius: float = math.inf
+        self._scene_pen_width: float = math.inf
 
         self._apply_visual_state(visual_state)
 
-    def _apply_visual_state(self, visual_state: NodeVisualState) -> None:
-        if visual_state.brush is not None:
-            self.setBrush(visual_state.brush)
-        if visual_state.pen is not None:
-            self.setPen(visual_state.pen)
+    @property
+    def scene_radius(self) -> float:
+        return self._scene_radius
 
-        radius = visual_state.radius
-        self.setRect(QRectF(-radius, -radius, 2 * radius, 2 * radius))
+    def _apply_visual_state(self, visual_state: NodeVisualState) -> None:
+        self._visual_state = visual_state
+        if self._visual_state.brush is not None:
+            self.setBrush(self._visual_state.brush)
+
+        self._recalculate_scene_sizes()
+
+    def adjust_to_view_scale(self, view_scale: float) -> None:
+        if self._current_view_scale != view_scale:
+            self._current_view_scale = view_scale
+            self._recalculate_scene_sizes()
+
+    def _recalculate_scene_sizes(self) -> None:
+        view_scale = max(self._current_view_scale, 0.001)  # Prevent division by zero
+        new_scene_radius = self._visual_state.radius / view_scale
+        # Convert scene-unit deltas back to screen pixels for accurate thresholding
+        scene_radius_delta_screen = abs(self._scene_radius - new_scene_radius) * view_scale
+
+        if self._visual_state.pen is not None:
+            new_scene_pen_width = self._visual_state.pen.widthF() / view_scale
+            pen_width_delta_screen = abs(self._scene_pen_width - new_scene_pen_width) * view_scale
+        else:
+            pen_width_delta_screen = -math.inf
+
+        # Only update if the visual change is actually perceptible on screen
+        if scene_radius_delta_screen < _SCREEN_DELTA_THRESHOLD and pen_width_delta_screen < _SCREEN_DELTA_THRESHOLD:
+            return
+
+        self.prepareGeometryChange()
+        self._scene_radius = new_scene_radius
+        self.setRect(QRectF(-self._scene_radius, -self._scene_radius, 2 * self._scene_radius, 2 * self._scene_radius))
+
+        if self._visual_state.pen is not None:
+            pen = QPen(self._visual_state.pen)
+            self._scene_pen_width = new_scene_pen_width
+            pen.setWidthF(self._scene_pen_width)
+            self.setPen(pen)
 
     def update_visual_state(self, visual_state: NodeVisualState) -> None:
         self._apply_visual_state(visual_state)
@@ -142,7 +181,13 @@ class VectorNodeActor(
     VectorElementActor[VectorNodeT, GraphicsNodeItemT],
     Generic[VectorNodeT, GraphicsNodeItemT],
 ):
-    """Actor for a single editable node (control point) of a vector shape."""
+    """Actor for a single editable node (control point) of a vector shape.
+
+    TODO(arch): Refactor to strict separation of concerns:
+        1. Actor should calculate `scene_radius` based on `view_scale`.
+        2. Actor should push a `NodeRenderState` dataclass to the Item.
+        3. GraphicsNodeItem should become a "dumb" view that only applies pre-calculated values.
+    """
 
     DEFAULT_RADIUS = DEFAULT_NODE_RADIUS
     DEFAULT_BRUSH = QBrush(DEFAULT_NODE_COLOR)
@@ -185,6 +230,10 @@ class VectorNodeActor(
     def _update_pos(self) -> None:
         self.graphics_item.setPos(self.model.local_pos)
 
+    def _on_view_scale_changed(self) -> None:
+        if self.graphics_item is not None:
+            self.graphics_item.adjust_to_view_scale(self._current_view_scale)
+
     def visual_distance_to_scene_pos(self, scene_pos: QPointF) -> float:
         """Return the signed distance to the node's visual edge.
 
@@ -193,7 +242,7 @@ class VectorNodeActor(
         """
         squared_distance = self.model.squared_distance_to_scene_pos(scene_pos)
         distance_to_center = math.sqrt(squared_distance)
-        return distance_to_center - self._visual_state.radius
+        return distance_to_center - self.graphics_item.scene_radius
 
 
 class PointActor(VectorShapeActor[Point, GraphicsNodeItem]):
@@ -224,9 +273,7 @@ class PointActor(VectorShapeActor[Point, GraphicsNodeItem]):
         self.graphics_item.setBrush(QBrush(color))
 
     def _create_graphics_item(self) -> GraphicsNodeItem:
-        item = GraphicsNodeItem(self._visual_state)
-        # item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-        return item
+        return GraphicsNodeItem(self._visual_state)
 
     def _update_graphics_item(self) -> None:
         self._update_pos()
@@ -236,9 +283,6 @@ class PointActor(VectorShapeActor[Point, GraphicsNodeItem]):
 
 
 class AntialiasedGraphicsPathItem(QGraphicsPathItem):
-    # Visually imperceptible threshold: changes < 0.5px are handled by anti-aliasing
-    _SCREEN_DELTA_THRESHOLD: float = 0.5
-
     def __init__(self, path: QPainterPath | None = None, parent: QGraphicsItem | None = None):
         super().__init__(path, parent)
 
@@ -300,7 +344,7 @@ class AntialiasedGraphicsPathItem(QGraphicsPathItem):
         pen_delta_screen = abs(self._pen_current_scene_width - pen_new_scene_width) * view_scale
         outline_delta_screen = abs(self._outline_current_scene_width - outline_new_scene_width) * view_scale
         # Only update if the visual change is actually perceptible on screen
-        if pen_delta_screen < self._SCREEN_DELTA_THRESHOLD and outline_delta_screen < self._SCREEN_DELTA_THRESHOLD:
+        if pen_delta_screen < _SCREEN_DELTA_THRESHOLD and outline_delta_screen < _SCREEN_DELTA_THRESHOLD:
             return
 
         self.prepareGeometryChange()
@@ -505,6 +549,9 @@ class NodeBasedShapeActor(
     def _on_view_scale_changed(self) -> None:
         if self.graphics_item is not None:
             self.graphics_item.adjust_to_view_scale(self._current_view_scale)
+
+        for node_actor in self._node_actors:
+            node_actor.adjust_to_view_scale(self._current_view_scale)
 
     def update_visual_state(
             self,

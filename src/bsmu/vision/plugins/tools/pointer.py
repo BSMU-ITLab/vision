@@ -243,8 +243,11 @@ class PointerTool(LayeredDataViewerTool):
         if not isinstance(actor, NodeBasedShapeActor):
             return False
 
-        # Find the closest edge within reasonable tolerance
         shape = actor.shape
+        if not shape.allows_node_insertion:
+            return False  # Silently ignore double-click on immutable shapes
+
+        # Find the closest edge within reasonable tolerance
         scene_tolerance = self.viewer.screen_to_scene_tolerance(DOUBLE_CLICK_SCREEN_TOLERANCE)
         hit_info = shape.closest_edge(scene_pos, max_tolerance=scene_tolerance)
         if hit_info is None:
@@ -292,7 +295,7 @@ class PointerTool(LayeredDataViewerTool):
 
         for node in self.selection_manager.selected_nodes:
             parent_shape = node.parent_shape
-            if not parent_shape.can_delete_nodes_individually:
+            if not parent_shape.allows_individual_node_deletion:
                 # Node cannot be deleted individually -> remove the whole parent shape instead
                 shapes_to_delete.add(parent_shape)
             # Skip nodes whose parent shape is already being deleted entirely.

@@ -385,9 +385,15 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
             self.completed.emit()
 
     @property
-    def can_delete_nodes_individually(self) -> bool:
+    def allows_individual_node_deletion(self) -> bool:
         """Return True if nodes can be deleted individually.
         Override for shapes that require the whole shape to be deleted when a node is removed."""
+        return True
+
+    @property
+    def allows_node_insertion(self) -> bool:
+        """Return True if new nodes can be inserted into this shape.
+        Override to False for shapes with a fixed node structure."""
         return True
 
     def squared_distance_to_scene_pos(self, scene_pos: QPointF) -> float:

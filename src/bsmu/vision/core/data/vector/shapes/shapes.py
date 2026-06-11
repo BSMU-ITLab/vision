@@ -35,12 +35,6 @@ class ShapeState(BaseShapeState):
     origin: QPointF = field(default_factory=QPointF)
 
 
-@dataclass(slots=True)
-class SnappedSpanState(BaseShapeState):
-    start_arc: float = 0.0
-    end_arc: float = 0.0
-
-
 class VectorShape(VectorElement):
     parent_shape_changed = Signal(VectorElement)  # VectorShape
 
@@ -518,13 +512,16 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
             remaining -= seg_len
 
         # Arc-length exceeds total path length; clamp to end of last segment
-        return ArcParam(max(0, node_count - 2), 1.0)
+        return ArcParam(node_count - 2, 1.0)
 
-    def map_point_to_arc_length(self, point: QPointF) -> float:
-        """Project point onto nearest path segment and return arc-length from start."""
-        hit = self.closest_edge(point, max_tolerance=math.inf)
+    def map_point_to_arc_length(self, scene_pos: QPointF) -> float | None:
+        """Project a scene point onto the path and return its arc length from the start.
+
+        Returns None if no valid projection is found within the path.
+        """
+        hit = self.closest_edge(scene_pos)
         if hit is None or hit.edge_index is None or hit.edge_normalized_pos is None:
-            return 0.0
+            return None
 
         # Sum lengths of all segments before the hit segment
         arc_len = 0.0

@@ -1,4 +1,12 @@
 from .shape import (
-    VectorElementActor, VectorShapeActor, VectorNodeActor, NodeVisualState, PointActor, NodeBasedShapeActor,
+    VectorElementActor,
+    VectorShapeActor,
+    VectorNodeActor,
+    GraphicsNodeItem,
+    AntialiasedGraphicsPathItem,
+    AntialiasedGraphicsPathItemT,
+    NodeVisualState,
+    NodeBasedShapeActor,
+    PointActor,
     PolylineActor,
 )

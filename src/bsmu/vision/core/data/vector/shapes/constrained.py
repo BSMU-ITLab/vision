@@ -370,7 +370,7 @@ class SnappedSpan(NodeBasedShape[SnappedNode]):
 
         return current_cursor_arc
 
-    def _scene_path_points(self) -> list[QPointF]:
+    def scene_path_points(self) -> list[QPointF]:
         """Return scene vertices along the parent path between the span nodes.
 
         Ensures the path is always built in forward traversal order

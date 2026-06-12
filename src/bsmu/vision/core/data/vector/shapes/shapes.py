@@ -395,7 +395,7 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
         if hit is not None:
             return hit.squared_distance
 
-        points = self._scene_path_points()
+        points = self.scene_path_points()
         if not points:
             return super().squared_distance_to_scene_pos(scene_pos)
 
@@ -453,7 +453,7 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
         while self._nodes:
             self.pop_node()
 
-    def _scene_path_points(self) -> list[QPointF]:
+    def scene_path_points(self) -> list[QPointF]:
         """Return scene positions defining the shape's edges for hit-testing.
 
         Override in subclasses to customize the path geometry
@@ -468,7 +468,7 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
     ) -> EdgeHitInfo | None:
         """Find the closest edge point to a scene position.
         Returns None if shape has < 2 nodes or exceeds tolerance."""
-        points = self._scene_path_points()
+        points = self.scene_path_points()
         if len(points) < 2:
             return None
 

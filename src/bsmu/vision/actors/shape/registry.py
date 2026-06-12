@@ -4,8 +4,9 @@ from collections.abc import Callable
 from typing import Any
 
 from bsmu.vision.actors.shape import VectorShapeActor, PointActor, PolylineActor
+from bsmu.vision.actors.shape.constrained import SnappedSpanActor
 from bsmu.vision.core.data.vector.shapes import VectorShape, Point, Polyline
-
+from bsmu.vision.core.data.vector.shapes.constrained import SnappedSpan
 
 ShapeType = type[VectorShape]
 ShapeActorFactory = Callable[[Any], VectorShapeActor]
@@ -29,3 +30,4 @@ def create_shape_actor(shape: VectorShape) -> VectorShapeActor | None:
 # Register built-in actors
 register_shape_actor(Point, PointActor)
 register_shape_actor(Polyline, PolylineActor)
+register_shape_actor(SnappedSpan, SnappedSpanActor)

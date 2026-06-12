@@ -194,10 +194,10 @@ class VectorNodeActor(
 
     def __init__(
             self,
-            model: VectorNode | None = None,
+            model: VectorNodeT | None = None,
             visual_state: NodeVisualState | None = None,
             parent: QObject | None = None,
-    ):
+    ) -> None:
         if visual_state is None:
             visual_state = NodeVisualState(
                 brush=self.DEFAULT_BRUSH,
@@ -208,7 +208,7 @@ class VectorNodeActor(
         super().__init__(model, parent)
 
     @property
-    def node(self) -> VectorNode | None:
+    def node(self) -> VectorNodeT | None:
         return self.model
 
     def update_visual_state(self, visual_state: NodeVisualState) -> None:
@@ -409,7 +409,7 @@ class NodeBasedShapeActor(
 
     def __init__(
             self,
-            model: NodeBasedShape | None = None,
+            model: NodeBasedShapeT | None = None,
             node_actor_class: type[VectorNodeActor] = VectorNodeActor,
             draft_color: QColor | None = None,
             completed_color: QColor | None = None,
@@ -419,7 +419,7 @@ class NodeBasedShapeActor(
             node_radius: float = DEFAULT_NODE_RADIUS,
             node_draft_color: QColor | None = None,
             parent: QObject | None = None,
-    ):
+    ) -> None:
         self._node_actor_class = node_actor_class
         self._draft_color = draft_color or self.DEFAULT_DRAFT_COLOR
         self._completed_color = completed_color or self.DEFAULT_COMPLETED_COLOR
@@ -443,7 +443,7 @@ class NodeBasedShapeActor(
     def last_node(self) -> VectorNode:
         return self.model.last_node
 
-    def _create_graphics_item(self) -> AntialiasedGraphicsPathItem:
+    def _create_graphics_item(self) -> AntialiasedGraphicsPathItemT:
         return AntialiasedGraphicsPathItem()
 
     def create_node(self, pos: QPointF) -> VectorNode:
@@ -452,7 +452,7 @@ class NodeBasedShapeActor(
     def pop_node(self, index: int = -1) -> VectorNode:
         return self.model.pop_node(index)
 
-    def _model_about_to_change(self, new_model: NodeBasedShape | None) -> None:
+    def _model_about_to_change(self, new_model: NodeBasedShapeT | None) -> None:
         if self.model is not None:
             self.model.geometry_changed.disconnect(self._on_geometry_changed)
             self.model.node_added.disconnect(self._on_node_added)

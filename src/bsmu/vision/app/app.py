@@ -125,6 +125,13 @@ class App(QObject, DataFileProvider):
         for error in errors:
             logging.error(f'  - [{error.category}] {error.plugin_name} -> {error.details}')
 
+        # Log full traceback for the first error
+        if errors and errors[0].__cause__:
+            logging.error(
+                f'Original traceback for {errors[0].plugin_name}:',
+                exc_info=errors[0].__cause__,
+            )
+
         dialog = PluginLoadErrorDialog(errors)
         dialog.exec()
 

@@ -89,25 +89,25 @@ class PluginManager(QObject):
         if plugin is None:
             try:
                 module_name, class_name = full_name.rsplit('.', 1)
-            except ValueError:
-                raise PluginLoadError(full_name, 'Invalid Format', 'Expected "module.path.ClassName"')
+            except ValueError as e:
+                raise PluginLoadError(full_name, 'Invalid Format', 'Expected "module.path.ClassName"') from e
 
             try:
                 module = importlib.import_module(module_name)
                 plugin_class = getattr(module, class_name)
             except ModuleNotFoundError as e:
-                raise PluginLoadError(full_name, 'Module Not Found', f"'{e.name}'")
-            except AttributeError:
-                raise PluginLoadError(full_name, 'Class Not Found', f"'{class_name}' in '{module_name}'")
+                raise PluginLoadError(full_name, 'Module Not Found', f"'{e.name}'") from e
+            except AttributeError as e:
+                raise PluginLoadError(full_name, 'Class Not Found', f"'{class_name}' in '{module_name}'") from e
             except Exception as e:
-                raise PluginLoadError(full_name, 'Import Error', str(e))
+                raise PluginLoadError(full_name, 'Import Error', str(e)) from e
 
             dependency_plugin_by_key = {}
             for plugin_key, plugin_full_name in plugin_class.default_dependency_plugin_full_name_by_key.items():
                 try:
                     dependency_plugin_by_key[plugin_key] = self._create_plugin(plugin_full_name)
                 except PluginLoadError as e:
-                    raise PluginLoadError(full_name, 'Dependency Failed', f"'{plugin_full_name}' ({e.category})")
+                    raise PluginLoadError(full_name, 'Dependency Failed', f"'{plugin_full_name}' ({e.category})") from e
 
             if args is not None:
                 plugins_as_args = [self._created_plugin_by_alias.get(arg) or arg for arg in args]
@@ -117,7 +117,7 @@ class PluginManager(QObject):
             try:
                 plugin = plugin_class(*plugins_as_args, **dependency_plugin_by_key)
             except Exception as e:
-                raise PluginLoadError(full_name, 'Instantiation Failed', str(e))
+                raise PluginLoadError(full_name, 'Instantiation Failed', str(e)) from e
 
             plugin.dependency_plugin_by_key = dependency_plugin_by_key
 
@@ -197,9 +197,11 @@ class PluginManager(QObject):
                 errors.append(e)
             except Exception as e:
                 # Fallback for unexpected errors
-                errors.append(
-                    PluginLoadError(self._resolve_plugin_name(plugin), 'Unknown Error', str(e))
-                )
+                plugin_name = self._resolve_plugin_name(plugin)
+                error = PluginLoadError(plugin_name, 'Unknown Error', str(e))
+                error.__cause__ = e
+                errors.append(error)
+
         return errors
 
     def enabled_plugin(self, full_name) -> Plugin | None:

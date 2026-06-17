@@ -12,9 +12,18 @@ from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.core.plugins.observer import ObserverPlugin
 
 if TYPE_CHECKING:
-    from typing import List
-
     from bsmu.vision.app import App
+
+
+class PluginLoadError(Exception):
+    """Exception containing structured information about a plugin loading error."""
+
+    def __init__(self, plugin_name: str, category: str, details: str) -> None:
+        super().__init__(f'{plugin_name}: {category} -> {details}')
+
+        self.plugin_name = plugin_name
+        self.category = category
+        self.details = details
 
 
 class PluginManager(QObject):
@@ -23,7 +32,7 @@ class PluginManager(QObject):
     plugin_disabling = Signal(Plugin)
     plugin_disabled = Signal(Plugin)
 
-    def __init__(self, app: App):
+    def __init__(self, app: App) -> None:
         super().__init__()
 
         self._app = app
@@ -37,10 +46,10 @@ class PluginManager(QObject):
         self._created_plugin_by_alias = {}  # { alias: Plugin }
 
     @property
-    def enabled_plugins(self) -> List[Plugin]:
+    def enabled_plugins(self) -> list[Plugin]:
         return list(self._enabled_plugin_by_full_name.values())
 
-    def _enable_created_plugin(self, plugin: Plugin, replace_full_name: str = None):
+    def _enable_created_plugin(self, plugin: Plugin, replace_full_name: str = None) -> None:
         full_name = plugin.full_name()
 
         assert full_name in self._created_plugin_by_full_name, \
@@ -65,29 +74,51 @@ class PluginManager(QObject):
     def _create_plugin(
             self,
             full_name: str,
-            args: List[str] | None = None,
+            args: list[str] | None = None,
             replace_full_name: str | None = None,
             alias: str | None = None,
     ) -> Plugin:
         if replace_full_name is not None:
-            assert replace_full_name not in self._created_plugin_by_full_name, \
-                'Create plugins with a replace property in the beginning before any other plugins, ' \
-                'because the replaced plugin can be created as other plugin dependency ' \
-                'and cannot be used after replacement'
+            assert replace_full_name not in self._created_plugin_by_full_name, (
+                'Plugins with a "replace" property must be created first. '
+                'Otherwise, the replaced plugin might be initialized as a dependency '
+                'and become unusable after replacement.'
+            )
 
-        plugin = self._created_plugin_by_full_name.get(full_name)   #### or self._aliases_plugins.get(full_name)
+        plugin = self._created_plugin_by_full_name.get(full_name)
         if plugin is None:
-            module_name, class_name = full_name.rsplit(".", 1)
-            plugin_class = getattr(importlib.import_module(module_name), class_name)
+            try:
+                module_name, class_name = full_name.rsplit('.', 1)
+            except ValueError:
+                raise PluginLoadError(full_name, 'Invalid Format', 'Expected "module.path.ClassName"')
+
+            try:
+                module = importlib.import_module(module_name)
+                plugin_class = getattr(module, class_name)
+            except ModuleNotFoundError as e:
+                raise PluginLoadError(full_name, 'Module Not Found', f"'{e.name}'")
+            except AttributeError:
+                raise PluginLoadError(full_name, 'Class Not Found', f"'{class_name}' in '{module_name}'")
+            except Exception as e:
+                raise PluginLoadError(full_name, 'Import Error', str(e))
 
             dependency_plugin_by_key = {}
             for plugin_key, plugin_full_name in plugin_class.default_dependency_plugin_full_name_by_key.items():
-                dependency_plugin_by_key[plugin_key] = self._create_plugin(plugin_full_name)
+                try:
+                    dependency_plugin_by_key[plugin_key] = self._create_plugin(plugin_full_name)
+                except PluginLoadError as e:
+                    raise PluginLoadError(full_name, 'Dependency Failed', f"'{plugin_full_name}' ({e.category})")
 
-            plugins_as_args = [self._created_plugin_by_alias.get(arg) or arg for arg in args] \
-                if args is not None else ()
+            if args is not None:
+                plugins_as_args = [self._created_plugin_by_alias.get(arg) or arg for arg in args]
+            else:
+                plugins_as_args = []
 
-            plugin = plugin_class(*plugins_as_args, **dependency_plugin_by_key)
+            try:
+                plugin = plugin_class(*plugins_as_args, **dependency_plugin_by_key)
+            except Exception as e:
+                raise PluginLoadError(full_name, 'Instantiation Failed', str(e))
+
             plugin.dependency_plugin_by_key = dependency_plugin_by_key
 
             self._created_plugin_by_full_name[plugin.full_name()] = plugin
@@ -120,7 +151,7 @@ class PluginManager(QObject):
 
         return plugin
 
-    def _create_and_enable_plugin_from_mapping(self, plugin_mapping: collections.Mapping) -> Plugin:
+    def _create_and_enable_plugin_from_mapping(self, plugin_mapping: collections.abc.Mapping) -> Plugin:
         assert len(plugin_mapping) == 1, 'Mapping has to contain only one element: plugin and its properties'
 
         full_name, plugin_properties = next(iter(plugin_mapping.items()))
@@ -138,7 +169,7 @@ class PluginManager(QObject):
 
         return plugin
 
-    def enable_plugin(self, plugin: str | collections.Mapping | Plugin) -> Plugin:
+    def enable_plugin(self, plugin: str | collections.abc.Mapping | Plugin) -> Plugin:
         if isinstance(plugin, collections.abc.Mapping):
             return self._create_and_enable_plugin_from_mapping(plugin)
 
@@ -148,25 +179,44 @@ class PluginManager(QObject):
 
         return self._create_and_enable_plugin_from_expression(plugin)
 
-    def enable_plugins(self, plugins: List[str | collections.Mapping | Plugin]):
+    @staticmethod
+    def _resolve_plugin_name(plugin_ref: str | collections.abc.Mapping | Plugin) -> str:
+        if isinstance(plugin_ref, collections.abc.Mapping):
+            return next(iter(plugin_ref.keys()))
+        if isinstance(plugin_ref, Plugin):
+            return plugin_ref.full_name()
+        return str(plugin_ref)
+
+    def enable_plugins(self, plugins: list[str | collections.abc.Mapping | Plugin]) -> list[PluginLoadError]:
+        """Load and enable plugins, returning a list of any encountered errors."""
+        errors = []
         for plugin in plugins:
-            self.enable_plugin(plugin)
+            try:
+                self.enable_plugin(plugin)
+            except PluginLoadError as e:
+                errors.append(e)
+            except Exception as e:
+                # Fallback for unexpected errors
+                errors.append(
+                    PluginLoadError(self._resolve_plugin_name(plugin), 'Unknown Error', str(e))
+                )
+        return errors
 
     def enabled_plugin(self, full_name) -> Plugin | None:
         return self._enabled_plugin_by_full_name.get(full_name)
 
-    def _enable_dependency_plugins(self, plugin: Plugin):
+    def _enable_dependency_plugins(self, plugin: Plugin) -> None:
         for dependency_plugin in plugin.dependency_plugin_by_key.values():
             self._enable_created_plugin(dependency_plugin)
 
-    def _setup_observer_plugin_connections(self, plugin: Plugin):
+    def _setup_observer_plugin_connections(self, plugin: Plugin) -> None:
         if not isinstance(plugin, ObserverPlugin):
             return
 
         plugin.enabled.connect(self._on_observer_plugin_enabled)
         plugin.disabling.connect(self._on_observer_plugin_disabling)
 
-    def _on_observer_plugin_enabled(self, observer_plugin: ObserverPlugin):
+    def _on_observer_plugin_enabled(self, observer_plugin: ObserverPlugin) -> None:
         for enabled_plugin in self._enabled_plugin_by_full_name.values():
             self._notify_observer_about_changed_plugin(
                 observer_plugin, observer_plugin.on_observed_plugin_enabled, enabled_plugin)
@@ -181,7 +231,7 @@ class PluginManager(QObject):
             observer_plugin: ObserverPlugin,
             observer_plugin_callback,
             changed_plugin: Plugin,
-    ):
+    ) -> None:
         if isinstance(changed_plugin, observer_plugin.observed_plugin_cls):
             observer_plugin_callback(changed_plugin)
 

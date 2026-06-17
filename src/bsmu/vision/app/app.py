@@ -14,6 +14,7 @@ from PySide6.QtCore import QObject, Signal, QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from bsmu.vision import __title__, __version__, __description__
+from bsmu.vision.app.dialogs import PluginLoadErrorDialog
 from bsmu.vision.app.logger import ColoredFormatter, RotatingFileHandlerWithSeparator, SimpleFormatter
 from bsmu.vision.app.plugin_manager import PluginManager
 from bsmu.vision.core.concurrent import ThreadPool
@@ -26,6 +27,8 @@ from bsmu.vision.dnn.config import OnnxConfig
 
 if TYPE_CHECKING:
     from typing import Sequence
+
+    from bsmu.vision.app.plugin_manager import PluginLoadError
 
 
 class App(QObject, DataFileProvider):
@@ -101,13 +104,31 @@ class App(QObject, DataFileProvider):
 
         os.environ['OPENCV_IO_MAX_IMAGE_PIXELS'] = str(self._config.value('opencv_io_max_image_pixels'))
 
+        self._init_plugins()
+
+    def _init_plugins(self):
+        """Initialize plugin manager and load all configured plugins."""
         self._plugin_manager = PluginManager(self)
         self._plugin_manager.plugin_enabled.connect(self.plugin_enabled)
         self._plugin_manager.plugin_disabled.connect(self.plugin_disabled)
 
         configured_plugins = self._config.value('plugins')
         if configured_plugins is not None:
-            self._plugin_manager.enable_plugins(configured_plugins)
+            errors = self._plugin_manager.enable_plugins(configured_plugins)
+            if errors:
+                self._handle_plugin_loading_errors(errors)
+
+    @staticmethod
+    def _handle_plugin_loading_errors(errors: list[PluginLoadError]):
+        """Log errors, show fatal dialog, and terminate the application."""
+        logging.error(f'Failed to load {len(errors)} plugin(s):')
+        for error in errors:
+            logging.error(f'  - [{error.category}] {error.plugin_name} -> {error.details}')
+
+        dialog = PluginLoadErrorDialog(errors)
+        dialog.exec()
+
+        sys.exit(1)
 
     @classmethod
     def base_app_classes(cls) -> Sequence[type[App]]:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar, overload
 
 from PySide6.QtCore import Signal
 
@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from bsmu.vision.core.palette import Palette
     from bsmu.vision.core.visibility import Visibility
 
+
+_L = TypeVar('_L', bound=Layer)
 
 class LayeredData(Data):
     layer_adding = Signal(Layer, int)
@@ -81,8 +83,17 @@ class LayeredData(Data):
     def _emit_display_name_changed(self):
         self.display_name_changed.emit(self.display_name)
 
-    def layer_by_name(self, name: str) -> Layer | None:
-        return self._name_to_layer.get(name)
+    @overload
+    def layer_by_name(self, name: str) -> Layer | None: pass
+
+    @overload
+    def layer_by_name(self, name: str, layer_type: type[_L]) -> _L | None: pass
+
+    def layer_by_name(self, name: str, layer_type: type[Layer] | None = None) -> Layer | None:
+        layer = self._name_to_layer.get(name)
+        if layer_type is not None and not isinstance(layer, layer_type):
+            return None
+        return layer
 
     def add_layer(self, layer: Layer) -> None:
         if layer.name in self._name_to_layer:

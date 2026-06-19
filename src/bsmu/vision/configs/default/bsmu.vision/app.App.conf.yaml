@@ -23,7 +23,8 @@ plugins:
   - bsmu.vision.plugins.tools.hand.HandToolPlugin
 #  - bsmu.vision.plugins.tools.smart_brush.SmartBrushToolPlugin
   - bsmu.vision.plugins.tools.wsi_smart_brush.WsiSmartBrushToolPlugin
-#  - bsmu.vision.plugins.tools.polyline.PolylineToolPlugin
+  - bsmu.vision.plugins.tools.pointer.PointerToolPlugin
+  - bsmu.vision.plugins.tools.polyline.PolylineToolPlugin
 
   - bsmu.vision.plugins.walkers.file.MdiImageLayerFileWalkerPlugin
 #  - bsmu.vision.plugins.walkers.mask_auto_save.MaskAutoSaveOnWalkPlugin

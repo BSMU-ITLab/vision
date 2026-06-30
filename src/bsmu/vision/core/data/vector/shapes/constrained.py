@@ -74,6 +74,9 @@ class SnappedNode(VectorNode):
         if abs(self._arc_length - clamped_value) > GEOMETRY_EPSILON:
             self._commit_position(clamped_value)
 
+    def emit_changed(self) -> None:
+        self.changed.emit()
+
     def _commit_position(self, new_arc: float) -> None:
         """Commit a new arc length as the authoritative position.
 
@@ -85,14 +88,14 @@ class SnappedNode(VectorNode):
 
         self._anchor_local_pos = self._compute_local_pos_from_arc()
 
-        self.changed.emit()
+        self.emit_changed()
 
-    def _adjust_to_parent(self, new_arc: float) -> None:
+    def _adjust_to_parent(self, new_arc: float, emit_changed: bool = True) -> bool:
         """Adjust the arc length to match updated parent geometry or topology.
 
         Unlike `_commit_position`, the geometric anchor remains unchanged.
-        Emits the `changed` signal only if the arc length or the parametric
-        cache actually changed.
+        Caller may suppress `changed` via `emit_changed` during bulk updates.
+        Returns True if the node moved.
         """
         is_arc_changed = abs(self._arc_length - new_arc) > GEOMETRY_EPSILON
         has_cached_param = self._cached_arc_param is not None
@@ -101,7 +104,10 @@ class SnappedNode(VectorNode):
             self._arc_length = new_arc
             self._cached_arc_param = None
             # _anchor_local_pos is intentionally preserved
-            self.changed.emit()
+            if emit_changed:
+                self.emit_changed()
+            return True
+        return False
 
     @property
     def segment_index(self) -> int:
@@ -170,22 +176,23 @@ class SnappedNode(VectorNode):
         normalized_t = max(0.0, min(1.0, arc_param.normalized_t))
         return p1_local + (p2_local - p1_local) * normalized_t
 
-    def reproject_from_anchor(self) -> None:
+    def reproject_from_anchor(self, emit_changed: bool = True) -> bool:
         """Project the frozen geometric anchor onto the updated constraint path.
 
         The anchor remains unmodified, preserving the relative tissue location
         across parent topology or geometry changes.
+        Returns True if the node moved. Caller may suppress `changed`
+        during bulk updates (e.g. _reproject_nodes_from_anchor).
         """
         if self.constraint_shape.length < GEOMETRY_EPSILON:
-            self._adjust_to_parent(0.0)
-            return
+            return self._adjust_to_parent(0.0, emit_changed=emit_changed)
 
         anchor_scene_pos = self.span.local_to_scene(self._anchor_local_pos)
         new_arc = self.constraint_shape.map_point_to_arc_length(anchor_scene_pos)
         if new_arc is None:
             new_arc = max(0.0, min(self._arc_length, self.constraint_shape.length))
 
-        self._adjust_to_parent(new_arc)
+        return self._adjust_to_parent(new_arc, emit_changed=emit_changed)
 
 
 class SnappedSpan(NodeBasedShape[SnappedNode]):
@@ -218,12 +225,19 @@ class SnappedSpan(NodeBasedShape[SnappedNode]):
         self._start_node: SnappedNode = self.nodes[0]
         self._end_node: SnappedNode = self.nodes[1]
 
+        self._is_reprojecting_nodes = False
+
         # Assign parent after nodes exist
         self.parent_shape = parent_shape
 
         # Forward node state changes to the shape's geometry signal
-        self._start_node.changed.connect(self.geometry_changed.emit)
-        self._end_node.changed.connect(self.geometry_changed.emit)
+        self._start_node.changed.connect(self._on_node_changed)
+        self._end_node.changed.connect(self._on_node_changed)
+
+    def _on_node_changed(self) -> None:
+        """Forward node changed to geometry_changed unless in bulk reprojection."""
+        if not self._is_reprojecting_nodes:
+            self.geometry_changed.emit()
 
     def _create_nodes(self, points: Sequence[QPointF]) -> list[SnappedNode]:
         """Create exactly two constrained SnappedNodes.
@@ -263,9 +277,27 @@ class SnappedSpan(NodeBasedShape[SnappedNode]):
         return False
 
     def _reproject_nodes_from_anchor(self) -> None:
-        """Reproject all span nodes onto the current constraint path."""
-        for node in self.nodes:
-            node.reproject_from_anchor()
+        """Reproject all span nodes onto the current constraint path.
+
+        Emits `geometry_changed` once for the span, then `changed` per moved node.
+        Re-entrant calls are ignored.
+        """
+        if self._is_reprojecting_nodes:
+            return
+        self._is_reprojecting_nodes = True
+
+        try:
+            changed_nodes = [
+                node for node in self.nodes
+                if node.reproject_from_anchor(emit_changed=False)
+            ]
+
+            if changed_nodes:
+                self.geometry_changed.emit()
+                for node in changed_nodes:
+                    node.emit_changed()
+        finally:
+            self._is_reprojecting_nodes = False
 
     def _on_parent_transform_changed(self) -> None:
         self._reproject_nodes_from_anchor()
@@ -381,16 +413,10 @@ class SnappedSpan(NodeBasedShape[SnappedNode]):
 
         parent_nodes = self.parent_shape.nodes
 
-        # Determine traversal order based on arc length progression
+        # Order by arc length (forward along the path)
         first_node = self.start_node
         last_node = self.end_node
-
-        is_reversed = (
-                first_node.segment_index > last_node.segment_index or
-                (first_node.segment_index == last_node.segment_index and
-                 first_node.normalized_t > last_node.normalized_t)
-        )
-        if is_reversed:
+        if first_node.arc_length > last_node.arc_length:
             first_node, last_node = last_node, first_node
 
         first_segment_index = first_node.segment_index

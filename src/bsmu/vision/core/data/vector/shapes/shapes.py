@@ -494,6 +494,20 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
 
         return closest_hit
 
+    def closest_point(self, scene_pos: QPointF) -> QPointF | None:
+        """Find the closest point on the shape (vertex or edge).
+
+        Returns None if shape is empty.
+        """
+        if self.is_empty:
+            return None
+
+        if len(self._nodes) == 1:
+            return self._nodes[0].scene_pos
+
+        hit = self.closest_edge(scene_pos)
+        return hit.closest_point if hit is not None else None
+
     def map_arc_length_to_param(self, arc_length: float) -> ArcParam:
         """Convert arc-length to parametric position on path."""
         node_count = len(self._nodes)
@@ -538,13 +552,6 @@ class NodeBasedShape(VectorShape, Generic[NodeT]):
         return arc_len
 
 
-@dataclass(frozen=True)
-class ClosestPolylinePointInfo:
-    point: QPointF | None = None
-    segment_index: int | None = None
-    squared_distance: float | None = None  # Squared distance from the query point to the closest point on the polyline
-
-
 class Polyline(NodeBasedShape):
     def __init__(
             self,
@@ -556,55 +563,3 @@ class Polyline(NodeBasedShape):
     ):
         super().__init__(
             points, origin=origin, parent_shape=parent_shape, inherit_transform=inherit_transform, parent=parent)
-
-    def closest_point(self, point: QPointF) -> QPointF | None:
-        """
-        Returns the closest point on the polyline to the given point.
-        Returns None if the polyline is empty.
-        """
-        return self._closest_point_info(point).point
-
-    def closest_point_info(self, point: QPointF) -> ClosestPolylinePointInfo:
-        """Returns the closest point with segment info, calculating distance if needed."""
-        partial_closest_point_info = self._closest_point_info(point)
-        if partial_closest_point_info.point is not None and partial_closest_point_info.squared_distance is None:
-            return ClosestPolylinePointInfo(
-                point=partial_closest_point_info.point,
-                segment_index=partial_closest_point_info.segment_index,
-                squared_distance=GeometryUtils.squared_distance(point, partial_closest_point_info.point),
-            )
-        return partial_closest_point_info
-
-    def _closest_point_info(self, point: QPointF) -> ClosestPolylinePointInfo:
-        """
-        Internal implementation of closest point search.
-        :return: ClosestPolylinePointInfo with:
-            - For empty polylines: all None
-            - For single-point polylines: (point, 0, None)
-            - For normal cases: full results
-        """
-        if self.is_empty:
-            return ClosestPolylinePointInfo()
-
-        if len(self._nodes) == 1:
-            return ClosestPolylinePointInfo(point=self.last_node.scene_pos, segment_index=0)
-
-        closest_point: QPointF | None = None
-        segment_index: int | None = None
-        min_squared_distance: float = math.inf
-
-        # Check each segment of the polyline
-        for i in range(len(self._nodes) - 1):
-            segment_start = self._nodes[i].scene_pos
-            segment_end = self._nodes[i + 1].scene_pos
-
-            segment_closest_point, _ = GeometryUtils.closest_point_on_segment(segment_start, segment_end, point)
-            squared_distance = GeometryUtils.squared_distance(point, segment_closest_point)
-
-            if squared_distance < min_squared_distance:
-                min_squared_distance = squared_distance
-                closest_point = segment_closest_point
-                segment_index = i
-
-        return ClosestPolylinePointInfo(
-            point=closest_point, segment_index=segment_index, squared_distance=min_squared_distance)

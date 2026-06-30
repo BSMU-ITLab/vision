@@ -130,7 +130,7 @@ class UnitedConfig:
         next_united_config_path = self.priority_config_paths[next_united_config_index]
 
         if next_united_config_path.exists():
-            with open(next_united_config_path) as fp:
+            with open(next_united_config_path, encoding='utf-8') as fp:
                 next_united_config_data = self.yaml.load(fp)
                 if next_united_config_data is None:
                     next_united_config_data = {}

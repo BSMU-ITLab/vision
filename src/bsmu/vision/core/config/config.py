@@ -47,7 +47,7 @@ class Config:
                 # and try to find a suitable one to convert the `config_value`
                 is_converted = False
                 for union_member_type in get_args(field_type):
-                    config_value, is_converted = cls._converted_value_to_type(config_value, union_member_type)
+                    config_value, is_converted = cls._convert_value_to_type(config_value, union_member_type)
                     if is_converted:
                         break
                 if not is_converted:
@@ -55,7 +55,7 @@ class Config:
                         f"Cannot convert {config_value} to any type from {field_type} "
                         f"for field name {field_name!r} of {cls}")
             else:
-                config_value, is_converted = cls._converted_value_to_type(config_value, field_type)
+                config_value, is_converted = cls._convert_value_to_type(config_value, field_type)
                 if not is_converted:
                     raise ValueError(
                         f"Cannot convert {config_value} to {field_type} for field name {field_name!r} of {cls}")
@@ -65,7 +65,12 @@ class Config:
         return cls(**field_name_to_config_value)
 
     @classmethod
-    def _converted_value_to_type(cls, value: Any, type_: Type) -> tuple[Any, bool]:
+    def _convert_value_to_type(cls, value: Any, type_: Type) -> tuple[Any, bool]:
+        # Handle parameterized generics (dict[K, V], list[T], etc.)
+        origin = get_origin(type_)
+        if origin is not None:
+            return cls._convert_generic(value, type_, origin)
+
         if isinstance(value, type_):
             return value, True
 
@@ -94,6 +99,51 @@ class Config:
                 return type_(value), True
 
         return value, False
+
+    @classmethod
+    def _convert_generic(cls, value: Any, type_: Type, origin: Type) -> tuple[Any, bool]:
+        """Convert value to parameterized generic type (dict, list, etc.)."""
+        args = get_args(type_)
+
+        if origin is dict and isinstance(value, dict):
+            return cls._convert_dict(value, args[0], args[1])
+
+        if origin in (list, Sequence) and isinstance(value, list):
+            return cls._convert_sequence(value, args[0])
+
+        # Unsupported generic type
+        return value, False
+
+    @classmethod
+    def _convert_dict(cls, value: dict, key_type: Type, value_type: Type) -> tuple[dict, bool]:
+        """Convert dictionary with typed keys and values."""
+        converted_dict = {}
+
+        for k, v in value.items():
+            converted_key, key_ok = cls._convert_value_to_type(k, key_type)
+            converted_value, value_ok = cls._convert_value_to_type(v, value_type)
+
+            if not (key_ok and value_ok):
+                return value, False
+
+            converted_dict[converted_key] = converted_value
+
+        return converted_dict, True
+
+    @classmethod
+    def _convert_sequence(cls, value: list, item_type: Type) -> tuple[list, bool]:
+        """Convert list with typed items."""
+        converted_list = []
+
+        for item in value:
+            converted_item, item_ok = cls._convert_value_to_type(item, item_type)
+
+            if not item_ok:
+                return value, False
+
+            converted_list.append(converted_item)
+
+        return converted_list, True
 
     def save_to_yaml(self, file_path: Path):
         yaml = YAML()

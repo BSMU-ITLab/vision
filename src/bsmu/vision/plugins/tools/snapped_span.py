@@ -173,6 +173,7 @@ class SnappedSpanTool(LayeredDataViewerTool):
         self._curr_span.complete()
         self.viewer.selection_manager.select_shape(self._curr_span)
         self._reset_tool_state()
+        self._drawing_undo_start_index = None
 
     def _cancel_drawing(self) -> None:
         if self._state is SnappedSpanToolState.DRAWING:
@@ -189,7 +190,6 @@ class SnappedSpanTool(LayeredDataViewerTool):
         self._curr_span = None
         self._curr_vector = None
         self._parent_shape = None
-        self._drawing_undo_start_index = None
         self._state = SnappedSpanToolState.IDLE
 
     def _update_end_node_to_cursor(self) -> None:

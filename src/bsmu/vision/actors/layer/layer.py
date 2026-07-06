@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy as np
 from PySide6.QtCore import Qt, Signal, QRectF
-from PySide6.QtGui import QPixmap, QImage, QTransform
-from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem
+from PySide6.QtGui import QImage
+from PySide6.QtWidgets import QGraphicsItem
 
 import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.actors import GraphicsActor, ItemT
@@ -148,7 +148,50 @@ class LayerActor(GraphicsActor[LayerT, ItemT], Generic[LayerT, ItemT]):
             self._apply_opacity_to_graphics_item()
 
 
-class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
+class RasterLayerGraphicsItem(QGraphicsItem):
+    def __init__(self, parent: QGraphicsItem | None = None) -> None:
+        super().__init__(parent)
+
+        self._qimage: QImage | None = None
+        # Scene coordinate rect, accounting for pixel spacing (not 1:1 with image pixels)
+        self._image_rect: QRectF = QRectF()
+        self._spatial_spacing: np.ndarray = np.ones(2)
+
+    def replace_qimage(self, qimage: QImage, spatial_spacing: np.ndarray) -> None:
+        """Replace the displayed image and update the scene geometry."""
+        self._qimage = qimage
+        self._spatial_spacing = spatial_spacing
+
+        self._image_rect = QRectF(
+            0.0, 0.0,
+            float(qimage.width() * spatial_spacing[1]),
+            float(qimage.height() * spatial_spacing[0]),
+        )
+        self.prepareGeometryChange()
+
+    def boundingRect(self) -> QRectF:
+        return self._image_rect
+
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget | None = None) -> None:
+        if self._qimage is None:
+            return
+
+        # Qt clips painting to the exposed/dirty region automatically.
+        # We draw the full image mapped to the scene coordinate rect;
+        # the renderer only processes the visible viewport area.
+        painter.drawImage(self._image_rect, self._qimage)
+
+    def update_region(self, bbox: BBox) -> None:
+        """Invalidate only the modified region on the scene."""
+        self.update(
+            float(bbox.left * self._spatial_spacing[1]),
+            float(bbox.top * self._spatial_spacing[0]),
+            float(bbox.width * self._spatial_spacing[1]),
+            float(bbox.height * self._spatial_spacing[0]),
+        )
+
+
+class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
     image_changed = Signal(Raster)  # TODO: rename into raster_changed or add into LayerActor data_changed signal
     image_shape_changed = Signal(object, object)  # TODO: rename into raster_shape_changed
     image_view_updated = Signal(FlatImage)  # TODO: remove this signal or rename into display_slice_updated
@@ -163,7 +206,7 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
         self._displayed_pixels = None
         # Bounding boxes of modified regions, which we have to update in the `_displayed_pixels`.
         # This field is not currently in use (full `_displayed_pixels` is recalculated). But later can be used for optimization.
-        self._modified_bboxes = []
+        self._modified_bboxes: list[BBox] = []
 
         self._display_slice: Raster | None = None
 
@@ -171,10 +214,8 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
 
         super().__init__(model, parent)
 
-    def _create_graphics_item(self) -> QGraphicsPixmapItem:
-        graphics_item = QGraphicsPixmapItem()
-        graphics_item.setShapeMode(QGraphicsPixmapItem.ShapeMode.BoundingRectShape)
-        return graphics_item
+    def _create_graphics_item(self) -> RasterLayerGraphicsItem:
+        return RasterLayerGraphicsItem()
 
     @property
     def raster(self) -> Raster | None:
@@ -194,7 +235,7 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
         if self.layer is not None:
             self.layer.data_changed.disconnect(self._on_layer_data_changed)
             self.layer.image_shape_changed.disconnect(self.image_shape_changed)
-            self.layer.image_pixels_modified.disconnect(self._on_image_pixels_modified)
+            self.layer.image_pixels_modified.disconnect(self._on_raster_pixels_modified)
 
     def _model_changed(self) -> None:
         super()._model_changed()
@@ -202,7 +243,7 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
         if self.layer is not None:
             self.layer.data_changed.connect(self._on_layer_data_changed)
             self.layer.image_shape_changed.connect(self.image_shape_changed)
-            self.layer.image_pixels_modified.connect(self._on_image_pixels_modified)
+            self.layer.image_pixels_modified.connect(self._on_raster_pixels_modified)
 
     @property
     def display_slice(self) -> Raster | None:
@@ -234,21 +275,14 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
         return self.current_slice
 
     def _update_graphics_item(self) -> None:
+        """Rebuild the display image from scratch and sync scene geometry."""
         old_scene_bounding_rect = None if self.graphics_item is None else self.graphics_item.sceneBoundingRect()
 
         if self.raster is None:
-            pixmap = QPixmap()
+            self.graphics_item.replace_qimage(QImage(), np.ones(2))
         else:
-            pixmap = QPixmap.fromImage(self._create_display_qimage())
-        self.graphics_item.setPixmap(pixmap)
-
-        if self.display_slice is not None:
-            # TODO: Try using current transform of the `_graphics_item` instead of creating a new one
-            spatial_transform = QTransform.fromScale(
-                self.display_slice.spatial.spacing[1],
-                self.display_slice.spatial.spacing[0],
-            )
-            self._graphics_item.setTransform(spatial_transform)
+            qimage = self._create_display_qimage()
+            self.graphics_item.replace_qimage(qimage, self.display_slice.spatial.spacing)
 
         if old_scene_bounding_rect != self.graphics_item.sceneBoundingRect():
             self.scene_bounding_rect_changed.emit()
@@ -284,14 +318,37 @@ class RasterLayerActor(LayerActor[RasterLayer, QGraphicsPixmapItem]):
 
     def _on_layer_data_changed(self, data: Raster | None) -> None:
         self.image_changed.emit(data)
-        self._on_image_pixels_modified()
+        self._on_raster_pixels_modified()
 
-    def _on_image_pixels_modified(self, bbox: BBox = None) -> None:  # TODO: rename the method
-        if bbox is not None:
-            self._modified_bboxes.append(bbox)
+    def _on_raster_pixels_modified(self, bbox: BBox | None = None) -> None:
+        """React to pixel changes in the backing raster.
 
+        - `bbox is None` - structural change; rebuild everything.
+        - `bbox` given, but `_display_slice` not yet created - build everything.
+        - `bbox` given, `_display_slice` exists - repaint only the region.
+          For Indexed8 this is instant (QImage shares memory with numpy).
+          For other formats the display slice is recreated if needed.
+        """
+        if bbox is None:
+            self._display_slice = None
+            self._update_graphics_item()
+            return
+
+        self._modified_bboxes.append(bbox)
+
+        if self._display_slice is None:
+            # First time showing this slice
+            self._update_graphics_item()
+            return
+
+        # Fast path for Indexed8: QImage shares memory, no need to recreate
+        if self._display_slice.is_indexed:
+            self.graphics_item.update_region(bbox)
+            return
+
+        # For non-Indexed8 (RGBA etc.): the QImage does not share memory.
+        # We must rebuild the display slice to pick up the new pixel values.
         self._display_slice = None
-
         self._update_graphics_item()
 
 

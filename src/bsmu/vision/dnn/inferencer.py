@@ -63,7 +63,9 @@ class ImageModelParams(ModelParams):
 
     # Which output channels to return: 'all' (default), a single index, or a list of indices.
     output_channels: int | Sequence[int] | str = 'all'
-    mask_binarization_threshold: float = 0.5
+    # Class name(s) corresponding to output_channels.
+    output_class_names: str | Sequence[str] = 'foreground'
+    mask_binarization_thresholds: float | Sequence[float] = 0.5  # One value per output channel
 
     _input_image_size_cache: tuple = field(default=None, init=False, repr=False, compare=False)
 
@@ -73,6 +75,40 @@ class ImageModelParams(ModelParams):
     # The following constants are used for minor optimization
     IMAGENET_MEAN_x_255: ClassVar[np.ndarray] = IMAGENET_MEAN * 255
     IMAGENET_STD_x_255: ClassVar[np.ndarray] = IMAGENET_STD * 255
+
+    def __post_init__(self):
+        if isinstance(self.output_channels, int):
+            self.output_channels = (self.output_channels,)
+        elif not isinstance(self.output_channels, str):
+            self.output_channels = tuple(self.output_channels)
+
+        if isinstance(self.output_class_names, str):
+            self.output_class_names = (self.output_class_names,)
+        else:
+            self.output_class_names = tuple(self.output_class_names)
+
+        if isinstance(self.mask_binarization_thresholds, (int, float)):
+            self.mask_binarization_thresholds = (float(self.mask_binarization_thresholds),)
+        else:
+            self.mask_binarization_thresholds = tuple(float(t) for t in self.mask_binarization_thresholds)
+
+        if self.output_channels != 'all':
+            n_ch = len(self.output_channels)
+            n_cls = len(self.output_class_names)
+            n_thr = len(self.mask_binarization_thresholds)
+            if n_ch != n_cls:
+                raise ValueError(
+                    f'`output_channels` count ({n_ch}) != `output_class_names` count ({n_cls})'
+                )
+            if n_ch != n_thr:
+                raise ValueError(
+                    f'`output_channels` count ({n_ch}) != `mask_binarization_thresholds` count ({n_thr})'
+                )
+
+    @property
+    def is_multiclass_output(self) -> bool:
+        """True if the model returns multiple class mask."""
+        return len(self.output_class_names) > 1
 
     def copy_but_change_name(self, new_name: str) -> ImageModelParams:
         model_params_copy = copy.deepcopy(self)

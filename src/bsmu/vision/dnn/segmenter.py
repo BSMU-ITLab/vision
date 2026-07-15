@@ -52,7 +52,7 @@ def largest_connected_component_label(mask: np.ndarray) -> Tuple[int | None, np.
 
 class Segmenter(Inferencer):
     def segment_batch_without_postresize(self, image_batch: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
-        input_image_batch = self._model_params.preprocessed_input_batch(image_batch)
+        input_image_batch = self._model_config.preprocessed_input_batch(image_batch)
 
         self._create_inference_session()
         model_inputs: List[ort.NodeArg] = self._inference_session.get_inputs()
@@ -63,15 +63,14 @@ class Segmenter(Inferencer):
         outputs = self._inference_session.run(output_names, input_feed)
         assert len(outputs) == 1, 'Segmenter can process only models with one output'
         output_mask_batch = outputs[0]
-        output_channels_axis = self.model_params.channels_axis + 1  # Use '+ 1' to take into account the batch axis
-        if self.model_params.output_channels == 'all':
-            # If there's only one channel, squeeze it out
-            if output_mask_batch.shape[output_channels_axis] == 1:
-                output_mask_batch = np.squeeze(output_mask_batch, axis=output_channels_axis)
-        else:
+        output_channels_axis = self.model_config.channels_axis + 1  # Use '+ 1' to take into account the batch axis
+        if not self.model_config.output_channels.is_all:
             # Select specific channel(s)
             output_mask_batch = np.take(
-                output_mask_batch, indices=self.model_params.output_channels, axis=output_channels_axis)
+                output_mask_batch, indices=self.model_config.output_channels, axis=output_channels_axis)
+        # If there's only one channel, squeeze it out
+        if output_mask_batch.shape[output_channels_axis] == 1:
+            output_mask_batch = np.squeeze(output_mask_batch, axis=output_channels_axis)
         return output_mask_batch
 
     def _segment_without_postresize(self, image: np.ndarray) -> np.ndarray:
@@ -151,7 +150,7 @@ class Segmenter(Inferencer):
             tile_grid_shape: Sequence = (3, 3),
             border_size: int = 10,
     ) -> np.ndarray:
-        model_input_image_size = self._model_params.input_image_size
+        model_input_image_size = self._model_config.input_image_size
         borders_size = 2 * border_size
         model_input_image_size_multiplied_by_tile_shape = (
             (model_input_image_size[0] - borders_size) * tile_grid_shape[0],

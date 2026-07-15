@@ -5,13 +5,13 @@ from dataclasses import asdict, dataclass, fields
 from enum import Enum
 from pathlib import Path
 from types import UnionType
-from typing import get_args, get_origin, get_type_hints, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Union, cast, get_args, get_origin, get_type_hints
 
 import numpy as np
 from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
-    from typing import Any, Self, Type
+    from typing import Any, Final, Literal, Self
 
 
 _SENTINEL: object = object()
@@ -19,23 +19,42 @@ _SENTINEL: object = object()
 # Define the permissible source types that can be cast to the specified target types.
 # The keys are the target types, and the values are the unions of source types
 # that can be safely cast to the corresponding key type.
-_TARGET_CASTING_TO_SOURCE_TYPES: dict[Type, Type | UnionType] = {
+_TARGET_CASTING_TO_SOURCE_TYPES: dict[type, type | UnionType] = {
     float: int,
     Path: str,
 }
 
+_ALL_KEYWORD: Final = 'all'
+
 
 @dataclass
 class Config:
+    """
+    Base class for dataclass-based config objects loaded from dictionaries.
+
+    IMPORTANT: All types used in field annotations must be importable at runtime
+    (not inside `if TYPE_CHECKING:` blocks), since `get_type_hints` evaluates
+    forward references using the module's globals.
+    """
+
     @classmethod
-    def from_dict(cls, config_dict: dict[str, Any]) -> Self:
+    def from_dict(cls, config_dict: dict[str, Any], **overrides) -> Self:
         field_name_to_config_value: dict[str, Any] = {}
         # Get actual type hints for the fields, resolving forward references. See:
         # https://stackoverflow.com/questions/55937859/dataclasses-field-doesnt-resolve-type-annotation-to-actual-type
-        type_hints = get_type_hints(cls)
+        try:
+            type_hints = get_type_hints(cls)
+        except NameError as e:
+            raise RuntimeError(
+                f'Failed to resolve type hints for {cls.__qualname__}. '
+                f'Ensure all annotation types are imported at runtime, not just '
+                f'under `if TYPE_CHECKING:`. Original error: {e}'
+            ) from e
         for field in fields(cls):
             field_name = field.name
-            if (config_value := config_dict.get(field_name, _SENTINEL)) is _SENTINEL:
+            if (override_value := overrides.get(field_name, _SENTINEL)) is not _SENTINEL:
+                config_value = override_value
+            elif (config_value := config_dict.get(field_name, _SENTINEL)) is _SENTINEL:
                 continue
 
             # Do not use field.type, because it can contain string instead of actual resolved type.
@@ -65,7 +84,7 @@ class Config:
         return cls(**field_name_to_config_value)
 
     @classmethod
-    def _convert_value_to_type(cls, value: Any, type_: Type) -> tuple[Any, bool]:
+    def _convert_value_to_type(cls, value: Any, type_: type) -> tuple[Any, bool]:
         # Handle parameterized generics (dict[K, V], list[T], etc.)
         origin = get_origin(type_)
         if origin is not None:
@@ -101,7 +120,7 @@ class Config:
         return value, False
 
     @classmethod
-    def _convert_generic(cls, value: Any, type_: Type, origin: Type) -> tuple[Any, bool]:
+    def _convert_generic(cls, value: Any, type_: type, origin: type) -> tuple[Any, bool]:
         """Convert value to parameterized generic type (dict, list, etc.)."""
         args = get_args(type_)
 
@@ -115,7 +134,7 @@ class Config:
         return value, False
 
     @classmethod
-    def _convert_dict(cls, value: dict, key_type: Type, value_type: Type) -> tuple[dict, bool]:
+    def _convert_dict(cls, value: dict, key_type: type, value_type: type) -> tuple[dict, bool]:
         """Convert dictionary with typed keys and values."""
         converted_dict = {}
 
@@ -131,7 +150,7 @@ class Config:
         return converted_dict, True
 
     @classmethod
-    def _convert_sequence(cls, value: list, item_type: Type) -> tuple[list, bool]:
+    def _convert_sequence(cls, value: list, item_type: type) -> tuple[list, bool]:
         """Convert list with typed items."""
         converted_list = []
 
@@ -157,6 +176,120 @@ class ValueWrapper:
     @classmethod
     def can_wrap(cls, value: Any) -> bool:
         raise NotImplementedError
+
+
+class _SequenceMixin:
+    """Common mixin for all scalar-or-sequence wrappers."""
+    _values: tuple
+
+    @property
+    def values(self) -> tuple:
+        return self._values
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __getitem__(self, index: int):
+        return self._values[index]
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({list(self._values)!r})'
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, _SequenceMixin):
+            return self._values == other._values
+        return self._values == other
+
+
+class _SequenceOrAllMixin(_SequenceMixin):
+    """Mixin for wrappers that support a special 'all' keyword."""
+    _values: tuple | str
+
+    @property
+    def is_all(self) -> bool:
+        return self._values == _ALL_KEYWORD
+
+    def __len__(self) -> int:
+        if self.is_all:
+            raise ValueError(f'Cannot get length of {_ALL_KEYWORD!r}')
+        return super().__len__()
+
+    def __iter__(self):
+        if self.is_all:
+            raise ValueError(f'Cannot iterate over {_ALL_KEYWORD!r}')
+        return super().__iter__()
+
+    def __getitem__(self, index: int):
+        if self.is_all:
+            raise ValueError(f'Cannot get item from {_ALL_KEYWORD!r}')
+        return super().__getitem__(index)
+
+    def __repr__(self) -> str:
+        if self.is_all:
+            return f'{self.__class__.__name__}({_ALL_KEYWORD!r})'
+        return super().__repr__()
+
+
+class IntSequenceOrAll(ValueWrapper, _SequenceOrAllMixin):
+    def __init__(self, value: int | Sequence[int] | Literal['all'] = _ALL_KEYWORD):
+        if value == _ALL_KEYWORD:
+            self._values = _ALL_KEYWORD
+        elif isinstance(value, int):
+            self._values = (value,)
+        else:
+            self._values = tuple(cast(Sequence[int], value))
+
+    @classmethod
+    def can_wrap(cls, value: Any) -> bool:
+        return (
+                value == _ALL_KEYWORD
+                or isinstance(value, int)
+                or (
+                        isinstance(value, Sequence)
+                        and not isinstance(value, str)
+                        and all(isinstance(x, int) for x in value)
+                )
+        )
+
+
+class StrSequence(ValueWrapper, _SequenceMixin):
+    def __init__(self, value: str | Sequence[str]):
+        if isinstance(value, str):
+            self._values = (value,)
+        else:
+            self._values = tuple(value)
+
+    @classmethod
+    def can_wrap(cls, value: Any) -> bool:
+        return (
+                isinstance(value, str)
+                or (
+                        isinstance(value, Sequence)
+                        and all(isinstance(x, str) for x in value)
+                )
+        )
+
+
+class FloatSequence(ValueWrapper, _SequenceMixin):
+    def __init__(self, value: float | Sequence[float]):
+        if isinstance(value, (int, float)):
+            self._values = (float(value),)
+        else:
+            self._values = tuple(float(x) for x in value)
+
+    @classmethod
+    def can_wrap(cls, value: Any) -> bool:
+        return (
+                isinstance(value, (int, float))
+                or (
+                        isinstance(value, Sequence)
+                        and not isinstance(value, str)
+                        and all(isinstance(x, (int, float)) for x in value)
+                )
+        )
 
 
 class NamesOrAll(ValueWrapper):

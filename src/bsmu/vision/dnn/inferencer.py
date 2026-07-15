@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import copy
 import logging
 import time
-from dataclasses import dataclass, field, fields
+from collections.abc import Sequence
+from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import ClassVar, TYPE_CHECKING
 
 import cv2 as cv
@@ -13,15 +14,15 @@ import onnxruntime as ort
 from PySide6.QtCore import QObject, QThreadPool, QTimer
 
 import bsmu.vision.core.converters.image as image_converter
+from bsmu.vision.core.config import Config, IntSequenceOrAll, FloatSequence, StrSequence
 from bsmu.vision.dnn.config import OnnxConfig, CPU_PROVIDER
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-    from pathlib import Path
+    from typing import Self, Any
 
 
 @dataclass
-class ModelParams:
+class ModelConfig(Config):
     path: Path
     output_object_name: str = 'Object'
     output_object_short_name: str = 'Obj'
@@ -29,13 +30,8 @@ class ModelParams:
     batch_size: int = 1
 
     @classmethod
-    def from_config(cls, config_data: dict, model_dir: Path) -> ModelParams:
-        field_names = {f.name for f in fields(cls)}
-        SENTINEL = object()
-        field_name_to_config_value = \
-            {field_name: config_value for field_name in field_names
-             if (config_value := config_data.get(field_name, SENTINEL)) != SENTINEL}
-        return cls(path=model_dir / config_data['name'], **field_name_to_config_value)
+    def from_dict_with_model_dir(cls, config_dict: dict[str, Any], model_dir: Path, **overrides) -> Self:
+        return super().from_dict(config_dict, path=model_dir / config_dict['name'], **overrides)
 
     def preprocessed_input(self, src: np.ndarray) -> np.ndarray:
         pass
@@ -49,7 +45,7 @@ class ModelParams:
 
 
 @dataclass
-class ImageModelParams(ModelParams):
+class ImageModelConfig(ModelConfig):
     input_size: Sequence[int] = (256, 256, 3)
     channels_axis: int = 2
     channels_order: str = 'rgb'
@@ -62,10 +58,11 @@ class ImageModelParams(ModelParams):
     input_type: npt.DTypeLike = np.float32
 
     # Which output channels to return: 'all' (default), a single index, or a list of indices.
-    output_channels: int | Sequence[int] | str = 'all'
+    output_channels: IntSequenceOrAll = field(default_factory=IntSequenceOrAll)
     # Class name(s) corresponding to output_channels.
-    output_class_names: str | Sequence[str] = 'foreground'
-    mask_binarization_thresholds: float | Sequence[float] = 0.5  # One value per output channel
+    output_class_names: StrSequence = field(default_factory=lambda: StrSequence('foreground'))
+    # One threshold per output class. If single value given, auto-repeats for all classes.
+    mask_binarization_thresholds: FloatSequence = field(default_factory=lambda: FloatSequence(0.5))
 
     _input_image_size_cache: tuple = field(default=None, init=False, repr=False, compare=False)
 
@@ -77,43 +74,33 @@ class ImageModelParams(ModelParams):
     IMAGENET_STD_x_255: ClassVar[np.ndarray] = IMAGENET_STD * 255
 
     def __post_init__(self):
-        if isinstance(self.output_channels, int):
-            self.output_channels = (self.output_channels,)
-        elif not isinstance(self.output_channels, str):
-            self.output_channels = tuple(self.output_channels)
+        n_cls = len(self.output_class_names)
 
-        if isinstance(self.output_class_names, str):
-            self.output_class_names = (self.output_class_names,)
-        else:
-            self.output_class_names = tuple(self.output_class_names)
-
-        if isinstance(self.mask_binarization_thresholds, (int, float)):
-            self.mask_binarization_thresholds = (float(self.mask_binarization_thresholds),)
-        else:
-            self.mask_binarization_thresholds = tuple(float(t) for t in self.mask_binarization_thresholds)
-
-        if self.output_channels != 'all':
+        if not self.output_channels.is_all:
             n_ch = len(self.output_channels)
-            n_cls = len(self.output_class_names)
-            n_thr = len(self.mask_binarization_thresholds)
             if n_ch != n_cls:
                 raise ValueError(
                     f'`output_channels` count ({n_ch}) != `output_class_names` count ({n_cls})'
                 )
-            if n_ch != n_thr:
-                raise ValueError(
-                    f'`output_channels` count ({n_ch}) != `mask_binarization_thresholds` count ({n_thr})'
-                )
+
+        n_thr = len(self.mask_binarization_thresholds)
+        if n_thr == 1 and n_cls > 1:
+            # Auto-repeat single threshold for all classes
+            self.mask_binarization_thresholds = FloatSequence(
+                [self.mask_binarization_thresholds[0]] * n_cls
+            )
+        elif n_thr != n_cls:
+            raise ValueError(
+                f'`mask_binarization_thresholds` count ({n_thr}) != `output_class_names` count ({n_cls})'
+            )
 
     @property
     def is_multiclass_output(self) -> bool:
         """True if the model returns multiple class mask."""
         return len(self.output_class_names) > 1
 
-    def copy_but_change_name(self, new_name: str) -> ImageModelParams:
-        model_params_copy = copy.deepcopy(self)
-        model_params_copy.path = model_params_copy.path.parent / new_name
-        return model_params_copy
+    def copy_but_change_name(self, new_name: str) -> ImageModelConfig:
+        return replace(self, path=self.path.parent / new_name)
 
     @property
     def input_image_size(self) -> tuple[int, ...]:
@@ -179,21 +166,21 @@ class ImageModelParams(ModelParams):
 
 
 class Inferencer(QObject):
-    def __init__(self, model_params: ModelParams, parent: QObject = None):
+    def __init__(self, model_config: ModelConfig, parent: QObject = None):
         super().__init__(parent)
 
-        self._model_params = model_params
+        self._model_config = model_config
 
         self._inference_session: ort.InferenceSession | None = None
         self._inference_session_being_created: bool = False
 
-        if self._model_params.preload:
+        if self._model_config.preload:
             # Use zero timer to start method whenever there are no pending events (see QCoreApplication::exec doc)
             QTimer.singleShot(0, self._preload_model)
 
     @property
-    def model_params(self) -> ModelParams:
-        return self._model_params
+    def model_config(self) -> ModelConfig:
+        return self._model_config
 
     def _preload_model(self):
         QThreadPool.globalInstance().start(self._create_inference_session_with_delay)
@@ -212,7 +199,7 @@ class Inferencer(QObject):
             providers = OnnxConfig.providers
             try:
                 self._inference_session = ort.InferenceSession(
-                    str(self._model_params.path), providers=providers)
+                    str(self._model_config.path), providers=providers)
             except Exception as e:
                 # Current onnxruntime version throws an error instead of warning,
                 # when CUDA provider failed, and does not try other providers (e.g. CPU provider), so do it by self
@@ -220,7 +207,7 @@ class Inferencer(QObject):
                                 f'The error: {e}'
                                 f'Trying to create the inference session using only {CPU_PROVIDER}')
                 self._inference_session = ort.InferenceSession(
-                    str(self._model_params.path), providers=[CPU_PROVIDER])
+                    str(self._model_config.path), providers=[CPU_PROVIDER])
 
             used_provider = self._inference_session.get_providers()[0]
             logging.info(f'Using ONNX `{used_provider}`')

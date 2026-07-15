@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class Predictor(Inferencer):
     def predict_batch(self, images: Sequence[np.ndarray]) -> np.ndarray:
-        input_image_batch = self._model_params.preprocessed_input_batch(images)
+        input_image_batch = self._model_config.preprocessed_input_batch(images)
 
         self._create_inference_session()
         model_inputs: List[ort.NodeArg] = self._inference_session.get_inputs()

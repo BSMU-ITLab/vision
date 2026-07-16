@@ -5,7 +5,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import ClassVar, TYPE_CHECKING
+from typing import ClassVar
 
 import cv2 as cv
 import numpy as np
@@ -17,9 +17,6 @@ import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.core.config import Config, IntSequenceOrAll, FloatSequence, StrSequence
 from bsmu.vision.dnn.config import OnnxConfig, CPU_PROVIDER
 
-if TYPE_CHECKING:
-    from typing import Self, Any
-
 
 @dataclass
 class ModelConfig(Config):
@@ -28,10 +25,6 @@ class ModelConfig(Config):
     output_object_short_name: str = 'Obj'
     preload: bool = False
     batch_size: int = 1
-
-    @classmethod
-    def from_dict_with_model_dir(cls, config_dict: dict[str, Any], model_dir: Path, **overrides) -> Self:
-        return super().from_dict(config_dict, path=model_dir / config_dict['name'], **overrides)
 
     def preprocessed_input(self, src: np.ndarray) -> np.ndarray:
         pass

@@ -21,7 +21,6 @@ _SENTINEL: object = object()
 # that can be safely cast to the corresponding key type.
 _TARGET_CASTING_TO_SOURCE_TYPES: dict[type, type | UnionType] = {
     float: int,
-    Path: str,
 }
 
 _ALL_KEYWORD: Final = 'all'
@@ -38,7 +37,7 @@ class Config:
     """
 
     @classmethod
-    def from_dict(cls, config_dict: dict[str, Any], **overrides) -> Self:
+    def from_dict(cls, config_dict: dict[str, Any], data_dir: Path | None = None, **overrides) -> Self:
         field_name_to_config_value: dict[str, Any] = {}
         # Get actual type hints for the fields, resolving forward references. See:
         # https://stackoverflow.com/questions/55937859/dataclasses-field-doesnt-resolve-type-annotation-to-actual-type
@@ -66,7 +65,8 @@ class Config:
                 # and try to find a suitable one to convert the `config_value`
                 is_converted = False
                 for union_member_type in get_args(field_type):
-                    config_value, is_converted = cls._convert_value_to_type(config_value, union_member_type)
+                    config_value, is_converted = cls._convert_value_to_type(
+                        config_value, union_member_type, data_dir=data_dir, field_name=field_name)
                     if is_converted:
                         break
                 if not is_converted:
@@ -74,7 +74,8 @@ class Config:
                         f"Cannot convert {config_value} to any type from {field_type} "
                         f"for field name {field_name!r} of {cls}")
             else:
-                config_value, is_converted = cls._convert_value_to_type(config_value, field_type)
+                config_value, is_converted = cls._convert_value_to_type(
+                    config_value, field_type, data_dir=data_dir, field_name=field_name)
                 if not is_converted:
                     raise ValueError(
                         f"Cannot convert {config_value} to {field_type} for field name {field_name!r} of {cls}")
@@ -84,14 +85,35 @@ class Config:
         return cls(**field_name_to_config_value)
 
     @classmethod
-    def _convert_value_to_type(cls, value: Any, type_: type) -> tuple[Any, bool]:
+    def _convert_value_to_type(
+            cls,
+            value: Any,
+            type_: type,
+            data_dir: Path | None = None,
+            field_name: str = '',
+    ) -> tuple[Any, bool]:
         # Handle parameterized generics (dict[K, V], list[T], etc.)
         origin = get_origin(type_)
         if origin is not None:
-            return cls._convert_generic(value, type_, origin)
+            return cls._convert_generic(value, type_, origin, data_dir=data_dir)
 
         if isinstance(value, type_):
             return value, True
+
+        if issubclass(type_, Path):
+            if isinstance(value, str):
+                path = Path(value)
+            else:
+                return value, False
+
+            if not path.is_absolute():
+                if data_dir is None:
+                    raise ValueError(
+                        f'Relative path {value!r} for field {field_name!r} of '
+                        f'{cls.__qualname__} requires data_dir, but none was provided.'
+                    )
+                path = data_dir / path
+            return path, True
 
         if issubclass(type_, ValueWrapper):
             if type_.can_wrap(value):
@@ -102,7 +124,7 @@ class Config:
         # If `value` is a dictionary and the `type_` is a subclass of Config,
         # then recursively call from_dict to create a nested Config object.
         if isinstance(value, dict) and issubclass(type_, Config):
-            return type_.from_dict(value), True
+            return type_.from_dict(value, data_dir=data_dir), True
 
         if isinstance(value, (str, int)) and issubclass(type_, Enum):
             try:
@@ -120,27 +142,39 @@ class Config:
         return value, False
 
     @classmethod
-    def _convert_generic(cls, value: Any, type_: type, origin: type) -> tuple[Any, bool]:
+    def _convert_generic(
+            cls,
+            value: Any,
+            type_: type,
+            origin: type,
+            data_dir: Path | None = None,
+    ) -> tuple[Any, bool]:
         """Convert value to parameterized generic type (dict, list, etc.)."""
         args = get_args(type_)
 
         if origin is dict and isinstance(value, dict):
-            return cls._convert_dict(value, args[0], args[1])
+            return cls._convert_dict(value, args[0], args[1], data_dir=data_dir)
 
         if origin in (list, Sequence) and isinstance(value, list):
-            return cls._convert_sequence(value, args[0])
+            return cls._convert_sequence(value, args[0], data_dir=data_dir)
 
         # Unsupported generic type
         return value, False
 
     @classmethod
-    def _convert_dict(cls, value: dict, key_type: type, value_type: type) -> tuple[dict, bool]:
+    def _convert_dict(
+            cls,
+            value: dict,
+            key_type: type,
+            value_type: type,
+            data_dir: Path | None = None,
+    ) -> tuple[dict, bool]:
         """Convert dictionary with typed keys and values."""
         converted_dict = {}
 
         for k, v in value.items():
-            converted_key, key_ok = cls._convert_value_to_type(k, key_type)
-            converted_value, value_ok = cls._convert_value_to_type(v, value_type)
+            converted_key, key_ok = cls._convert_value_to_type(k, key_type, data_dir=data_dir)
+            converted_value, value_ok = cls._convert_value_to_type(v, value_type, data_dir=data_dir)
 
             if not (key_ok and value_ok):
                 return value, False
@@ -150,12 +184,12 @@ class Config:
         return converted_dict, True
 
     @classmethod
-    def _convert_sequence(cls, value: list, item_type: type) -> tuple[list, bool]:
+    def _convert_sequence(cls, value: list, item_type: type, data_dir: Path | None = None) -> tuple[list, bool]:
         """Convert list with typed items."""
         converted_list = []
 
         for item in value:
-            converted_item, item_ok = cls._convert_value_to_type(item, item_type)
+            converted_item, item_ok = cls._convert_value_to_type(item, item_type, data_dir=data_dir)
 
             if not item_ok:
                 return value, False

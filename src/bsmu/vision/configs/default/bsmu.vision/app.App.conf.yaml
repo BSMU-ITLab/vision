@@ -19,6 +19,9 @@ plugins:
 
   - bsmu.vision.plugins.writers.image.common.CommonImageFileWriterPlugin
 
+  - bsmu.vision.plugins.layers_view.LayersTableViewPlugin
+  - bsmu.vision.plugins.task_storage_view.TaskStorageViewPlugin
+
   - bsmu.vision.plugins.tools.manager.ViewerToolManagerPlugin
   - bsmu.vision.plugins.tools.hand.HandToolPlugin
 #  - bsmu.vision.plugins.tools.smart_brush.SmartBrushToolPlugin
@@ -31,9 +34,6 @@ plugins:
 #  - bsmu.vision.plugins.walkers.slice.MdiVolumeSliceWalkerPlugin
 
   - bsmu.vision.plugins.layer_controller.MdiImageViewerLayerControllerPlugin
-  - bsmu.vision.plugins.layers_view.LayersTableViewPlugin
-
-  - bsmu.vision.plugins.task_storage_view.TaskStorageViewPlugin
 
 enable_gui: true
 

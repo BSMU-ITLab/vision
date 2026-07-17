@@ -46,23 +46,21 @@ class TaskStorageViewPlugin(Plugin):
 
         self._task_storage_table_view = TaskStorageTableView()
         self._task_storage_table_view.setModel(self._task_storage_table_model)
-        self._task_storage_table_view_dock_widget = QDockWidget('Tasks', self._main_window)
-        self._task_storage_table_view_dock_widget.setWidget(self._task_storage_table_view)
 
         self._progress_delegate = ProgressDelegate(parent=self._task_storage_table_view)
         progress_column_number = self._task_storage_table_model.column_number(NameProgressTableColumn)
         self._task_storage_table_view.setItemDelegateForColumn(progress_column_number, self._progress_delegate)
 
-        self._main_window.addDockWidget(Qt.RightDockWidgetArea, self._task_storage_table_view_dock_widget)
+        self._task_storage_table_view_dock_widget = self._main_window.add_dock_widget(
+            self._task_storage_table_view,
+            self.tr('Tasks'),
+        )
 
     def _disable(self):
-        self._main_window.removeDockWidget(self._task_storage_table_view_dock_widget)
-
-        self._progress_delegate = None
-
+        self._main_window.remove_dock_widget(self._task_storage_table_view_dock_widget)
         self._task_storage_table_view_dock_widget = None
         self._task_storage_table_view = None
-
+        self._progress_delegate = None
         self._task_storage_table_model = None
 
         self._main_window = None

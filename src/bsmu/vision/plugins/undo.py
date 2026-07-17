@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import QObject
 from PySide6.QtGui import QUndoGroup, QUndoStack, QKeySequence
-from PySide6.QtWidgets import QUndoView, QDockWidget
+from PySide6.QtWidgets import QUndoView
 
 from bsmu.vision.core.plugins import Plugin
-from bsmu.vision.plugins.windows.main import EditMenu, WindowsMenu
+from bsmu.vision.plugins.windows.main import EditMenu
 from bsmu.vision.undo import UndoCommand
 
 if TYPE_CHECKING:
@@ -60,9 +60,18 @@ class UndoPlugin(Plugin):
         redo_action.setShortcut(QKeySequence.StandardKey.Redo)
         edit_menu.addAction(redo_action)
 
-        self._main_window.add_menu_action(WindowsMenu, 'History', self._on_history_action_triggered, checkable=True)
+        self._undo_view = QUndoView(self._undo_manager.undo_group)
+        self._history_dock_widget = self._main_window.add_dock_widget(
+            self._undo_view,
+            self.tr('History'),
+            visible=False,
+        )
 
     def _disable(self):
+        self._main_window.remove_dock_widget(self._history_dock_widget)
+        self._history_dock_widget = None
+        self._undo_view = None
+
         self._undo_manager.clean()
         self._undo_manager = None
 
@@ -70,19 +79,6 @@ class UndoPlugin(Plugin):
         self._main_window = None
 
         raise NotImplementedError
-
-    def _on_history_action_triggered(self, checked: bool):
-        if checked:
-            self._undo_view = QUndoView(self._undo_manager.undo_group)
-
-            self._history_dock_widget = QDockWidget('History')
-            self._history_dock_widget.setWidget(self._undo_view)
-            self._main_window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._history_dock_widget)
-        else:
-            self._main_window.removeDockWidget(self._history_dock_widget)
-            self._history_dock_widget = None
-
-            self._undo_view = None
 
 
 class UndoManager(QObject):

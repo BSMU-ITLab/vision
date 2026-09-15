@@ -54,6 +54,7 @@ class GraphicsView(QGraphicsView):
     zoom_changed = Signal(float)   # Fires on every scale change
     zoom_finished = Signal(float)  # Fires only when smooth zoom ends
     pan_finished = Signal()
+    viewport_changed = Signal(QRectF)
     scrollable_invalidated = Signal()
     scrollable_changed = Signal(bool)
 
@@ -283,6 +284,8 @@ class GraphicsView(QGraphicsView):
         self._update_viewport_rect_in_scene()
         self._min_ratio = None
         self._anchor_rect = None
+
+        self.viewport_changed.emit(self._viewport_rect_in_scene)
 
     def _update_viewport_rect_in_scene(self):
         viewport_rect = self.viewport().rect()

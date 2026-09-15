@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from bsmu.vision.actors.layer import LayerActor, RasterLayerActor, VectorLayerActor
+from bsmu.vision.actors.layer.tiled import TiledRasterLayerActor
 from bsmu.vision.core.layers import Layer, RasterLayer, VectorLayer
 
 
@@ -26,6 +27,14 @@ def create_layer_actor(layer: Layer) -> LayerActor | None:
     return None
 
 
+def _create_raster_layer_actor(layer: RasterLayer) -> LayerActor:
+    """Create the appropriate actor based on whether the raster is tiled (WSI) or in-memory."""
+    raster = layer.data
+    if raster.is_tiled:
+        return TiledRasterLayerActor(layer)
+    return RasterLayerActor(layer)
+
+
 # Register built-in actors
-register_layer_actor(RasterLayer, RasterLayerActor)
+register_layer_actor(RasterLayer, _create_raster_layer_actor)
 register_layer_actor(VectorLayer, VectorLayerActor)

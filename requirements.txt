@@ -34,7 +34,7 @@ scikit-image==0.24.0
 scipy==1.14.1
 shiboken6==6.8.0.2
 six==1.16.0
-slideio==2.6.3
+slideio==2.9.0
 sortedcontainers==2.4.0
 sympy==1.13.3
 tifffile==2024.9.20

@@ -56,6 +56,7 @@ class GraphicsViewer(DataViewer[DataT]):
         self._settings = settings
         self._graphics_view = GraphicsView(self._graphics_scene, self._settings.graphics_view_settings)
         self._graphics_view.zoom_changed.connect(self._on_view_zoom_changed)
+        self._graphics_view.viewport_changed.connect(self._on_viewport_changed)
 
         super().__init__(data, parent)
 
@@ -245,3 +246,7 @@ class GraphicsViewer(DataViewer[DataT]):
 
     def _on_view_zoom_changed(self, view_scale: float) -> None:
         pass
+
+    def _on_viewport_changed(self, scene_rect: QRectF) -> None:
+        for actor in self._top_level_actors:
+            actor.update_visible_region(scene_rect)

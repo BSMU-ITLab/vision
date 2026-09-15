@@ -7,7 +7,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QGraphicsItem
 
 if TYPE_CHECKING:
-    from PySide6.QtCore import QPointF
+    from PySide6.QtCore import QRectF, QPointF
 
 ModelT = TypeVar('ModelT', bound=QObject)
 ItemT = TypeVar('ItemT', bound=QGraphicsItem)
@@ -63,6 +63,10 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
         if self._current_view_scale != view_scale:
             self._current_view_scale = view_scale
             self._on_view_scale_changed()
+
+    def update_visible_region(self, scene_rect: QRectF) -> None:
+        """Called when the visible viewport area changes. Override in subclasses."""
+        pass
 
     def _on_view_scale_changed(self) -> None:
         """

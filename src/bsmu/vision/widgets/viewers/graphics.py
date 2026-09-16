@@ -77,6 +77,7 @@ class GraphicsViewer(DataViewer[DataT]):
             actor.scene_bounding_rect_changed.connect(self._on_top_level_actor_scene_bounding_rect_changed)
 
     def remove_actor(self, actor: GraphicsActor):
+        actor.release_resources()
         if actor.graphics_item.parentItem() is None:
             self._top_level_actors.remove(actor)
             actor.scene_bounding_rect_changed.disconnect(self._on_top_level_actor_scene_bounding_rect_changed)

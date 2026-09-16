@@ -250,3 +250,7 @@ class GraphicsViewer(DataViewer[DataT]):
     def _on_viewport_changed(self, scene_rect: QRectF) -> None:
         for actor in self._top_level_actors:
             actor.update_visible_region(scene_rect)
+
+    def _release_resources(self) -> None:
+        for actor in self._top_level_actors:
+            actor.release_resources()

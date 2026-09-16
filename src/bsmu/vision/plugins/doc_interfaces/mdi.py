@@ -11,6 +11,8 @@ from bsmu.vision.core.plugins import Plugin
 if TYPE_CHECKING:
     from typing import Protocol
 
+    from PySide6.QtGui import QCloseEvent
+
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
 
@@ -80,3 +82,10 @@ class Mdi(QMdiArea):
             sub_window.lay_out_to_anchors()
 
         self.resized.emit(resize_event)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        for sub_window in self.subWindowList():
+            widget = sub_window.widget()
+            if widget is not None:
+                widget.close()
+        super().closeEvent(event)

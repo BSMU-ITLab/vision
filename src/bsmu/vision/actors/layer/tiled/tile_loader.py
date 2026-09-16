@@ -119,7 +119,6 @@ class TileLoader(QThread):
                         qimage=numpy_array_to_qimage(tile, image_format=QImage.Format.Format_RGB888),
                     )
                 )
-
             except Exception as e:
                 logger.error('TileLoader critical error at L%d(%d,%d): %s', level, col, row, e)
                 # Fallback: emit black tile to prevent rendering gaps
@@ -134,7 +133,6 @@ class TileLoader(QThread):
                         qimage=numpy_array_to_qimage(black, image_format=QImage.Format.Format_RGB888),
                     )
                 )
-
             finally:
                 with QMutexLocker(self._mutex):
                     if self._current == key:

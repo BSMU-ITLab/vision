@@ -88,7 +88,7 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
 
     def _model_about_to_change(self, new_model: RasterLayer | None) -> None:
         if self.layer is not None:
-            self._teardown()
+            self.release_resources()
 
         super()._model_about_to_change(new_model)
 
@@ -142,25 +142,27 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
         # Initial level selection and tile request
         self._auto_select_level()
 
-    def _teardown(self) -> None:
+    def release_resources(self) -> None:
+        """Stop the tile loader and free all rendering resources."""
+        self._tile_request_timer.stop()
+
         if self._loader is not None:
             self._loader.tile_ready.disconnect(self._on_tile_ready)
             self._loader.stop()
-            self._loader.deleteLater()
             self._loader = None
 
-        self._tile_request_timer.stop()
         self._cache.clear()
         self._inflight.clear()
         self._last_scene_rect = None
 
-        # Remove child items from container
+        # Remove child items from scene
         for item in (self._overview_item, self._fallback_item, self._current_item):
             if item is not None and item.scene() is not None:
                 item.scene().removeItem(item)
         self._overview_item = None
         self._fallback_item = None
         self._current_item = None
+
         self._backend = None
 
     def _auto_select_level(self) -> None:

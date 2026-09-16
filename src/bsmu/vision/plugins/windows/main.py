@@ -11,7 +11,7 @@ from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.widgets.images import icons_rc  # noqa: F401
 
 if TYPE_CHECKING:
-    from PySide6.QtGui import QKeySequence
+    from PySide6.QtGui import QCloseEvent, QKeySequence
     from PySide6.QtWidgets import QWidget
 
 
@@ -184,6 +184,12 @@ class MainWindow(QMainWindow):
 
     def menu(self, menu_type: type[MainMenu], add_nonexistent: bool = True) -> MainMenu | None:
         return self._menu_bar.menu(menu_type, add_nonexistent)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        central_widget = self.centralWidget()
+        if central_widget is not None:
+            central_widget.close()
+        super().closeEvent(event)
 
 
 class MainWindowPlugin(Plugin):

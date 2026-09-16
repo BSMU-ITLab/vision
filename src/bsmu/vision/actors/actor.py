@@ -68,6 +68,10 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
         """Called when the visible viewport area changes. Override in subclasses."""
         pass
 
+    def release_resources(self) -> None:
+        """Release heavy resources (threads, caches) before destruction."""
+        pass
+
     def _on_view_scale_changed(self) -> None:
         """
         Internal hook: override in subclasses to recalculate

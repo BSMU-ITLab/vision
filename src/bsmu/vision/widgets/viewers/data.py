@@ -77,7 +77,15 @@ class DataViewer(QWidget, Generic[DataT]):
             app.focusChanged.disconnect(self._on_app_focus_changed)
         except Exception:
             pass
+
+        self._release_resources()
+
         super().closeEvent(event)
+
+    def _release_resources(self) -> None:
+        """Release heavy resources (background threads, caches) before the viewer is destroyed.
+        Override in subclasses that hold such resources. Safe to call multiple times."""
+        pass
 
     @property
     def data(self) -> DataT | None:

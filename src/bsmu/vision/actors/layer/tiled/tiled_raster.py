@@ -80,9 +80,6 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
         self._tile_request_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._tile_request_timer.timeout.connect(self._request_visible_tiles)
 
-        if self._backend is not None:
-            self._request_visible_tiles()
-
     def _create_graphics_item(self) -> TiledRasterContainerItem:
         return TiledRasterContainerItem()
 
@@ -101,14 +98,15 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
         self._setup(raster.backend)
 
     def update_visible_region(self, scene_rect: QRectF) -> None:
-        """Called by the viewer when the visible viewport area changes."""
+        """Store the visible scene rect and schedule a tile update."""
         self._last_scene_rect = scene_rect
+        # Fallback: set initial level if adjust_to_view_scale didn't trigger (e.g. scale == 1.0)
+        if self._current_item is not None and self._current_item.current_level is None:
+            self._auto_select_level()
         self._schedule_tile_update()
 
     def _on_view_scale_changed(self) -> None:
-        """Called via adjust_to_view_scale when zoom changes."""
         self._auto_select_level()
-        self._schedule_tile_update()
 
     def _setup(self, backend: TiledBackend) -> None:
         self._backend = backend
@@ -138,9 +136,6 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
         self._loader = TileLoader(self._backend, parent=self)
         self._loader.tile_ready.connect(self._on_tile_ready)
         self._loader.start()
-
-        # Initial level selection and tile request
-        self._auto_select_level()
 
     def release_resources(self) -> None:
         """Stop the tile loader and free all rendering resources."""

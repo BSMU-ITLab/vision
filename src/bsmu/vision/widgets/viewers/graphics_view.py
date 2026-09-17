@@ -212,13 +212,12 @@ class GraphicsView(QGraphicsView):
         self.viewport().update(self._scale_text_rect)
         self.viewport().update(self._scale_text_rect.translated(dx, dy))
 
-        self._refresh_viewport_region()
+        self._finish_viewport_interaction()
 
     def fit_in_view(self, rect: QRectF, aspect_ratio_mode: Qt.AspectRatioMode = Qt.AspectRatioMode.KeepAspectRatio):
         self._anchor_rect = rect
         self._aspect_ratio_mode = aspect_ratio_mode
         self._fit_in_anchor_rect()
-        self._update_viewport_rect_in_scene()
 
     def capture_normalized_view_region(self) -> NormalizedViewRegion | None:
         if self._should_display_full_scene():
@@ -248,10 +247,10 @@ class GraphicsView(QGraphicsView):
         if normalized_view_region is None:
             self._viewport_rect_in_scene = None
         else:
-            self._update_viewport_rect_in_scene()
+            self._recalculate_viewport_rect_in_scene()
 
     def _on_pan_finished(self):
-        self._refresh_viewport_region()
+        self._finish_viewport_interaction()
 
     def set_cursor(self, cursor: QCursor | Qt.CursorShape):
         self.viewport().setCursor(cursor)
@@ -269,25 +268,32 @@ class GraphicsView(QGraphicsView):
         self._update_scale()
         self._invalidate_scrollable()
 
-        self._refresh_viewport_region()
+        self._finish_viewport_interaction()
 
         self.zoom_finished.emit(self._cur_scale)
 
-    def _refresh_viewport_region(self):
+    def sync_viewport_region(self) -> bool:
+        """Recalculate visible region and notify actors. Does NOT reset anchor.
+        Returns False if skipped (fitting in progress or empty scene)."""
         if self._is_fitting_in_anchor_rect or self._is_scene_rect_changing:
-            return
+            return False
 
         scene_rect = self.sceneRect()
         if scene_rect.isEmpty():
-            return
+            return False
 
-        self._update_viewport_rect_in_scene()
-        self._min_ratio = None
-        self._anchor_rect = None
-
+        self._recalculate_viewport_rect_in_scene()
         self.viewport_changed.emit(self._viewport_rect_in_scene)
+        return True
 
-    def _update_viewport_rect_in_scene(self):
+    def _finish_viewport_interaction(self) -> None:
+        """Sync visible region and reset anchor. Called when user interaction
+        finishes (zoom end, pan end, scroll)."""
+        if self.sync_viewport_region():
+            self._min_ratio = None
+            self._anchor_rect = None
+
+    def _recalculate_viewport_rect_in_scene(self):
         viewport_rect = self.viewport().rect()
         self._viewport_rect_in_scene = self.mapToScene(viewport_rect).boundingRect()
 
@@ -348,6 +354,8 @@ class GraphicsView(QGraphicsView):
 
         self._is_fitting_in_anchor_rect = False
 
+        self.sync_viewport_region()
+
 
 class ZoomSettings(Settings):
     zoom_factor_changed = Signal(float)
@@ -400,7 +408,7 @@ class _ViewSmoothZoom(QObject):
     zoom_changed = Signal(float)
     zoom_finished = Signal()
 
-    def __init__(self, view: QGraphicsView, settings: ZoomSettings, parent: QObject = None):
+    def __init__(self, view: GraphicsView, settings: ZoomSettings, parent: QObject = None):
         super().__init__(parent)
 
         self._view = view
@@ -442,7 +450,7 @@ class _Zoom:
 class _ZoomTimeLine(QTimeLine):
     zoom_changed = Signal(float)
 
-    def __init__(self, view: QGraphicsView, zoom: _Zoom, duration: int = 1000, parent: QObject = None):
+    def __init__(self, view: GraphicsView, zoom: _Zoom, duration: int = 1000, parent: QObject = None):
         super().__init__(duration, parent)
 
         self._view = view
@@ -478,6 +486,7 @@ class _ZoomTimeLine(QTimeLine):
         # Translate view so the cursor stays fixed
         delta_pos = new_pos - old_pos
         self._view.translate(delta_pos.x(), delta_pos.y())
+        self._view.sync_viewport_region()
 
         self.zoom_changed.emit(clamped_target_scale)
 
@@ -545,6 +554,7 @@ class _ViewPan(QObject):
                     new_pos = self.event_pos(event)
                     delta = self._view.mapToScene(new_pos.toPoint()) - self._view.mapToScene(self._old_pos.toPoint())
                     self._view.translate(delta.x(), delta.y())
+                    self._view.sync_viewport_region()
                     self._old_pos = new_pos
                     return False
 

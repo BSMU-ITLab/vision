@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import math
+import time
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QRect, QRectF, Qt
@@ -12,6 +14,12 @@ if TYPE_CHECKING:
 
     from bsmu.vision.actors.layer.tiled.tile_cache import TileCache
     from bsmu.vision.core.data.tiled_backend import TiledBackend
+
+
+logger = logging.getLogger(__name__)
+
+_MAX_EXPECTED_TILE_COUNT = 200
+_TILE_COUNT_WARNING_INTERVAL_S = 5.0
 
 
 class TileLayerItem(QGraphicsItem):
@@ -35,6 +43,8 @@ class TileLayerItem(QGraphicsItem):
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemUsesExtendedStyleOption, True)
         self.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+
+        self._last_tile_count_warning_s = 0.0
 
     @property
     def current_level(self) -> int | None:
@@ -96,6 +106,17 @@ class TileLayerItem(QGraphicsItem):
         # SmoothPixmapTransform keeps objects (e.g. cells) smooth when zoomed in
         # and prevents tile jitter during zoom/pan with drawPixmap
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+
+        tile_count = (row1 - row0) * (col1 - col0)
+        if tile_count > _MAX_EXPECTED_TILE_COUNT:
+            now_s = time.monotonic()
+            if now_s - self._last_tile_count_warning_s >= _TILE_COUNT_WARNING_INTERVAL_S:
+                logger.warning(
+                    'Painting %d tiles at L%d (expected at most %d) - '
+                    'likely a too-detailed level was selected.',
+                    tile_count, level, _MAX_EXPECTED_TILE_COUNT,
+                )
+                self._last_tile_count_warning_s = now_s
 
         for row in range(row0, row1):
             for col in range(col0, col1):

@@ -29,11 +29,12 @@ MAX_SCALE = 100
 
 
 class GraphicsViewSettings(Settings):
-    def __init__(self, zoomable: bool = True, zoom_settings: ZoomSettings = None):
+    def __init__(self, zoomable: bool = True, zoom_settings: ZoomSettings = None, use_device_pixel_ratio: bool = True):
         super().__init__()
 
         self._zoomable = zoomable
         self._zoom_settings = zoom_settings
+        self._use_device_pixel_ratio = use_device_pixel_ratio
 
     @property
     def zoomable(self) -> bool:
@@ -42,6 +43,10 @@ class GraphicsViewSettings(Settings):
     @property
     def zoom_settings(self) -> ZoomSettings:
         return self._zoom_settings
+
+    @property
+    def use_device_pixel_ratio(self) -> bool:
+        return self._use_device_pixel_ratio
 
 
 @dataclass
@@ -103,6 +108,13 @@ class GraphicsView(QGraphicsView):
     def current_scale(self) -> float:
         """Current view transformation multiplier (1.0 = 100%)."""
         return self._cur_scale
+
+    @property
+    def device_pixel_ratio(self) -> float:
+        """Physical-to-logical pixel ratio of the screen. At least 1.0."""
+        if self._settings.use_device_pixel_ratio:
+            return max(self.viewport().devicePixelRatioF(), 1.0)
+        return 1.0
 
     @property
     def is_scrollable(self) -> bool:

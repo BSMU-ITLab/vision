@@ -166,7 +166,7 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
             return
         if self._current_view_scale <= 0:
             return
-        target_ds = 1.0 / self._current_view_scale
+        target_ds = 1.0 / (self._current_view_scale * self._device_pixel_ratio)
         new_level = self._level_selector.resolve_level(
             self._backend, target_ds, self._current_item.current_level)
         self._switch_level(new_level)

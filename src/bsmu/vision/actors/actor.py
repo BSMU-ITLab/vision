@@ -29,6 +29,7 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
         self._graphics_item.setData(self.ACTOR_KEY, weakref.ref(self))
 
         self._current_view_scale: float = 1.0
+        self._device_pixel_ratio: float = 1.0
 
         if model is not None:
             self.model = model
@@ -55,6 +56,14 @@ class GraphicsActor(QObject, Generic[ModelT, ItemT]):
     @property
     def graphics_item(self) -> ItemT | None:
         return self._graphics_item
+
+    @property
+    def device_pixel_ratio(self) -> float:
+        return self._device_pixel_ratio
+
+    @device_pixel_ratio.setter
+    def device_pixel_ratio(self, value: float) -> None:
+        self._device_pixel_ratio = value
 
     def map_from_scene(self, scene_pos: QPointF):
         return self._graphics_item.mapFromScene(scene_pos)

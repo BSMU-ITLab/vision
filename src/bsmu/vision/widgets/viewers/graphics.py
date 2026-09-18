@@ -40,7 +40,8 @@ class ImageViewerSettings(Settings):
         return cls(
             GraphicsViewSettings(
                 zoomable=config.value('zoomable', True),
-                zoom_settings=ZoomSettings(config.value('zoom_factor', 1))
+                zoom_settings=ZoomSettings(config.value('zoom_factor', 1)),
+                use_device_pixel_ratio=config.value('use_device_pixel_ratio', True),
             )
         )
 
@@ -69,6 +70,8 @@ class GraphicsViewer(DataViewer[DataT]):
     def add_actor(self, actor: GraphicsActor):
         actor.setParent(self)
         actor.adjust_to_view_scale(self._graphics_view.current_scale)
+        actor.device_pixel_ratio = self._graphics_view.device_pixel_ratio
+
         self._graphics_scene.addItem(actor.graphics_item)
 
         if actor.graphics_item.parentItem() is None:

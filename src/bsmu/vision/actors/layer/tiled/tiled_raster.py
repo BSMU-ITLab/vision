@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
     from bsmu.vision.actors.layer.tiled.tile_loader import LoadedTile
+    from bsmu.vision.core.data.raster import Raster
     from bsmu.vision.core.data.tiled_backend import TiledBackend
 
 
@@ -85,6 +86,7 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
 
     def _model_about_to_change(self, new_model: RasterLayer | None) -> None:
         if self.layer is not None:
+            self.layer.data_changed.disconnect(self._on_layer_data_changed)
             self.release_resources()
 
         super()._model_about_to_change(new_model)
@@ -92,10 +94,27 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
     def _model_changed(self) -> None:
         super()._model_changed()
 
+        if self.layer is not None:
+            self.layer.data_changed.connect(self._on_layer_data_changed)
+            self._setup_from_data()
+
+    def _on_layer_data_changed(self, _data: Raster | None) -> None:
+        old_scene_rect = self.graphics_item.sceneBoundingRect()
+
+        self._release_rendering_resources()
+        self._setup_from_data()
+
+        if self.graphics_item.sceneBoundingRect() != old_scene_rect:
+            self.scene_bounding_rect_changed.emit()
+
+        self._auto_select_level()
+        self._schedule_tile_update()
+
+    def _setup_from_data(self) -> None:
+        """Set up rendering from the current layer data."""
         raster = self.data
-        if raster is None or not raster.is_tiled:
-            return
-        self._setup(raster.backend)
+        if raster is not None and raster.is_tiled:
+            self._setup(raster.backend)
 
     def update_visible_region(self, scene_rect: QRectF) -> None:
         """Store the visible scene rect and schedule a tile update."""
@@ -109,6 +128,7 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
         self._auto_select_level()
 
     def _setup(self, backend: TiledBackend) -> None:
+        """Create rendering items and tile loader for the given backend."""
         self._backend = backend
         container = self.graphics_item
 
@@ -137,8 +157,8 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
         self._loader.tile_ready.connect(self._on_tile_ready)
         self._loader.start()
 
-    def release_resources(self) -> None:
-        """Stop the tile loader and free all rendering resources."""
+    def _release_rendering_resources(self) -> None:
+        """Free rendering items and tile loader. Keeps viewport state."""
         self._tile_request_timer.stop()
 
         if self._loader is not None:
@@ -148,7 +168,6 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
 
         self._cache.clear()
         self._inflight.clear()
-        self._last_scene_rect = None
 
         # Remove child items from scene
         for item in (self._overview_item, self._fallback_item, self._current_item):
@@ -159,6 +178,11 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
         self._current_item = None
 
         self._backend = None
+
+    def release_resources(self) -> None:
+        """Release rendering resources and reset viewport state."""
+        self._release_rendering_resources()
+        self._last_scene_rect = None
 
     def _auto_select_level(self) -> None:
         """Auto-select the best level based on current zoom."""

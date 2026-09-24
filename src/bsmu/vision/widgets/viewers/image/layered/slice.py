@@ -104,7 +104,7 @@ class VolumeSliceImageViewer(LayeredImageViewer):
 
         self.slice_number = slice_number
 
-        super().__init__(data, selection_manager, settings, parent)
+        super().__init__(data, selection_manager, settings=settings, parent=parent)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> VolumeSliceImageLayerView:
         if isinstance(image_layer.image, VolumeImage):

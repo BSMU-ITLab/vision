@@ -55,6 +55,9 @@ class SmartBrushToolSettings(LayeredDataViewerToolSettings):
 
 
 class SmartBrushTool(LayeredDataViewerTool):
+    _uses_mask: bool = True
+    _uses_tool_mask: bool = True
+
     def __init__(self, viewer: LayeredImageViewer, undo_manager: UndoManager, config: UnitedConfig):
         super().__init__(viewer, undo_manager, config)
 

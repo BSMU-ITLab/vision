@@ -12,7 +12,6 @@ import bsmu.vision.core.converters.image as image_converter
 from bsmu.vision.actors import GraphicsActor, ItemT
 from bsmu.vision.actors.shape.registry import create_shape_actor
 from bsmu.vision.core.data.raster import Raster
-from bsmu.vision.core.image import FlatImage
 from bsmu.vision.core.layers import Layer, RasterLayer, VectorLayer
 
 if TYPE_CHECKING:
@@ -40,6 +39,8 @@ class LayerActor(GraphicsActor[LayerT, ItemT], Generic[LayerT, ItemT]):
         # is shown in multiple viewers; the model remains the single source of truth.
         self._visible_override: bool | None = None
         self._opacity_override: float | None = None
+
+        self._slice_number: int | None = None
 
         super().__init__(model, parent)
 
@@ -114,6 +115,20 @@ class LayerActor(GraphicsActor[LayerT, ItemT], Generic[LayerT, ItemT]):
     def _update_opacity(self) -> None:
         self._apply_opacity_to_graphics_item()
         self.opacity_changed.emit(self.opacity)
+
+    @property
+    def slice_number(self) -> int | None:
+        return self._slice_number
+
+    @slice_number.setter
+    def slice_number(self, value: int | None) -> None:
+        if self._slice_number != value:
+            self._slice_number = value
+            self._on_slice_number_changed()
+
+    def _on_slice_number_changed(self) -> None:
+        """Override in subclasses to react to slice change (e.g., update rendering)."""
+        pass
 
     def _apply_visible_to_graphics_item(self) -> None:
         if self.graphics_item is not None:
@@ -194,7 +209,6 @@ class RasterLayerGraphicsItem(QGraphicsItem):
 class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
     image_changed = Signal(Raster)  # TODO: rename into raster_changed or add into LayerActor data_changed signal
     image_shape_changed = Signal(object, object)  # TODO: rename into raster_shape_changed
-    image_view_updated = Signal(FlatImage)  # TODO: remove this signal or rename into display_slice_updated
 
     def __init__(
             self,
@@ -210,12 +224,15 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
 
         self._display_slice: Raster | None = None
 
-        self.slice_number: int | None = None
-
         super().__init__(model, parent)
 
     def _create_graphics_item(self) -> RasterLayerGraphicsItem:
         return RasterLayerGraphicsItem()
+
+    def _on_slice_number_changed(self) -> None:
+        # Invalidate cached display slice and refresh rendering
+        self._display_slice = None
+        self._update_graphics_item()
 
     @property
     def raster(self) -> Raster | None:
@@ -249,7 +266,7 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
     def display_slice(self) -> Raster | None:
         """Display-ready version of `current_slice` with intensity windowing applied; used to create QImage."""
         if self._display_slice is None:
-            current_slice = self.current_slice
+            current_slice = self._current_slice
             if current_slice is not None and current_slice.n_channels == 1 and not current_slice.is_indexed:
                 # Apply intensity windowing -> must NOT modify original slice.pixels
                 windowed_pixels = IntensityWindowing(current_slice.pixels).windowing_applied()
@@ -257,22 +274,19 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
             else:
                 self._display_slice = current_slice
 
-            self.image_view_updated.emit(self._display_slice)
-
         return self._display_slice
 
     @property
-    def current_slice(self) -> Raster | None:
-        """
-        Current 2D raster slice - raw data with no processing applied.
-        Is used by both 2D tools (e.g., Smart Brush) and the display system.
-        """
-        return self.data
+    def _current_slice(self) -> Raster | None:
+        """Raw 2D slice at the current slice_number, for rendering only."""
+        if self.data is None:
+            return None
+        return self.data.slice_2d(self.slice_number)
 
     @property
     def flat_image(self) -> Raster | None:
-        warnings.warn('`flat_image` is deprecated; use `current_slice` instead.', DeprecationWarning, stacklevel=2)
-        return self.current_slice
+        warnings.warn('`flat_image` is deprecated; use `_current_slice` instead.', DeprecationWarning, stacklevel=2)
+        return self._current_slice
 
     def _update_graphics_item(self) -> None:
         """Rebuild the display image from scratch and sync scene geometry."""

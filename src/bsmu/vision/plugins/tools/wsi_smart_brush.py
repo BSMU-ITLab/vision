@@ -571,6 +571,9 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
     # Use class attribute, because new instances of tool are created, when tool is activated/deactivated
     _STROKE_ID = 0
 
+    _uses_mask: bool = True
+    _uses_tool_mask: bool = True
+
     def __init__(
             self,
             viewer: LayeredDataViewer,

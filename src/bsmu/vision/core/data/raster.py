@@ -140,6 +140,15 @@ class Raster(Data):
             return self._backend.n_channels
         raise RuntimeError('No data source')
 
+    def slice_2d(self, slice_number: int | None = None) -> Raster:
+        """Return 2D slice. For 2D rasters returns self; for tiled raises (use read_region)."""
+        if self.n_dims == 2:
+            return self
+        if self.is_tiled:
+            raise RuntimeError(
+                'slice_2d() is not supported for tiled rasters. Use read_region() instead.')
+        raise NotImplementedError('3D slice extraction is not yet implemented')
+
     def read_region(self, bbox: BBox, target_downsample: float = 1.0) -> np.ndarray:
         """
         Read a region in level-0 pixel coordinates.

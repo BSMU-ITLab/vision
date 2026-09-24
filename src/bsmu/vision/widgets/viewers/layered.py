@@ -13,6 +13,7 @@ from bsmu.vision.core.data.layered import LayeredData
 from bsmu.vision.core.data.raster import MaskDrawMode
 from bsmu.vision.core.layers import VectorLayer
 from bsmu.vision.core.selection import SelectionManager
+from bsmu.vision.core.slice import SliceController
 from bsmu.vision.widgets.viewers.graphics import GraphicsViewer
 
 if TYPE_CHECKING:
@@ -42,19 +43,25 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
             self,
             data: LayeredData | None = None,
             selection_manager: SelectionManager | None = None,
+            slice_controller: SliceController | None = None,
             settings: ImageViewerSettings | None = None,
             parent: QWidget | None = None,
-    ):
+    ) -> None:
         self._layer_to_actor: dict[Layer, LayerActor] = {}
 
         self._active_layer_actor = None
 
-        self._selection_manager = (
-            selection_manager if selection_manager is not None else SelectionManager(parent=self))
-
+        self._selection_manager = selection_manager
+        self._slice_controller = slice_controller
         super().__init__(data, settings, parent)
 
+        self._selection_manager = (
+            selection_manager if selection_manager is not None else SelectionManager(parent=self))
+        self._slice_controller = (
+            slice_controller if slice_controller is not None else SliceController(parent=self))
+
         self._selection_manager.selection_changed.connect(self._on_selection_changed)
+        self._slice_controller.slice_changed.connect(self._on_slice_changed)
 
     @property
     def layers(self) -> list[Layer]:
@@ -82,6 +89,10 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
     @property
     def selection_manager(self) -> SelectionManager:
         return self._selection_manager
+
+    @property
+    def slice_controller(self) -> SliceController:
+        return self._slice_controller
 
     def layer_by_name(self, name: str) -> Layer | None:
         return self.data.layer_by_name(name)
@@ -198,6 +209,8 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
         self.layer_actor_about_to_add.emit(actor, layer_index)
 
         self._layer_to_actor[layer] = actor
+        if self._slice_controller is not None:
+            actor.slice_number = self._slice_controller.slice_number
         self.add_actor(actor)
 
         if isinstance(layer, VectorLayer):
@@ -243,6 +256,10 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
                 is_shape_selected = self.selection_manager.is_shape_selected(shape_actor.shape)
                 selected_shape_nodes = self.selection_manager.selected_shape_nodes(shape_actor.shape)
                 shape_actor.update_visual_state(is_shape_selected, selected_shape_nodes)
+
+    def _on_slice_changed(self, slice_number: int | None) -> None:
+        for layer_actor in self._layer_to_actor.values():
+            layer_actor.slice_number = slice_number
 
     def _on_view_zoom_changed(self, view_scale: float) -> None:
         super()._on_view_zoom_changed(view_scale)

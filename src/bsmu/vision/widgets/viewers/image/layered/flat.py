@@ -37,7 +37,7 @@ class LayeredFlatImageViewer(LayeredImageViewer):
             settings: ImageViewerSettings = None,
             parent: QWidget | None = None,
     ):
-        super().__init__(data, selection_manager, settings, parent)
+        super().__init__(data, selection_manager, settings=settings, parent=parent)
 
     def _add_layer_view_from_model(self, image_layer: ImageLayer, layer_index: int = None) -> FlatImageLayerView:
         layer_view = FlatImageLayerView(image_layer, image_layer.visibility.visible, image_layer.visibility.opacity)

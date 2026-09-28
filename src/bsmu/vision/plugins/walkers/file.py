@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, Signal
 
+from bsmu.vision.core.layers import RasterLayer
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.plugins.windows.main import ViewMenu
 from bsmu.vision.widgets.mdi.windows.image.layered import LayeredImageViewerSubWindow
@@ -12,6 +13,7 @@ from bsmu.vision.widgets.viewers.image.layered import LayeredImageViewer
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from bsmu.vision.core.data.raster import Raster
     from bsmu.vision.core.layers import Layer
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
@@ -185,6 +187,10 @@ class ImageLayerFileWalker(QObject):
 
         self._main_layer_file_index = index % len(self.main_layer_dir_relative_file_paths)
         requested_file_relative_path = self.main_layer_dir_relative_file_paths[self._main_layer_file_index]
+
+        # First raster layer with loaded data becomes the reference for spacing adjustment
+        reference_raster: Raster | None = None
+
         # Update images of all layers
         for layer in self._image_viewer.layers:
             if layer.path is None:
@@ -195,6 +201,15 @@ class ImageLayerFileWalker(QObject):
             if layer != self._image_viewer.active_layer and layer.extension is not None:
                 file_path = file_path.with_suffix(layer.extension)
             palette = getattr(layer, 'palette', None)
-            layer.data = self._file_reading_manager.read_file(file_path, palette=palette)
+            data = self._file_reading_manager.read_file(file_path, palette=palette)
+
+            # Fit spacing before assigning to the layer so it receives data with correct spacing
+            if isinstance(layer, RasterLayer) and data is not None:
+                if reference_raster is None:
+                    reference_raster = data  # First raster layer is the reference
+                else:
+                    data.fit_spacing_to(reference_raster)
+
+            layer.data = data
 
         self._image_viewer.restore_normalized_view_region(normalized_view_region)

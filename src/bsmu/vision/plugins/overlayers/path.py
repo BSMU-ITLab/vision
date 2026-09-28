@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.readers.manager import FileReadingManager, FileReadingManagerPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
     from bsmu.vision.plugins.postread.manager import (
-        PostReadConversionManagerPlugin, PostReadConversionManager
+        PostReadConversionManagerPlugin, PostReadConversionManager,
     )
 
 
@@ -82,6 +82,9 @@ class ImageViewerPathOverlayer(QObject):
         layers_dir = first_layer.path.parent
         relative_image_path = first_layer.image_path.relative_to(first_layer.path)
 
+        # Find the first raster layer with data (reference image) for spacing adjustment.
+        reference_data = data.first_raster_data()
+
         for new_layer_name, layer_props in self._layers_config_data.items():
             new_layer_path = layers_dir / new_layer_name
             new_layer_image_path = new_layer_path / relative_image_path
@@ -102,4 +105,9 @@ class ImageViewerPathOverlayer(QObject):
             layer_visibility = Visibility(opacity=layer_opacity) if layer_opacity is not None else None
 
             new_image = self._file_reading_manager.read_file(new_layer_image_path, palette=palette)
+
+            # Adjust spacing to overlay correctly on the reference image
+            if reference_data is not None:
+                new_image.fit_spacing_to(reference_data)
+
             data.add_layer_from_image(new_image, new_layer_name, new_layer_path, layer_visibility)

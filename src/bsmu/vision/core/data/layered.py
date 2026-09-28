@@ -256,6 +256,12 @@ class LayeredData(Data):
     def layer_image(self, layer_name: str) -> Raster | None:
         return (layer := self.layer_by_name(layer_name)) and layer.image
 
+    def first_raster_data(self) -> Raster | None:
+        for layer in self.layers:
+            if isinstance(layer, RasterLayer) and layer.data is not None:
+                return layer.data
+        return None
+
     def print_layers(self):
         for index, layer in enumerate(self.layers):
             print(f'Layer {index}: {layer.name}')

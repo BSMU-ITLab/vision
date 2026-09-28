@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import QObject, QPointF
 
+from bsmu.vision.core.data.raster import TILED_MASK_DOWNSAMPLE
 from bsmu.vision.core.layers import Layer, RasterLayer
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.plugins.tools import ViewerToolSettings
@@ -322,14 +323,24 @@ class MaskManagerBase(QObject):
         layer_name = layer_props[LAYER_NAME_PROPERTY_KEY]
         layer = self._viewer.layer_by_name(layer_name)
         if layer is None:
-            layer_image = self.image_layer.data.zeros_mask(palette=palette)
+            layer_image = self.image_layer.data.zeros_mask(
+                palette=palette, mask_downsample=self._mask_downsample)
             layer = self._viewer.add_layer_from_image(layer_image, layer_name)
             layer.opacity = layer_props.get('opacity', Layer.DEFAULT_OPACITY)
         return layer
 
     def _update_mask(self) -> None:
         if self._mask_layer.data is None:
-            self._mask_layer.data = self.image_layer.data.zeros_mask(palette=self._mask_layer.palette)
+            self._mask_layer.data = self.image_layer.data.zeros_mask(
+                palette=self._mask_layer.palette, mask_downsample=self._mask_downsample)
+
+    @property
+    def _mask_downsample(self) -> float:
+        """Mask downsample factor: reduced for tiled images, full-size for regular."""
+        image_layer = self.image_layer
+        if image_layer is None or image_layer.data is None:
+            return 1.0
+        return TILED_MASK_DOWNSAMPLE if image_layer.data.is_tiled else 1.0
 
 
 class MaskManager(MaskManagerBase):

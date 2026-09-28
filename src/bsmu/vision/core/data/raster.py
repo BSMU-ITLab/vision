@@ -15,6 +15,7 @@ from bsmu.vision.core.data.level_selector import BalancedLevelSelector
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Sequence
 
     from PySide6.QtCore import QObject
 
@@ -26,6 +27,13 @@ if TYPE_CHECKING:
 
 MASK_TYPE = np.uint8
 MASK_MAX = np.iinfo(MASK_TYPE).max
+
+# Downsample factor for masks on tiled images.
+# Tiled images are typically large (e.g., WSI), so masks are reduced
+# to save memory; spacing compensates for the reduction.
+# TODO: creation tools will read this from their config;
+#  loading plugins will read spacing from file metadata (e.g., TIFF, NIfTI) instead.
+TILED_MASK_DOWNSAMPLE = 8.0
 
 
 class SpatialAttrs:
@@ -115,7 +123,7 @@ class Raster(Data):
         return self.is_tiled or self.array is not None
 
     @property
-    def shape(self) -> tuple:
+    def shape(self) -> tuple[int, ...]:
         if self.array is not None:
             return self.array.shape
         if self.is_tiled:
@@ -127,7 +135,7 @@ class Raster(Data):
         raise RuntimeError('No data source: neither array nor backend is set')
 
     @property
-    def shape_or_none(self) -> tuple | None:
+    def shape_or_none(self) -> tuple[int, ...] | None:
         if self.array is None and not self.is_tiled:
             return None
         return self.shape
@@ -196,14 +204,10 @@ class Raster(Data):
             palette: Palette = None,
             mask_downsample: float = 1.0,
     ) -> Raster:
-        # Determine the spatial shape of the source (excluding the channel dimension)
-        if other.is_tiled:
-            spatial_shape = tuple(reversed(other._backend.slide_size))
-        else:
-            spatial_shape = other.array.shape[:cls.n_dims]
-
         if create_mask:
-            mask_shape = tuple(max(1, round(s / mask_downsample)) for s in spatial_shape)
+            # Determine the spatial shape of the source (excluding the channel dimension)
+            spatial_shape = other.shape[:cls.n_dims]
+            mask_shape = cls._downsampled_shape(spatial_shape, mask_downsample)
             pixels = np.zeros(mask_shape, dtype=MASK_TYPE)
 
             # Derive spacing from actual dimensions so the physical extent matches the source
@@ -226,6 +230,11 @@ class Raster(Data):
 
         palette = palette or other.palette
         return cls(pixels, palette, spatial=spatial)
+
+    @staticmethod
+    def _downsampled_shape(spatial_shape: Sequence[int], downsample: float) -> tuple[int, ...]:
+        """Calculate downsampled shape with rounding matching mask creation."""
+        return tuple(max(1, round(s / downsample)) for s in spatial_shape)
 
     @classmethod
     def zeros_mask_like(cls, other: Raster, palette: Palette = None, mask_downsample: float = 1.0) -> Raster:
@@ -322,6 +331,32 @@ class Raster(Data):
 
     def zeros_mask(self, palette: Palette = None, mask_downsample: float = 1.0) -> Raster:
         return self.zeros_mask_like(self, palette=palette, mask_downsample=mask_downsample)
+
+    def fit_spacing_to(self, reference: Raster) -> bool:
+        """Adjust this raster's spacing to overlay correctly on the reference image.
+
+        Validates that this raster's size matches the expected size: full size for
+        regular images, or reduced by TILED_MASK_DOWNSAMPLE for tiled images.
+        On success, calculates spacing from the actual size ratio (handles rounding).
+
+        Returns True if spacing was adjusted, False if sizes don't match.
+        """
+        reference_spatial_shape = reference.shape[:reference.n_dims]
+        expected_downsample = TILED_MASK_DOWNSAMPLE if reference.is_tiled else 1.0
+        expected_shape = np.array(
+            self._downsampled_shape(reference_spatial_shape, expected_downsample),
+            dtype=np.float64,
+        )
+        actual_shape = np.array(self.shape[:self.n_dims], dtype=np.float64)
+
+        # Validate size; tolerance covers rounding in the downsampling step
+        if not np.allclose(actual_shape, expected_shape, atol=1.0):
+            return False
+
+        # Derive spacing from actual dimensions so the physical extent matches the reference
+        spacing_ratios = reference_spatial_shape / actual_shape
+        self.spatial.spacing = reference.spatial.spacing * spacing_ratios
+        return True
 
     def close(self) -> None:
         """Release backend resources. After this, the Raster is no longer usable for reading."""

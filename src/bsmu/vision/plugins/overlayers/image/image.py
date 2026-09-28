@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins import Plugin
@@ -12,6 +12,8 @@ from bsmu.vision.plugins.windows.main import FileMenu
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
 
 if TYPE_CHECKING:
+    from bsmu.vision.core.data.layered import LayeredData
+    from bsmu.vision.core.data.raster import Raster
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
     from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
@@ -62,7 +64,7 @@ class ImageViewerOverlayerPlugin(Plugin):
     def _disable(self):
         raise NotImplementedError
 
-    def _load_mask_and_overlay(self):
+    def _load_mask_and_overlay(self) -> None:
         layered_data_viewer_sub_window = self._mdi.active_sub_window_with_type(LayeredDataViewerHolder)
         if layered_data_viewer_sub_window is None:
             return
@@ -90,6 +92,29 @@ class ImageViewerOverlayerPlugin(Plugin):
             mask_palette = self._palette_pack_settings.main_palette
         mask = self._file_reading_manager.read_file(Path(file_name), palette=mask_palette)
 
+        # Adjust mask spacing to overlay correctly on the reference image
+        self._fit_mask_spacing(mask, layered_data_viewer.data)
+
         mask_opacity = mask_props.get('opacity')
         mask_visibility = None if mask_opacity is None else Visibility(opacity=mask_opacity)
         layered_data_viewer.add_layer_or_modify_image(layer_name, mask, visibility=mask_visibility)
+
+    def _fit_mask_spacing(self, mask: Raster, layered_data: LayeredData) -> None:
+        """Adjust mask spacing based on the first raster layer with data (reference image)."""
+        reference_raster = layered_data.first_raster_data()
+        if reference_raster is None:
+            return
+        if not mask.fit_spacing_to(reference_raster):
+            self._show_mask_size_mismatch_warning(mask, reference_raster)
+
+    def _show_mask_size_mismatch_warning(self, mask: Raster, reference_raster: Raster) -> None:
+        """Show a warning that the mask size doesn't match the reference image."""
+        mask_shape = mask.shape[:mask.n_dims]
+        reference_shape = reference_raster.shape[:reference_raster.n_dims]
+        message = (
+            f'The mask size ({mask_shape[1]}x{mask_shape[0]}) does not match the expected size '
+            f'for the current image ({reference_shape[1]}x{reference_shape[0]}).\n\n'
+            f'The mask may belong to a different image. '
+            f'It will be loaded without spacing adjustment.'
+        )
+        QMessageBox.warning(self._main_window, self.tr('Mask Size Mismatch'), message)

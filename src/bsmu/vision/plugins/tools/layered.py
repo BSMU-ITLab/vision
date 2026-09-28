@@ -350,12 +350,12 @@ class MaskManager(MaskManagerBase):
         mask_layer_props = self._settings.layers_props['mask']
         if mask_layer_props.get('use_active_indexed_layer', True):
             active_layer = self._viewer.active_layer
-            if active_layer.is_indexed:
+            if isinstance(active_layer, RasterLayer) and active_layer.is_indexed:
                 return active_layer
 
         if mask_layer_props.get('use_first_indexed_layer', True):
             for layer in self._viewer.layers:
-                if layer.is_indexed:
+                if isinstance(layer, RasterLayer) and layer.is_indexed:
                     return layer
 
         return self._create_layer_with_zeros_mask('mask', self._settings.mask_palette)

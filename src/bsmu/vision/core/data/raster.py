@@ -157,32 +157,60 @@ class Raster(Data):
                 'slice_2d() is not supported for tiled rasters. Use read_region() instead.')
         raise NotImplementedError('3D slice extraction is not yet implemented')
 
-    def read_region(self, bbox: BBox, target_downsample: float = 1.0) -> np.ndarray:
+    def read_region(
+            self,
+            bbox: BBox,
+            output_size: tuple[int, int] | None = None,
+            interpolation: int = cv.INTER_AREA,
+    ) -> np.ndarray:
         """
-        Read a region in level-0 pixel coordinates.
+        Read a region, guaranteeing the exact output size.
 
-        For in-memory rasters: extracts from ``self.array`` (target_downsample ignored).
-        For tiled rasters: reads from backend at the optimal level.
+        For tiled rasters, the optimal pyramid level is selected automatically;
+        for regular rasters, the region is sliced from the in-memory array.
+        The result is resized to ``output_size`` if it differs from the read size.
 
         Args:
-            bbox: Bounding box in level-0 pixel coordinates.
-            target_downsample: Desired resolution scale (tiled only).
-                               1.0 = full resolution, 8.0 = 8x smaller.
+            bbox: Bounding box in pixel coordinates
+                  (level-0 for tiled rasters, array coords for regular).
+            output_size: Desired output size as ``(width, height)``.
+                         If None, defaults to ``(bbox.width, bbox.height)``.
+            interpolation: OpenCV interpolation flag used when resizing
+                           (e.g. ``cv.INTER_AREA``, ``cv.INTER_LINEAR``).
+
+        Returns:
+            Array of shape ``(height, width, ...)`` matching ``output_size``.
         """
-        if not self.is_tiled:
-            # In-memory raster: simple array slice (numpy clamps automatically)
-            return bbox.pixels(self.array)
+        if output_size is None:
+            output_size = (bbox.width, bbox.height)
 
-        # Tiled raster: choose level via strategy, convert coords, read
-        level = self._level_selector.best_level(self._backend, target_downsample)
-        level_ds = self._backend.level_downsample(level)
+        output_w, output_h = output_size
 
-        x = int(bbox.left / level_ds)
-        y = int(bbox.top / level_ds)
-        w = int(math.ceil(bbox.width / level_ds))
-        h = int(math.ceil(bbox.height / level_ds))
+        if self.is_tiled:
+            # Derive target downsample from the ratio of bbox to output_size
+            target_ds_x = bbox.width / output_w
+            target_ds_y = bbox.height / output_h
+            target_downsample = math.sqrt(target_ds_x * target_ds_y)
 
-        return self._backend.read_region(level, x, y, w, h)
+            level = self._level_selector.best_level(self._backend, target_downsample)
+            level_ds_x, level_ds_y = self._backend.level_downsample_xy(level)
+
+            # Compute both edges independently to guarantee full [left, right) coverage
+            x = math.floor(bbox.left / level_ds_x)
+            y = math.floor(bbox.top / level_ds_y)
+            x_end = math.ceil(bbox.right / level_ds_x)
+            y_end = math.ceil(bbox.bottom / level_ds_y)
+            w = x_end - x
+            h = y_end - y
+
+            region = self._backend.read_region(level, x, y, w, h)
+        else:
+            region = bbox.pixels(self.array)
+
+        # Resize to the exact requested size
+        if region.shape[:2] != (output_h, output_w):
+            region = cv.resize(region, output_size, interpolation=interpolation)
+        return region
 
     def bboxed_pixels(self, bbox: BBox) -> np.ndarray:
         if self.is_tiled:

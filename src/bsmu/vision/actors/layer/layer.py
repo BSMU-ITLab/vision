@@ -178,7 +178,7 @@ class RasterLayerGraphicsItem(QGraphicsItem):
         self._spatial_spacing = spatial_spacing
 
         self._image_rect = QRectF(
-            0.0, 0.0,
+            0.0, 0.0,  # TODO: use origin here
             float(qimage.width() * spatial_spacing[1]),
             float(qimage.height() * spatial_spacing[0]),
         )

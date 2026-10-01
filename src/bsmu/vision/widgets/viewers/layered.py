@@ -168,10 +168,9 @@ class LayeredDataViewer(GraphicsViewer[LayeredData]):
 
     def map_viewport_to_pixel_coords(self, viewport_pos: QPoint, layer: RasterLayer) -> np.ndarray:
         """Map viewport position to continuous pixel coordinates"""
-        layer_actor = self.actor_by_layer(layer)
-        layer_actor_pos = self.map_viewport_to_actor(viewport_pos, layer_actor)
+        scene_pos = self.map_viewport_to_scene(viewport_pos)
         return layer.data.map_spatial_to_pixel_coords(
-            np.array([layer_actor_pos.y(), layer_actor_pos.x()])) * layer.data.spatial.spacing
+            np.array([scene_pos.y(), scene_pos.x()]))
 
     def map_viewport_to_pixel_indices(self, viewport_pos: QPoint, layer: RasterLayer) -> np.ndarray:
         """Map viewport position to discrete pixel array indices"""

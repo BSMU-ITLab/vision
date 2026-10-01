@@ -27,10 +27,11 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from typing import Sequence
 
-    from PySide6.QtCore import QObject, QPoint
+    from PySide6.QtCore import QObject, QPoint, QPointF
     from PySide6.QtWidgets import QWidget
 
     from bsmu.vision.core.config.united import UnitedConfig
+    from bsmu.vision.core.data.raster import Raster
     from bsmu.vision.core.image import FlatImage
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
@@ -583,7 +584,8 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
         super().__init__(viewer, undo_manager, settings)
 
         self._mode = None
-        self._brush_bbox = None
+        self._mask_brush_bbox: BBox | None = None
+        self._image_brush_bbox: BBox | None = None
         self._is_stroke_finished = True
         self._is_mask_modified_during_stroke = False
         self._stroke_central_cluster_brightness_index: int | None = None  # Index of the central cluster
@@ -729,42 +731,51 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
         return self._mask_class_in_pos(viewport_pos)
 
     def _erase_brush(self):
-        if self._brush_bbox is not None:
-            self.tool_mask.bboxed_pixels(self._brush_bbox).fill(self.settings.tool_background_class)
-            self.tool_mask.emit_pixels_modified(self._brush_bbox)
+        if self._mask_brush_bbox is not None:
+            self.tool_mask.bboxed_pixels(self._mask_brush_bbox).fill(self.settings.tool_background_class)
+            self.tool_mask.emit_pixels_modified(self._mask_brush_bbox)
 
-    def _draw_brush_in_pos(self, pos: QPoint):
-        image_pixel_coords = self.map_viewport_to_pixel_coords(pos, self.tool_mask_layer)
-        self.draw_brush(*image_pixel_coords)
+    def _draw_brush_in_pos(self, viewport_pos: QPoint):
+        scene_pos = self.viewer.map_viewport_to_scene(viewport_pos)
+        self.draw_brush(scene_pos)
 
-    def draw_brush(self, row_f: float, col_f: float):
-        row_spatial_radius, col_spatial_radius = \
-            self.tool_mask.map_spatial_vector_to_pixel_vector(np.array([self.settings.radius, self.settings.radius]))
-        not_clipped_brush_bbox = BBox(
-            int(round(col_f - col_spatial_radius)), int(round(col_f + col_spatial_radius)) + 1,
-            int(round(row_f - row_spatial_radius)), int(round(row_f + row_spatial_radius)) + 1)
-        self._brush_bbox = not_clipped_brush_bbox.clipped_to_shape(self.tool_mask.shape)
-        brush_clip_bbox = self._brush_bbox.calculate_clip_bbox(not_clipped_brush_bbox)
-        if self._brush_bbox.empty:
+    def draw_brush(self, scene_pos: QPointF):
+        """Draw the brush at the given scene position."""
+        scene_coords = np.array([scene_pos.y(), scene_pos.x()])
+
+        spatial_radius = np.array([self.settings.radius, self.settings.radius])
+        mask_pixel_radius = self.tool_mask.map_spatial_vector_to_pixel_vector(spatial_radius)
+        image_pixel_radius = self.image.map_spatial_vector_to_pixel_vector(spatial_radius)
+
+        not_clipped_mask_brush_bbox = self._compute_brush_bbox(self.tool_mask, scene_coords, mask_pixel_radius)
+        self._mask_brush_bbox = not_clipped_mask_brush_bbox.clipped_to_shape(self.tool_mask.shape)
+        if self._mask_brush_bbox.empty:
             return
+
+        self._image_brush_bbox = self._compute_brush_bbox(
+            self.image, scene_coords, image_pixel_radius).clipped_to_shape(self.image.shape)
+
+        brush_clip_bbox = self._mask_brush_bbox.calculate_clip_bbox(not_clipped_mask_brush_bbox)
 
         # Downscale the image in brush region if radius is large.
         # Smaller analyzed region will improve performance of algorithms
         # (skimage.draw.ellipse, cv2.kmeans, skimage.measure.label) at the expense of accuracy.
         downscale_factor = min(1, self.settings.max_radius_without_downscale / self.settings.radius)
-        downscaled_brush_shape_f = \
-            (self._brush_bbox.height * downscale_factor, self._brush_bbox.width * downscale_factor)
+        downscaled_brush_shape_f = (
+            self._mask_brush_bbox.height * downscale_factor,
+            self._mask_brush_bbox.width * downscale_factor)
         downscaled_brush_shape = np.rint(downscaled_brush_shape_f).astype(int) + 1
         if (downscaled_brush_shape == 0).any():
             return
 
-        not_clipped_brush_bbox_center = (np.array(not_clipped_brush_bbox.shape) - 1) / 2
+        not_clipped_brush_bbox_center = (np.array(not_clipped_mask_brush_bbox.shape) - 1) / 2
         brush_center = np.array(brush_clip_bbox.map_rc_point(not_clipped_brush_bbox_center))
         downscaled_brush_center_f = brush_center * downscale_factor
         downscaled_brush_center = np.rint(downscaled_brush_center_f).astype(int)
 
-        row_downscaled_radius, col_downscaled_radius = \
-            row_spatial_radius * downscale_factor, col_spatial_radius * downscale_factor
+        row_pixel_radius, col_pixel_radius = mask_pixel_radius
+        row_downscaled_radius, col_downscaled_radius = (
+            row_pixel_radius * downscale_factor, col_pixel_radius * downscale_factor)
 
         rr, cc = skimage.draw.ellipse(  # we can use rounded row, col and radii,
             # but float values give more precise resulting ellipse indexes
@@ -784,21 +795,21 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
             downscaled_tool_mask_in_brush_bbox[rr, cc] = tool_class
             tool_mask_in_brush_bbox, temp_tool_class = self.resize_indexed_binary_image(
                 downscaled_tool_mask_in_brush_bbox,
-                self._brush_bbox.size,
+                self._mask_brush_bbox.size,
                 self.settings.tool_background_class,
                 tool_class)
             pixels_under_brush = tool_mask_in_brush_bbox == temp_tool_class
 
             if tool_class == temp_tool_class:
-                self.tool_mask.bboxed_pixels(self._brush_bbox)[...] = tool_mask_in_brush_bbox
+                self.tool_mask.bboxed_pixels(self._mask_brush_bbox)[...] = tool_mask_in_brush_bbox
             else:
-                self.tool_mask.bboxed_pixels(self._brush_bbox)[pixels_under_brush] = tool_class
+                self.tool_mask.bboxed_pixels(self._mask_brush_bbox)[pixels_under_brush] = tool_class
 
             modified_mask_pixels_under_brush = pixels_under_brush & self.modifiable_mask_pixels(mask_class)
             if self._mode is Mode.SHOW:
-                self.tool_mask.bboxed_pixels(self._brush_bbox)[modified_mask_pixels_under_brush] = (
+                self.tool_mask.bboxed_pixels(self._mask_brush_bbox)[modified_mask_pixels_under_brush] = (
                     self.settings.tool_foreground_class)
-            self.tool_mask.emit_pixels_modified(self._brush_bbox)
+            self.tool_mask.emit_pixels_modified(self._mask_brush_bbox)
 
             if self._mode in [Mode.ERASE, Mode.DRAW] and modified_mask_pixels_under_brush.any():
                 command_text = (
@@ -810,9 +821,10 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
 
             return
 
-        image_in_brush_bbox = self.image.bboxed_pixels(self._brush_bbox)
-        downscaled_image_in_brush_bbox = cv2.resize(
-            image_in_brush_bbox, tuple(reversed(downscaled_brush_shape)), interpolation=cv2.INTER_AREA)
+        # Read image directly at downscaled resolution
+        downscaled_image_in_brush_bbox = self._read_image_region_for_brush(output_shape=tuple(downscaled_brush_shape))
+        if downscaled_image_in_brush_bbox is None:
+            return
 
         downscaled_image_in_brush_bbox = self._preprocess_downscaled_image_in_brush_bbox(downscaled_image_in_brush_bbox)
         samples = downscaled_image_in_brush_bbox[rr, cc]
@@ -884,7 +896,7 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
             downscaled_tool_mask_foreground_pixels] = self.settings.tool_no_paint_class
         tool_mask_in_brush_bbox_without_foreground = cv2.resize(
             downscaled_tool_mask_without_foreground,
-            self._brush_bbox.size,
+            self._mask_brush_bbox.size,
             interpolation=cv2.INTER_NEAREST)
 
         # Second resize: Use INTER_LINEAR_EXACT for accurate resizing of the foreground class.
@@ -893,14 +905,14 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
             ~downscaled_tool_mask_foreground_pixels] = self.settings.tool_background_class
         tool_mask_in_brush_bbox, temp_tool_foreground_class = self.resize_indexed_binary_image(
             downscaled_tool_mask_in_brush_bbox,
-            self._brush_bbox.size,
+            self._mask_brush_bbox.size,
             self.settings.tool_background_class,
             self.settings.tool_foreground_class)
         tool_mask_temp_foreground_pixels = tool_mask_in_brush_bbox == temp_tool_foreground_class
         tool_mask_foreground_class = (
             self.settings.tool_foreground_class if self.mode is Mode.SHOW else self.settings.tool_fixed_class)
         # Combine foreground and other classes from two resized tool masks.
-        self.tool_mask.bboxed_pixels(self._brush_bbox)[...] = np.where(
+        self.tool_mask.bboxed_pixels(self._mask_brush_bbox)[...] = np.where(
             tool_mask_temp_foreground_pixels,
             tool_mask_foreground_class,
             tool_mask_in_brush_bbox_without_foreground)
@@ -909,7 +921,7 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
 
         if self.mode is Mode.SHOW:
             fixed_mask_pixels = tool_mask_temp_foreground_pixels & ~modifiable_mask_pixels
-            self.tool_mask.bboxed_pixels(self._brush_bbox)[fixed_mask_pixels] = self.settings.tool_fixed_class
+            self.tool_mask.bboxed_pixels(self._mask_brush_bbox)[fixed_mask_pixels] = self.settings.tool_fixed_class
 
         if self._mode is Mode.DRAW:
             modified_mask_pixels = tool_mask_temp_foreground_pixels & modifiable_mask_pixels
@@ -918,10 +930,39 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
                 self._create_and_push_modify_mask_command(
                     modified_mask_pixels, self.settings.mask_foreground_class, command_text)
 
-        self.tool_mask.emit_pixels_modified(self._brush_bbox)
+        self.tool_mask.emit_pixels_modified(self._mask_brush_bbox)
+
+    @staticmethod
+    def _compute_brush_bbox(raster: Raster, scene_coords: np.ndarray, pixel_radius: np.ndarray) -> BBox:
+        """Compute non-clipped brush bbox in pixel coordinates of the given raster."""
+        row_f, col_f = raster.map_spatial_to_pixel_coords(scene_coords)
+        row_radius, col_radius = pixel_radius
+        return BBox(
+            round(col_f - col_radius),
+            round(col_f + col_radius) + 1,
+            round(row_f - row_radius),
+            round(row_f + row_radius) + 1,
+        )
+
+    def _read_image_region_for_brush(self, output_shape: tuple[int, int] | None = None) -> np.ndarray | None:
+        """Read image region under the brush.
+
+        Args:
+            output_shape: Output shape ``(height, width)``. Defaults to mask brush bbox size.
+        """
+        image = self.image
+        if image is None or self._image_brush_bbox is None or self._mask_brush_bbox is None:
+            return None
+
+        if output_shape is None:
+            output_size = self._mask_brush_bbox.size
+        else:
+            output_size = (output_shape[1], output_shape[0])
+
+        return image.read_region(self._image_brush_bbox, output_size=output_size)
 
     def modifiable_mask_pixels(self, mask_class: int) -> npt.NDArray[bool]:
-        mask_in_brush_bbox = self.mask.bboxed_pixels(self._brush_bbox)
+        mask_in_brush_bbox = self.mask.bboxed_pixels(self._mask_brush_bbox)
         if self.settings.repainting_enabled or self._mode is Mode.ERASE:
             if self.settings.repainting_mode is RepaintingMode.ALL or self._mode is Mode.ERASE:
                 return mask_in_brush_bbox != mask_class
@@ -943,7 +984,7 @@ class WsiSmartBrushTool(LayeredDataViewerTool):
     def _create_and_push_modify_mask_command(
             self, modified_bbox_pixels: np.ndarray, new_modified_bbox_pixels: int | np.ndarray, text: str):
         modify_mask_command = ModifyMaskCommand(
-            self.mask, self._brush_bbox, modified_bbox_pixels, new_modified_bbox_pixels, text=text)
+            self.mask, self._mask_brush_bbox, modified_bbox_pixels, new_modified_bbox_pixels, text=text)
         self._undo_manager.push(modify_mask_command)
         self._is_mask_modified_during_stroke = True
 

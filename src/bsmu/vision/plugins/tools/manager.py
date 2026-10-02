@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QObject, QEvent, QElapsedTimer, QCoreApplication
-from PySide6.QtGui import QActionGroup
+from PySide6.QtGui import QActionGroup, QKeyEvent
 
 from bsmu.vision.core.plugins.observer import ObserverPlugin
 from bsmu.vision.plugins.tools import ViewerToolPlugin
@@ -34,14 +34,14 @@ class ViewerToolManagerPlugin(ObserverPlugin):
         self._main_window = self._main_window_plugin.main_window
         self._viewer_tool_manager = ViewerToolManager(self._main_window)
         self._main_window.add_menu_action(
-            ToolsMenu, self.tr('Uncheck Tool'), self._viewer_tool_manager.deactivate_active_tool, Qt.Key_Escape)
+            ToolsMenu, self.tr('Uncheck Tool'), self._viewer_tool_manager.deactivate_active_tool, Qt.Key.Key_Escape)
 
         # We install the filter on app instance instead of the main window
-        # because the main window doesn't receive mouse press events from subwindow viewports
+        # because the main window doesn't receive mouse press events from subwindow viewports.
         QCoreApplication.instance().installEventFilter(self._viewer_tool_manager)
 
     def _disable(self):
-        self._main_window.removeEventFilter(self._viewer_tool_manager)
+        QCoreApplication.instance().removeEventFilter(self._viewer_tool_manager)
 
         self._viewer_tool_manager.clear()
         self._viewer_tool_manager = None
@@ -55,6 +55,8 @@ class ViewerToolManagerPlugin(ObserverPlugin):
 
 
 class ViewerToolManager(QObject):
+    _SHORT_PRESS_MAX_MS = 300
+
     def __init__(self, main_window: MainWindow):
         super().__init__()
 
@@ -67,10 +69,13 @@ class ViewerToolManager(QObject):
         self._action_group.setExclusionPolicy(QActionGroup.ExclusionPolicy.ExclusiveOptional)
 
         self._pressed_tool_action_shortcut_key: Qt.Key | None = None
+        # Input event timestamp: actual input time, not event-processing time.
+        self._pressed_tool_action_shortcut_timestamp: int | None = None
         self._pressed_tool_action_shortcut_timer = QElapsedTimer()
         self._is_mouse_used_during_tool_action_shortcut_being_pressed: bool = False
 
         self._active_viewer_tool: MdiViewerTool | None = None
+
         # Long press of a tool shortcut allows to temporarily activate the tool.
         # Upon releasing the shortcut (KeyRelease event), the previous active tool is reactivated.
         self._viewer_tool_temporary_deactivated: MdiViewerTool | None = None
@@ -116,14 +121,19 @@ class ViewerToolManager(QObject):
             self._active_viewer_tool.deactivate()
 
     def eventFilter(self, watched_obj: QObject, event: QEvent):
-        if event.type() in (QEvent.MouseButtonPress, QEvent.Wheel):
-            self._is_mouse_used_during_tool_action_shortcut_being_pressed = True
+        if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.Wheel):
+            if self._pressed_tool_action_shortcut_key is not None:
+                self._is_mouse_used_during_tool_action_shortcut_being_pressed = True
 
         if watched_obj != self._main_window:
             return super().eventFilter(watched_obj, event)
 
         # We will not get QEvent.KeyPress events for action shortcuts, so use QEvent.ShortcutOverride instead.
-        if event.type() == QEvent.ShortcutOverride and not event.isAutoRepeat():
+        if (
+            event.type() == QEvent.Type.ShortcutOverride
+            and isinstance(event, QKeyEvent)
+            and not event.isAutoRepeat()
+        ):
             pressed_key = event.key()
             viewer_tool_plugin_by_key = self._key_to_tool_plugin.get(pressed_key)
             if viewer_tool_plugin_by_key is not None:
@@ -134,25 +144,32 @@ class ViewerToolManager(QObject):
                 self._viewer_tool_temporary_deactivated = self._active_viewer_tool
 
                 self._pressed_tool_action_shortcut_key = pressed_key
+                self._pressed_tool_action_shortcut_timestamp = event.timestamp()
+
+                # Fallback timer is used only if event timestamps are unavailable
+                # or cannot be used for some reason.
                 self._pressed_tool_action_shortcut_timer.start()
                 self._is_mouse_used_during_tool_action_shortcut_being_pressed = False
 
-        elif (event.type() == QEvent.KeyRelease
-              and event.key() == self._pressed_tool_action_shortcut_key
-              and not event.isAutoRepeat()):
-
-            pressing_time = self._pressed_tool_action_shortcut_timer.elapsed()
-            if pressing_time > 300 or self._is_mouse_used_during_tool_action_shortcut_being_pressed:
-                # Activate previous temporary deactivated tool
+        elif (
+            event.type() == QEvent.Type.KeyRelease
+            and isinstance(event, QKeyEvent)
+            and event.key() == self._pressed_tool_action_shortcut_key
+            and not event.isAutoRepeat()
+        ):
+            release_timestamp = event.timestamp()
+            pressing_time_ms = self._pressing_time_ms(release_timestamp)
+            if (
+                pressing_time_ms > self._SHORT_PRESS_MAX_MS
+                or self._is_mouse_used_during_tool_action_shortcut_being_pressed
+            ):
+                # Activate previous temporary deactivated tool.
                 if self._viewer_tool_temporary_deactivated is None:
                     self.deactivate_active_tool()
                 else:
                     self._viewer_tool_temporary_deactivated.activate()
 
-            self._pressed_tool_action_shortcut_key = None
-            self._pressed_tool_action_shortcut_timer.invalidate()
-
-            self._viewer_tool_temporary_deactivated = None
+            self._reset_pressed_tool_action_shortcut_state()
 
         return super().eventFilter(watched_obj, event)
 
@@ -178,3 +195,26 @@ class ViewerToolManager(QObject):
         )
 
         self._active_viewer_tool = None
+
+    def _pressing_time_ms(self, release_timestamp: int) -> int:
+        """Return key press duration in milliseconds."""
+        if self._pressed_tool_action_shortcut_timestamp is not None:
+            pressing_time = release_timestamp - self._pressed_tool_action_shortcut_timestamp
+
+            # Ignore invalid timestamp differences.
+            if pressing_time >= 0:
+                return pressing_time
+
+        # Fallback if event timestamps cannot be used.
+        if self._pressed_tool_action_shortcut_timer.isValid():
+            return self._pressed_tool_action_shortcut_timer.elapsed()
+
+        # Treat unknown duration as a long press.
+        return self._SHORT_PRESS_MAX_MS + 1
+
+    def _reset_pressed_tool_action_shortcut_state(self):
+        self._pressed_tool_action_shortcut_key = None
+        self._pressed_tool_action_shortcut_timestamp = None
+        self._pressed_tool_action_shortcut_timer.invalidate()
+        self._is_mouse_used_during_tool_action_shortcut_being_pressed = False
+        self._viewer_tool_temporary_deactivated = None

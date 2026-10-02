@@ -11,7 +11,7 @@ from PySide6.QtCore import Signal
 
 from bsmu.vision.core.bbox import BBox
 from bsmu.vision.core.data import Data
-from bsmu.vision.core.data.level_selector import BalancedLevelSelector
+from bsmu.vision.core.data.level_selector import SharpLevelSelector
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -78,7 +78,7 @@ class Raster(Data):
         self.spatial = spatial or SpatialAttrs.default_for_ndim(self.n_dims)
         self._backend = backend
         if backend is not None:
-            self._level_selector = level_selector or BalancedLevelSelector()
+            self._level_selector = level_selector or SharpLevelSelector()
         else:
             self._level_selector = None
 

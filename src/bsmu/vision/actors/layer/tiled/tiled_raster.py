@@ -13,7 +13,7 @@ from bsmu.vision.actors.layer.tiled.tile_cache import TileCache, RenderTile
 from bsmu.vision.actors.layer.tiled.tile_layer_item import TileLayerItem
 from bsmu.vision.actors.layer.tiled.tile_loader import TileLoader
 from bsmu.vision.core.converters.image import numpy_array_to_qimage
-from bsmu.vision.core.data.level_selector import BalancedLevelSelector
+from bsmu.vision.core.data.level_selector import SharpLevelSelector
 from bsmu.vision.core.layers import RasterLayer
 
 if TYPE_CHECKING:
@@ -58,9 +58,9 @@ class TiledRasterLayerActor(LayerActor[RasterLayer, TiledRasterContainerItem]):
 
     def __init__(self, model: RasterLayer | None = None, parent: QObject | None = None) -> None:
         self._backend: TiledBackend | None = None
-        self._cache = TileCache(max_memory_mb=512)
+        self._cache = TileCache(max_memory_mb=1024)
         self._loader: TileLoader | None = None
-        self._level_selector = BalancedLevelSelector()
+        self._level_selector = SharpLevelSelector()
         self._inflight: set[tuple[int, int, int]] = set()
 
         self._overview_item: QGraphicsPixmapItem | None = None

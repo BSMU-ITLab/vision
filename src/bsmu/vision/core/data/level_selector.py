@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 _MIN_EPS = 1e-9
-_LEVEL_HYSTERESIS_MARGIN = 0.10
+_LEVEL_HYSTERESIS_MARGIN = 0.03
 
 
 class LevelSelectionMode(Enum):

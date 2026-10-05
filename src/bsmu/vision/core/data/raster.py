@@ -148,6 +148,12 @@ class Raster(Data):
             return self._backend.n_channels
         raise RuntimeError('No data source')
 
+    @property
+    def full_bbox(self) -> BBox:
+        """Bounding box covering the entire raster."""
+        h, w = self.shape[:self.n_dims]
+        return BBox(0, w, 0, h)
+
     def slice_2d(self, slice_number: int | None = None) -> Raster:
         """Return 2D slice. For 2D rasters returns self; for tiled raises (use read_region)."""
         if self.n_dims == 2:
@@ -159,7 +165,7 @@ class Raster(Data):
 
     def read_region(
             self,
-            bbox: BBox,
+            bbox: BBox | None = None,
             output_size: tuple[int, int] | None = None,
             interpolation: int = cv.INTER_AREA,
     ) -> np.ndarray:
@@ -171,16 +177,18 @@ class Raster(Data):
         The result is resized to ``output_size`` if it differs from the read size.
 
         Args:
-            bbox: Bounding box in pixel coordinates
-                  (level-0 for tiled rasters, array coords for regular).
+            bbox: Bounding box in pixel coordinates (level-0 for tiled, array coords for regular).
+                  If None, reads the entire raster.
             output_size: Desired output size as ``(width, height)``.
                          If None, defaults to ``(bbox.width, bbox.height)``.
-            interpolation: OpenCV interpolation flag used when resizing
-                           (e.g. ``cv.INTER_AREA``, ``cv.INTER_LINEAR``).
+            interpolation: OpenCV interpolation flag used when resizing.
 
         Returns:
             Array of shape ``(height, width, ...)`` matching ``output_size``.
         """
+        if bbox is None:
+            bbox = self.full_bbox
+
         if output_size is None:
             output_size = (bbox.width, bbox.height)
 

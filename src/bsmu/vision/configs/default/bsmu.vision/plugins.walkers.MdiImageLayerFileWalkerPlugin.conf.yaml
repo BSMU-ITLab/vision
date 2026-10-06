@@ -2,3 +2,5 @@ extensions:
   - 'png'
   - 'jpg'
   - 'bmp'
+  - 'svs'
+  - 'ndpi'

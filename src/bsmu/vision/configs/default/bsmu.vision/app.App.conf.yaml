@@ -4,7 +4,7 @@ plugins:
 
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
   - bsmu.vision.plugins.readers.image.common.CommonImageFileReaderPlugin
-#  - bsmu.vision.plugins.readers.image.wsi.WholeSlideImageFileReaderPlugin
+  - bsmu.vision.plugins.readers.image.wsi.WholeSlideImageFileReaderPlugin
 #  - bsmu.vision.plugins.readers.nifti.NiftiFileReaderPlugin
 
   - bsmu.vision.plugins.postread.image_to_layered.ImageToLayeredImagePostReadConverterPlugin

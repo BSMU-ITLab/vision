@@ -176,13 +176,19 @@ class RasterLayerGraphicsItem(QGraphicsItem):
         """Replace the displayed image and update the scene geometry."""
         self._qimage = qimage
         self._spatial_spacing = spatial_spacing
+        self._update_image_rect()
 
-        self._image_rect = QRectF(
-            0.0, 0.0,  # TODO: use origin here
-            float(qimage.width() * spatial_spacing[1]),
-            float(qimage.height() * spatial_spacing[0]),
-        )
+    def _update_image_rect(self) -> None:
+        """Recalculate the scene geometry rect from current image, spacing and origin."""
         self.prepareGeometryChange()
+        if self._qimage is None:
+            self._image_rect = QRectF()
+        else:
+            self._image_rect = QRectF(
+                0.0, 0.0,  # TODO: use origin here
+                float(self._qimage.width() * self._spatial_spacing[1]),
+                float(self._qimage.height() * self._spatial_spacing[0]),
+            )
 
     def boundingRect(self) -> QRectF:
         return self._image_rect
@@ -195,6 +201,11 @@ class RasterLayerGraphicsItem(QGraphicsItem):
         # We draw the full image mapped to the scene coordinate rect;
         # the renderer only processes the visible viewport area.
         painter.drawImage(self._image_rect, self._qimage)
+
+    def update_spacing(self, spatial_spacing: np.ndarray) -> None:
+        """Update the scene geometry without recreating the image."""
+        self._spatial_spacing = spatial_spacing
+        self._update_image_rect()
 
     def update_region(self, bbox: BBox) -> None:
         """Invalidate only the modified region on the scene."""
@@ -252,6 +263,7 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
         if self.layer is not None:
             self.layer.data_changed.disconnect(self._on_layer_data_changed)
             self.layer.image_shape_changed.disconnect(self.image_shape_changed)
+            self.layer.raster_spatial_changed.disconnect(self._on_raster_spatial_changed)
             self.layer.image_pixels_modified.disconnect(self._on_raster_pixels_modified)
 
     def _model_changed(self) -> None:
@@ -260,6 +272,7 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
         if self.layer is not None:
             self.layer.data_changed.connect(self._on_layer_data_changed)
             self.layer.image_shape_changed.connect(self.image_shape_changed)
+            self.layer.raster_spatial_changed.connect(self._on_raster_spatial_changed)
             self.layer.image_pixels_modified.connect(self._on_raster_pixels_modified)
 
     @property
@@ -296,7 +309,7 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
             self.graphics_item.replace_qimage(QImage(), np.ones(2))
         else:
             qimage = self._create_display_qimage()
-            self.graphics_item.replace_qimage(qimage, self.display_slice.spatial.spacing)
+            self.graphics_item.replace_qimage(qimage, self.display_slice.spacing)
 
         if old_scene_bounding_rect != self.graphics_item.sceneBoundingRect():
             self.scene_bounding_rect_changed.emit()
@@ -333,6 +346,12 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
     def _on_layer_data_changed(self, data: Raster | None) -> None:
         self.image_changed.emit(data)
         self._on_raster_pixels_modified()
+
+    def _on_raster_spatial_changed(self) -> None:
+        """Update scene geometry when spatial attributes change (no pixel rebuild needed)."""
+        if self.graphics_item is not None and self.display_slice is not None:
+            self.graphics_item.update_spacing(self.display_slice.spacing)
+            self.scene_bounding_rect_changed.emit()
 
     def _on_raster_pixels_modified(self, bbox: BBox | None = None) -> None:
         """React to pixel changes in the backing raster.

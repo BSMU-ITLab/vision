@@ -37,11 +37,34 @@ TILED_MASK_DOWNSAMPLE = 8.0
 
 
 class SpatialAttrs:
-    def __init__(self, origin, spacing, direction) -> None:
-        # https://discourse.itk.org/t/images-in-physical-space-in-python/2124/17
-        self.origin = origin
-        self.spacing = spacing
-        self.direction = direction
+    """Spatial attributes of a raster in physical space.
+
+    Attributes are read-only after construction.
+    To modify spacing, use ``Raster.spacing`` property (emits ``spatial_changed`` signal).
+
+    See: https://discourse.itk.org/t/images-in-physical-space-in-python/2124/17
+    """
+
+    def __init__(self, origin: np.ndarray, spacing: np.ndarray, direction: np.ndarray) -> None:
+        self._origin = origin
+        self._spacing = spacing
+        self._direction = direction
+
+    @property
+    def origin(self) -> np.ndarray:
+        return self._origin
+
+    @property
+    def spacing(self) -> np.ndarray:
+        return self._spacing
+
+    @property
+    def direction(self) -> np.ndarray:
+        return self._direction
+
+    def _set_spacing(self, value: np.ndarray) -> None:
+        """Internal: update spacing value. Use ``Raster.spacing`` property instead."""
+        self._spacing = value
 
     @classmethod
     def default_for_ndim(cls, ndim: int) -> SpatialAttrs:
@@ -54,8 +77,9 @@ class SpatialAttrs:
 class Raster(Data):
     n_dims = 2  # Number of dimensions excluding channel dimension (2 for FlatImage, 3 for VolumeImage)
 
-    pixels_modified = Signal(BBox)
     shape_changed = Signal(object, object)  # old_shape: tuple[int] | None, new_shape: tuple[int] | None
+    spatial_changed = Signal()
+    pixels_modified = Signal(BBox)
 
     def __init__(
             self,
@@ -153,6 +177,17 @@ class Raster(Data):
         """Bounding box covering the entire raster."""
         h, w = self.shape[:self.n_dims]
         return BBox(0, w, 0, h)
+
+    @property
+    def spacing(self) -> np.ndarray:
+        return self.spatial.spacing
+
+    @spacing.setter
+    def spacing(self, value: np.ndarray) -> None:
+        if not np.array_equal(self.spatial.spacing, value):
+            # noinspection PyProtectedMember
+            self.spatial._set_spacing(value)
+            self.spatial_changed.emit()
 
     def slice_2d(self, slice_number: int | None = None) -> Raster:
         """Return 2D slice. For 2D rasters returns self; for tiled raises (use read_region)."""
@@ -391,7 +426,7 @@ class Raster(Data):
 
         # Derive spacing from actual dimensions so the physical extent matches the reference
         spacing_ratios = reference_spatial_shape / actual_shape
-        self.spatial.spacing = reference.spatial.spacing * spacing_ratios
+        self.spacing = reference.spacing * spacing_ratios
         return True
 
     def close(self) -> None:

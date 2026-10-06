@@ -173,6 +173,7 @@ class Layer(QObject, Generic[DataT]):
 
 class RasterLayer(Layer[Raster]):
     image_shape_changed = Signal(object, object)  # TODO: rename into raster_shape_changed
+    raster_spatial_changed = Signal()
     image_pixels_modified = Signal(BBox)  # TODO: rename into raster_pixels_modified
 
     def __init__(
@@ -233,14 +234,16 @@ class RasterLayer(Layer[Raster]):
 
     def _data_about_to_change(self, new_data: Raster | None):
         if self.data is not None:
-            self.data.pixels_modified.disconnect(self.image_pixels_modified)
             self.data.shape_changed.disconnect(self.image_shape_changed)
+            self.data.spatial_changed.disconnect(self.raster_spatial_changed)
+            self.data.pixels_modified.disconnect(self.image_pixels_modified)
 
     def _data_changed(self):
         if self.data is not None:
             self._palette = self.data.palette
-            self.data.pixels_modified.connect(self.image_pixels_modified)
             self.data.shape_changed.connect(self.image_shape_changed)
+            self.data.spatial_changed.connect(self.raster_spatial_changed)
+            self.data.pixels_modified.connect(self.image_pixels_modified)
 
     @property
     def is_indexed(self) -> bool:

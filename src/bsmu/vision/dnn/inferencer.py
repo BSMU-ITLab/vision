@@ -175,6 +175,11 @@ class Inferencer(QObject):
     def model_config(self) -> ModelConfig:
         return self._model_config
 
+    def warmup(self) -> None:
+        """Create session synchronously (idempotent).
+        Useful for benchmarking to exclude first-call overhead."""
+        self._create_inference_session()
+
     def _preload_model(self):
         QThreadPool.globalInstance().start(self._create_inference_session_with_delay)
 

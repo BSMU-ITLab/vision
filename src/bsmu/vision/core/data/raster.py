@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import warnings
 from enum import Enum
@@ -23,6 +24,9 @@ if TYPE_CHECKING:
     from bsmu.vision.core.data.level_selector import LevelSelector
     from bsmu.vision.core.data.tiled_backend import TiledBackend
     from bsmu.vision.core.palette import Palette
+
+
+logger = logging.getLogger(__name__)
 
 
 MASK_TYPE = np.uint8
@@ -98,6 +102,12 @@ class Raster(Data):
         ), 'Indexed images (with palette) have to be of np.uint8 type'
 
         self.array = array
+        if array is not None and not array.flags.c_contiguous:
+            logger.debug(
+                f'Raster created with non-C-contiguous array (shape={array.shape}, strides={array.strides}). '
+                'This may cause performance degradation in some operations.'
+            )
+
         self._palette = palette
         self.spatial = spatial or SpatialAttrs.default_for_ndim(self.n_dims)
         self._backend = backend

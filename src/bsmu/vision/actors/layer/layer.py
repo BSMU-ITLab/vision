@@ -333,7 +333,17 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
                 else QImage.Format.Format_RGBA64_Premultiplied
             )
 
-        if not self._displayed_pixels.flags['C_CONTIGUOUS']:
+        if not self._displayed_pixels.flags.c_contiguous:
+            if self.display_slice.is_indexed:
+                # QImage(Format_Indexed8) shares memory with the numpy array.
+                # A non-contiguous array would be silently copied by ascontiguousarray,
+                # breaking memory sharing: in-place pixel edits become invisible to QImage.
+                raise RuntimeError(
+                    f'Indexed raster pixels must be C-contiguous for QImage memory sharing. '
+                    f'Shape: {self._displayed_pixels.shape}, strides: {self._displayed_pixels.strides}. '
+                    f'Ensure the source array is contiguous before creating a Raster.'
+                )
+            # For RGBA etc. a copy is safe: QImage does not share memory anyway.
             self._displayed_pixels = np.ascontiguousarray(self._displayed_pixels)
 
         display_qimage = image_converter.numpy_array_to_qimage(self._displayed_pixels, display_qimage_format)

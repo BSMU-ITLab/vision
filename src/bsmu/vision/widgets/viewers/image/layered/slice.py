@@ -55,7 +55,7 @@ class VolumeSliceImageLayerView(ImageLayerView):
 
             # slice_pixels = np.ascontiguousarray(slice_pixels, dtype=np.uint8)
             # print('min, max', slice_pixels.min(), slice_pixels.max(), slice_pixels.dtype)
-            # assert slice_pixels.flags['C_CONTIGUOUS'], 'array of center slice pixels is not CONTIGUOUS'
+            # assert slice_pixels.flags.c_contiguous, 'array of center slice pixels is not CONTIGUOUS'
 
             slice_origin = np.delete(self.image.spatial.origin, self.plane_axis)
             slice_spacing = np.delete(self.image.spatial.spacing, self.plane_axis)

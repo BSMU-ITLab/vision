@@ -29,7 +29,7 @@ def numpy_array_to_qimage(
     Do not delete `numpy_array` or it's data, because QImage uses it without copying,
     and QImage will crash if it's data buffer will be deleted
     """
-    assert numpy_array.flags['C_CONTIGUOUS'], 'Numpy array have to be C-contiguous'
+    assert numpy_array.flags.c_contiguous, 'Numpy array have to be C-contiguous'
     height, width, *channel_count = numpy_array.shape
     # If shape has no channels use 1 as channel count
     channel_count = (channel_count and channel_count[0]) or 1

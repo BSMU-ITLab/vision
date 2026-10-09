@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from bsmu.vision.actors.shape import VectorShapeActor
     from bsmu.vision.core.bbox import BBox
     from bsmu.vision.core.data import Data
+    from bsmu.vision.core.data.vector import Vector
     from bsmu.vision.core.data.vector.shapes import VectorShape
     from bsmu.vision.core.palette import Palette
 
@@ -146,10 +147,12 @@ class LayerActor(GraphicsActor[LayerT, ItemT], Generic[LayerT, ItemT]):
         if self._opacity_override is None:
             self._update_opacity()
 
-    def _model_about_to_change(self, new_model: RasterLayer | None) -> None:
+    def _model_about_to_change(self, new_model: LayerT | None) -> None:
         if self.layer is not None:
             self.layer.visible_changed.disconnect(self._on_layer_visible_changed)
             self.layer.opacity_changed.disconnect(self._on_layer_opacity_changed)
+            self.layer.data_about_to_change.disconnect(self._on_layer_data_about_to_change)
+            self.layer.data_changed.disconnect(self._on_layer_data_changed)
 
         super()._model_about_to_change(new_model)
 
@@ -159,8 +162,16 @@ class LayerActor(GraphicsActor[LayerT, ItemT], Generic[LayerT, ItemT]):
         if self.layer is not None:
             self.layer.visible_changed.connect(self._on_layer_visible_changed)
             self.layer.opacity_changed.connect(self._on_layer_opacity_changed)
+            self.layer.data_about_to_change.connect(self._on_layer_data_about_to_change)
+            self.layer.data_changed.connect(self._on_layer_data_changed)
             self._apply_visible_to_graphics_item()
             self._apply_opacity_to_graphics_item()
+
+    def _on_layer_data_about_to_change(self, _old_data: Data | None, _new_data: Data | None) -> None:
+        pass  # Override in subclasses.
+
+    def _on_layer_data_changed(self, _data: Data | None) -> None:
+        pass  # Override in subclasses.
 
 
 class RasterLayerGraphicsItem(QGraphicsItem):
@@ -258,19 +269,17 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
         return self.layer.raster_pixels
 
     def _model_about_to_change(self, new_model: RasterLayer | None) -> None:
-        super()._model_about_to_change(new_model)
-
         if self.layer is not None:
-            self.layer.data_changed.disconnect(self._on_layer_data_changed)
             self.layer.image_shape_changed.disconnect(self.image_shape_changed)
             self.layer.raster_spatial_changed.disconnect(self._on_raster_spatial_changed)
             self.layer.image_pixels_modified.disconnect(self._on_raster_pixels_modified)
+
+        super()._model_about_to_change(new_model)
 
     def _model_changed(self) -> None:
         super()._model_changed()
 
         if self.layer is not None:
-            self.layer.data_changed.connect(self._on_layer_data_changed)
             self.layer.image_shape_changed.connect(self.image_shape_changed)
             self.layer.raster_spatial_changed.connect(self._on_raster_spatial_changed)
             self.layer.image_pixels_modified.connect(self._on_raster_pixels_modified)
@@ -462,11 +471,10 @@ class VectorLayerActor(LayerActor[VectorLayer, GraphicsContainerItem]):
 
     def _model_about_to_change(self, new_model: VectorLayer | None) -> None:
         if self.layer is not None:
-            for shape in self.shapes:
-                self._on_shape_about_to_remove(shape)
-
             self.layer.shape_added.disconnect(self._on_shape_added)
             self.layer.shape_about_to_remove.disconnect(self._on_shape_about_to_remove)
+
+            self._remove_all_shape_actors()
 
         super()._model_about_to_change(new_model)
 
@@ -477,8 +485,13 @@ class VectorLayerActor(LayerActor[VectorLayer, GraphicsContainerItem]):
             self.layer.shape_added.connect(self._on_shape_added)
             self.layer.shape_about_to_remove.connect(self._on_shape_about_to_remove)
 
-            for shape in self.shapes:
-                self._on_shape_added(shape)
+            self._create_all_shape_actors()
+
+    def _on_layer_data_about_to_change(self, _old_data: Vector | None, _new_data: Vector | None) -> None:
+        self._remove_all_shape_actors()
+
+    def _on_layer_data_changed(self, _data: Vector | None) -> None:
+        self._create_all_shape_actors()
 
     def _on_shape_added(self, shape: VectorShape) -> None:
         if shape in self._shape_to_actor:
@@ -501,3 +514,11 @@ class VectorLayerActor(LayerActor[VectorLayer, GraphicsContainerItem]):
             # TODO: or maybe the LayeredDataViewer have to add_actor/remove_actor when some signal was emitted?
 
             actor.deleteLater()
+
+    def _remove_all_shape_actors(self) -> None:
+        for shape in self.shapes:
+            self._on_shape_about_to_remove(shape)
+
+    def _create_all_shape_actors(self) -> None:
+        for shape in self.shapes:
+            self._on_shape_added(shape)

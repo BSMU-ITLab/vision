@@ -97,3 +97,8 @@ class Vector(Data):
 
     def _adopt_shape(self, shape: VectorShape) -> None:
         shape.setParent(self)
+
+    def clear(self) -> None:
+        """Remove all shapes, emitting removal signals for each."""
+        while self._shapes:
+            self.pop_shape()

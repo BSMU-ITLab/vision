@@ -165,7 +165,11 @@ class LayeredDataViewerTool(GraphicsViewerTool[LayeredDataViewer]):
         if self._tool_mask_manager is not None:
             self._tool_mask_manager.activate()
 
+        self.viewer.data_about_to_change.connect(self._on_viewer_data_about_to_change)
+
     def deactivate(self) -> None:
+        self.viewer.data_about_to_change.disconnect(self._on_viewer_data_about_to_change)
+
         if self._tool_mask_manager is not None:
             self._tool_mask_manager.deactivate()
         if self._mask_manager is not None:
@@ -176,6 +180,13 @@ class LayeredDataViewerTool(GraphicsViewerTool[LayeredDataViewer]):
         super().deactivate()
 
         self.viewer.enable_panning()
+
+    def _on_viewer_data_about_to_change(self, _old_data, _new_data) -> None:
+        self.cancel_active_operations()
+
+    def cancel_active_operations(self) -> None:
+        """Cancel any in-progress operations (e.g., drawing, selection)."""
+        pass  # Override in subclasses.
 
     def map_viewport_to_pixel_coords(self, viewport_pos: QPoint | QPointF, layer: RasterLayer) -> np.ndarray:
         if isinstance(viewport_pos, QPointF):

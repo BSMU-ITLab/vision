@@ -7,6 +7,7 @@ from PySide6.QtCore import QObject, Signal
 from bsmu.vision.core.data.vector.shapes import NodeBasedShape
 
 if TYPE_CHECKING:
+    from bsmu.vision.core.data.vector import Vector
     from bsmu.vision.core.data.vector.shapes import VectorShape, VectorNode
     from bsmu.vision.core.layers import VectorLayer
 
@@ -85,6 +86,7 @@ class SelectionManager(QObject):
 
     def observe_layer(self, layer: VectorLayer) -> None:
         """Start monitoring layer for shape and node removals."""
+        layer.data_about_to_change.connect(self._on_layer_data_about_to_change)
         layer.shape_removed.connect(self._on_layer_shape_removed)
         layer.shape_added.connect(self._on_layer_shape_added)
 
@@ -93,10 +95,11 @@ class SelectionManager(QObject):
 
     def unobserve_layer(self, layer: VectorLayer) -> None:
         """Stop monitoring layer and clean up subscriptions."""
+        layer.data_about_to_change.disconnect(self._on_layer_data_about_to_change)
         layer.shape_removed.disconnect(self._on_layer_shape_removed)
         layer.shape_added.disconnect(self._on_layer_shape_added)
 
-        for shape in list(self._monitored_shapes):
+        for shape in layer.shapes:
             self._unobserve_shape(shape)
 
     def _observe_shape(self, shape: VectorShape) -> None:
@@ -110,11 +113,9 @@ class SelectionManager(QObject):
             shape.node_removed.disconnect(self._on_shape_node_removed)
             self._monitored_shapes.remove(shape)
 
-    def _on_layer_shape_added(self, shape: VectorShape, index: int) -> None:
-        self._observe_shape(shape)
-
-    def _on_layer_shape_removed(self, shape: VectorShape, index: int) -> None:
-        """Deselect removed shape/nodes and stop monitoring."""
+    def _deselect_shape_and_nodes(self, shape: VectorShape) -> bool:
+        """Deselect shape and its nodes, stop monitoring.
+        Returns True if selection changed."""
         changed = False
 
         if shape in self._selected_shapes:
@@ -129,8 +130,27 @@ class SelectionManager(QObject):
             changed = True
 
         self._unobserve_shape(shape)
+        return changed
+
+    def _on_layer_data_about_to_change(self, old_data: Vector | None, _new_data: Vector | None) -> None:
+        """Deselect and stop monitoring shapes when the layer's Vector data is replaced."""
+        if old_data is None:
+            return
+
+        changed = False
+        for shape in old_data.shapes:
+            if self._deselect_shape_and_nodes(shape):
+                changed = True
 
         if changed:
+            self.selection_changed.emit()
+
+    def _on_layer_shape_added(self, shape: VectorShape, index: int) -> None:
+        self._observe_shape(shape)
+
+    def _on_layer_shape_removed(self, shape: VectorShape, index: int) -> None:
+        """Deselect removed shape/nodes and stop monitoring."""
+        if self._deselect_shape_and_nodes(shape):
             self.selection_changed.emit()
 
     def _on_shape_node_removed(self, node: VectorNode, index: int) -> None:

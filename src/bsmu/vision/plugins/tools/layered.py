@@ -104,7 +104,8 @@ class LayeredDataViewerTool(GraphicsViewerTool[LayeredDataViewer]):
             MaskManager(viewer, settings, self._image_resolver, parent=self) if self._uses_mask else None
         )
         self._tool_mask_manager: ToolMaskManager | None = (
-            ToolMaskManager(viewer, settings, self._image_resolver, parent=self) if self._uses_tool_mask else None
+            ToolMaskManager(viewer, settings, self._image_resolver, self._mask_manager, parent=self)
+            if self._uses_tool_mask else None
         )
 
         self._vector_layer: VectorLayer | None = None
@@ -289,6 +290,19 @@ class MaskManagerBase(QObject):
     def image(self) -> Raster | None:
         return self._image_resolver.image
 
+    @property
+    def _mask_source(self) -> Raster | None:
+        """Raster to derive mask geometry from (default: the image layer)."""
+        return self.image_layer.data if self.image_layer is not None else None
+
+    @property
+    def _mask_source_downsample(self) -> float:
+        """Downsample factor applied to `_mask_source` when creating a mask."""
+        source = self._mask_source
+        if source is None:
+            return 1.0
+        return TILED_MASK_DOWNSAMPLE if source.is_tiled else 1.0
+
     def activate(self) -> None:
         """Connect to model signals, set up mask layer.
         ImageLayerResolver must be activated before this."""
@@ -334,24 +348,16 @@ class MaskManagerBase(QObject):
         layer_name = layer_props[LAYER_NAME_PROPERTY_KEY]
         layer = self._viewer.layer_by_name(layer_name)
         if layer is None:
-            layer_image = self.image_layer.data.zeros_mask(
-                palette=palette, mask_downsample=self._mask_downsample)
+            layer_image = self._mask_source.zeros_mask(
+                palette=palette, mask_downsample=self._mask_source_downsample)
             layer = self._viewer.add_layer_from_image(layer_image, layer_name)
             layer.opacity = layer_props.get('opacity', Layer.DEFAULT_OPACITY)
         return layer
 
     def _update_mask(self) -> None:
         if self._mask_layer.data is None:
-            self._mask_layer.data = self.image_layer.data.zeros_mask(
-                palette=self._mask_layer.palette, mask_downsample=self._mask_downsample)
-
-    @property
-    def _mask_downsample(self) -> float:
-        """Mask downsample factor: reduced for tiled images, full-size for regular."""
-        image_layer = self.image_layer
-        if image_layer is None or image_layer.data is None:
-            return 1.0
-        return TILED_MASK_DOWNSAMPLE if image_layer.data.is_tiled else 1.0
+            self._mask_layer.data = self._mask_source.zeros_mask(
+                palette=self._mask_layer.palette, mask_downsample=self._mask_source_downsample)
 
 
 class MaskManager(MaskManagerBase):
@@ -377,6 +383,40 @@ class MaskManager(MaskManagerBase):
 
 class ToolMaskManager(MaskManagerBase):
     """Temporary tool mask (e.g., brush preview). Removed on deactivation."""
+
+    def __init__(
+            self,
+            viewer: LayeredDataViewer,
+            settings: LayeredDataViewerToolSettings,
+            image_resolver: ImageLayerResolver,
+            mask_manager: MaskManager | None = None,
+            parent: QObject | None = None,
+    ) -> None:
+        super().__init__(viewer, settings, image_resolver, parent)
+        self._mask_manager = mask_manager
+
+    @property
+    def _main_mask_data(self) -> Raster | None:
+        """Data of the main mask layer, or None if unavailable."""
+        mask_layer = self._mask_manager.mask_layer if self._mask_manager is not None else None
+        if mask_layer is not None and mask_layer.data is not None:
+            return mask_layer.data
+        return None
+
+    @property
+    def _mask_source(self) -> Raster | None:
+        """Geometry source for the tool mask: the main mask if available, else the image."""
+        main_mask = self._main_mask_data
+        if main_mask is not None:
+            return main_mask
+        return super()._mask_source
+
+    @property
+    def _mask_source_downsample(self) -> float:
+        """No extra downsampling when the source is the main mask (already downsampled)."""
+        if self._main_mask_data is not None:
+            return 1.0
+        return super()._mask_source_downsample
 
     def _configure_mask_layer(self) -> RasterLayer:
         return self._create_layer_with_zeros_mask('tool_mask', self._settings.tool_mask_palette)

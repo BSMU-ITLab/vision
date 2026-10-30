@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import skimage.io
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from bsmu.vision.core.io.file import FileWriter
+from bsmu.vision.io.raster.common import CommonRasterFileWriter
 from bsmu.vision.plugins.windows.main import FileMenu
 from bsmu.vision.plugins.writers.file import FileWriterPlugin
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
@@ -30,7 +28,7 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
             main_window_plugin: MainWindowPlugin,
             mdi_plugin: MdiPlugin,
     ):
-        super().__init__(CommonImageFileWriter)
+        super().__init__(CommonRasterFileWriter)
 
         self._main_window_plugin = main_window_plugin
         self._main_window: MainWindow | None = None
@@ -120,14 +118,3 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
                 'Save Error',
                 f'Cannot save the image.\n{e}')
             return False
-
-
-class CommonImageFileWriter(FileWriter):
-    _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tif', 'tiff')
-
-    def _write_to_file(self, data: Image, path: Path, **kwargs):
-        # TODO: move the logging into base class
-        logging.info(f'Write Common Image: {path}')
-
-        # TODO: use OpenCV to save the image (compare performance and size of the resulting files)
-        skimage.io.imsave(str(path), data.pixels, check_contrast=False)

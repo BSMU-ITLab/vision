@@ -1,1 +1,1 @@
-from .image import ImageFileReader, ImageFileReaderPlugin
+from .image import ImageFileReaderPlugin

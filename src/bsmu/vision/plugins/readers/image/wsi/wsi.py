@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 
 from bsmu.vision.core.data.raster import Raster
 from bsmu.vision.core.image import FlatImage
-from bsmu.vision.plugins.readers.image import ImageFileReader, ImageFileReaderPlugin
+from bsmu.vision.core.io.raster import RasterFileReader
+from bsmu.vision.plugins.readers.image import ImageFileReaderPlugin
 from bsmu.vision.plugins.readers.image.wsi.slideio_backend import SlideIoBackend
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ class WholeSlideImageFileReaderPlugin(ImageFileReaderPlugin):
         super().__init__(WholeSlideImageFileReader)
 
 
-class WholeSlideImageFileReader(ImageFileReader):
+class WholeSlideImageFileReader(RasterFileReader):
     _FORMATS = ('svs', 'afi', 'scn', 'czi', 'zvi', 'ndpi', 'tiff', 'tif')
 
     def __init__(self):

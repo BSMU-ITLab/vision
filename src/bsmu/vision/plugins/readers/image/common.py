@@ -7,7 +7,8 @@ import cv2 as cv
 import numpy as np
 
 from bsmu.vision.core.image import FlatImage
-from bsmu.vision.plugins.readers.image import ImageFileReaderPlugin, ImageFileReader
+from bsmu.vision.core.io.raster import RasterFileReader
+from bsmu.vision.plugins.readers.image import ImageFileReaderPlugin
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -18,7 +19,7 @@ class CommonImageFileReaderPlugin(ImageFileReaderPlugin):
         super().__init__(CommonImageFileReader)
 
 
-class CommonImageFileReader(ImageFileReader):
+class CommonImageFileReader(RasterFileReader):
     _FORMATS = ('png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif')
 
     def _read_file(self, path: Path, palette=None, as_gray=False, **kwargs):

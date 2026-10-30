@@ -1,19 +1,13 @@
 from __future__ import annotations
 
-import abc
-from typing import Type
+from typing import TYPE_CHECKING, Type
 
-from bsmu.vision.plugins.readers.file import FileReaderPlugin, FileReader
+from bsmu.vision.plugins.readers.file import FileReaderPlugin
+
+if TYPE_CHECKING:
+    from bsmu.vision.core.io.raster import RasterFileReader
 
 
 class ImageFileReaderPlugin(FileReaderPlugin):
-    def __init__(self, file_reader_cls: Type[FileReader]):
+    def __init__(self, file_reader_cls: Type[RasterFileReader]):
         super().__init__(file_reader_cls)
-
-
-class ImageFileReader(FileReader):
-    @abc.abstractmethod  # Method was added to fix current PySide bug, when inspect.isabstract returns False
-    # for classes without explicit abstract methods
-    # https://bugreports.qt.io/browse/PYSIDE-1767
-    def _read_file(self, path: Path, **kwargs) -> Data:
-        pass

@@ -8,8 +8,9 @@ import skimage.io
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
+from bsmu.vision.core.io.file import FileWriter
 from bsmu.vision.plugins.windows.main import FileMenu
-from bsmu.vision.plugins.writers.file import FileWriterPlugin, FileWriter
+from bsmu.vision.plugins.writers.file import FileWriterPlugin
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
 
 if TYPE_CHECKING:

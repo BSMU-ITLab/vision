@@ -14,23 +14,28 @@ from bsmu.vision.core.data import Data
 if TYPE_CHECKING:
     from bsmu.vision.core.task import Task
 
+from typing import Iterator
+
+
+def iter_file_suffixes(path: Path) -> Iterator[str]:
+    """Yield all suffixes after dots, from longest to shortest.
+
+    Example: ``image.nii.gz`` yields ``image.nii.gz``, ``nii.gz``, ``gz``.
+    """
+    name = path.name.lower()
+    while True:
+        yield name
+
+        dot_index = name.find('.')
+        if dot_index == -1:
+            break
+
+        name = name[dot_index + 1:]  # dot_index + 1 to remove dot
+
 
 def _matches_file_format(path: Path, formats: tuple[str, ...]) -> bool:
-    """Return True if `path` matches one of `formats`.
-
-    Checks compound extensions from the longest suffix:
-    e.g. `image.nii.gz` -> `image.nii.gz`, `nii.gz`, `gz`.
-    """
-    file_extension = path.name.lower()
-    while True:
-        if file_extension in formats:
-            return True
-
-        dot_index = file_extension.find('.')
-        if dot_index == -1:
-            return False
-
-        file_extension = file_extension[dot_index + 1:]  # dot_index + 1 to remove dot
+    """Return True if `path` matches one of `formats`."""
+    return any(suffix in formats for suffix in iter_file_suffixes(path))
 
 
 class FileReaderMeta(type(QObject), abc.ABCMeta):

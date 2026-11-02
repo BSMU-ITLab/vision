@@ -48,6 +48,15 @@ class DataVisualizer(QObject, metaclass=DataVisualizerMeta):
     def settings(self) -> Settings:
         return self._settings
 
+    @classmethod
+    def can_handle(cls, data: Data) -> bool:
+        """Return True if this visualizer can visualize the given data instance.
+
+        Default: accept any instance of the registered data types.
+        Override for runtime-aware dispatch (e.g., based on instance property).
+        """
+        return isinstance(data, cls.data_types)
+
     def visualize_data(self, data: Data) -> list[DataViewerSubWindow]:
         data_viewer_sub_windows = self._visualize_data(data)
         self.data_visualized.emit(data_viewer_sub_windows)

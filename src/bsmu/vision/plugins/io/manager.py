@@ -7,22 +7,22 @@ from PySide6.QtCore import QObject, Signal
 
 from bsmu.vision.core.concurrent import ThreadPool
 from bsmu.vision.core.data import Data
+from bsmu.vision.core.io.file import iter_file_suffixes
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.core.task import FnTask
 
 if TYPE_CHECKING:
-    from typing import Type
     from pathlib import Path
 
     from bsmu.vision.core.task import Task
-    from bsmu.vision.plugins.readers.file import FileReader
-    from bsmu.vision.plugins.readers.registry import FileReaderRegistryPlugin
+    from bsmu.vision.core.io.file import FileReader
+    from bsmu.vision.plugins.io.registry import FileReaderRegistryPlugin
     from bsmu.vision.plugins.storages.task import TaskStorage, TaskStoragePlugin
 
 
 class FileReadingManagerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
-        'file_reader_registry_plugin': 'bsmu.vision.plugins.readers.registry.FileReaderRegistryPlugin',
+        'file_reader_registry_plugin': 'bsmu.vision.plugins.io.registry.FileReaderRegistryPlugin',
         'task_storage_plugin': 'bsmu.vision.plugins.storages.task.TaskStoragePlugin',
     }
 
@@ -87,20 +87,11 @@ class FileReadingManager(QObject):
         ThreadPool.run_async_task_with_args(file_reading_task, path, **kwargs)
         return file_reading_task
 
-    def _reader_cls(self, path: Path) -> Type[FileReader] | None:
-        """Return FileReader for a file with this path.
-        Start to check file format from the biggest part after first dot,
-        e.g. for NiftiFile.nii.gz
-        at first check 'nii.gz', then check 'gz'
-        """
-        file_format = path.name.lower()
-        while True:
-            reader_cls = self.file_reader_registry.processor_cls(file_format)
+    def _reader_cls(self, path: Path) -> type[FileReader] | None:
+        """Return FileReader for a file with this path."""
+        for suffix in iter_file_suffixes(path):
+            reader_cls = self.file_reader_registry.processor_cls(suffix)
             if reader_cls is not None:
                 return reader_cls
 
-            dot_index = file_format.find('.')
-            if dot_index == -1:
-                return None
-
-            file_format = file_format[dot_index + 1:]  # dot_index + 1 to remove dot
+        return None

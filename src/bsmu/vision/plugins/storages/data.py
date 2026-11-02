@@ -8,12 +8,12 @@ from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins import Plugin
 
 if TYPE_CHECKING:
-    from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
+    from bsmu.vision.plugins.io.manager import FileReadingManagerPlugin, FileReadingManager
 
 
 class DataStoragePlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
-        'file_reading_manager_plugin': 'bsmu.vision.plugins.readers.manager.FileReadingManagerPlugin',
+        'file_reading_manager_plugin': 'bsmu.vision.plugins.io.manager.FileReadingManagerPlugin',
     }
 
     def __init__(self, file_reading_manager_plugin: FileReadingManagerPlugin):

@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject
 
 from bsmu.vision.core.config import Config, NamesOrAll
 from bsmu.vision.core.plugins import Plugin
-from bsmu.vision.plugins.writers.image.common import CommonImageFileWriter
+from bsmu.vision.io.raster.common import CommonRasterFileWriter
 
 if TYPE_CHECKING:
     from bsmu.vision.core.image.layered import ImageLayer
@@ -63,7 +63,7 @@ class MaskAutoSaveOnWalk(QObject):
         super().__init__()
 
         self._config = config
-        self._writer = CommonImageFileWriter()
+        self._writer = CommonRasterFileWriter()
 
     def save_masks(self, image_viewer: LayeredImageViewer):
         if self._config.layers.is_all:

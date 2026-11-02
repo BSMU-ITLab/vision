@@ -4,8 +4,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from bsmu.vision.core.constants import PlaneAxis
+from bsmu.vision.core.data.layered import LayeredData
 from bsmu.vision.core.image import VolumeImage
-from bsmu.vision.core.image.layered import LayeredImage
 from bsmu.vision.core.selection import SelectionManager
 from bsmu.vision.plugins.visualizers import DataVisualizerPlugin, DataVisualizer
 from bsmu.vision.widgets.mdi.windows.image.layered import VolumeSliceImageViewerSubWindow, LayeredImageViewerSubWindow
@@ -16,20 +16,20 @@ if TYPE_CHECKING:
     from bsmu.vision.plugins.viewers.image.settings import ImageViewerSettingsPlugin
 
 
-class LayeredImageVisualizerPlugin(DataVisualizerPlugin):
+class LayeredDataVisualizerPlugin(DataVisualizerPlugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'image_viewer_settings_plugin': 'bsmu.vision.plugins.viewers.image.settings.ImageViewerSettingsPlugin',
     }
 
     def __init__(self, image_viewer_settings_plugin: ImageViewerSettingsPlugin):
-        super().__init__(LayeredImageVisualizer, image_viewer_settings_plugin)
+        super().__init__(LayeredDataVisualizer, image_viewer_settings_plugin)
 
 
-class LayeredImageVisualizer(DataVisualizer):
-    _DATA_TYPES = (LayeredImage, )
+class LayeredDataVisualizer(DataVisualizer):
+    _DATA_TYPES = (LayeredData, )
 
-    def _visualize_data(self, data: LayeredImage):
-        logging.info('Visualize layered image')
+    def _visualize_data(self, data: LayeredData):
+        logging.info('Visualize layered data')
 
         selection_manager = SelectionManager()
         viewer_sub_windows = []

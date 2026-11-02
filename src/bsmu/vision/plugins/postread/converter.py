@@ -31,6 +31,15 @@ class PostReadConverter(QObject, metaclass=PostReadConverterMeta):
     def __init__(self):
         super().__init__()
 
+    @classmethod
+    def can_handle(cls, data: Data) -> bool:
+        """Return True if this converter can convert the given data instance.
+
+        Default: accept any instance of the registered data types.
+        Override for runtime-aware dispatch (e.g., based instance property).
+        """
+        return isinstance(data, cls.data_types)
+
     def convert_data(self, data: Data) -> Data:
         converted_data = self._convert_data(data)
         self.data_converted.emit(converted_data)

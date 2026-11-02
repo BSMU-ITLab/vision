@@ -6,18 +6,13 @@ from typing import TYPE_CHECKING
 import pydicom
 
 from bsmu.vision.core.image import VolumeImage
-from bsmu.vision.plugins.readers.file import FileReaderPlugin, FileReader
+from bsmu.vision.core.io.raster import RasterFileReader
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class MultiFrameDicomFileReaderPlugin(FileReaderPlugin):
-    def __init__(self):
-        super().__init__(MultiFrameDicomFileReader)
-
-
-class MultiFrameDicomFileReader(FileReader):
+class MultiFrameDicomRasterFileReader(RasterFileReader):
     _FORMATS = ('dcm',)
 
     def _read_file(self, path: Path, **kwargs) -> VolumeImage:

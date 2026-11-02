@@ -3,21 +3,21 @@ plugins:
   - bsmu.vision.plugins.layouts.mdi.MdiLayoutPlugin
 
   - bsmu.vision.plugins.file_dropper.FileDropperPlugin
-  - bsmu.vision.plugins.readers.image.common.CommonImageFileReaderPlugin
-  - bsmu.vision.plugins.readers.image.wsi.WholeSlideImageFileReaderPlugin
-#  - bsmu.vision.plugins.readers.nifti.NiftiFileReaderPlugin
+  - bsmu.vision.plugins.io.raster.common.CommonRasterFileReaderPlugin
+  - bsmu.vision.plugins.io.raster.wsi.WholeSlideRasterFileReaderPlugin
+#  - bsmu.vision.plugins.io.raster.nifti.NiftiRasterFileReaderPlugin
 
-  - bsmu.vision.plugins.postread.image_to_layered.ImageToLayeredImagePostReadConverterPlugin
+  - bsmu.vision.plugins.postread.raster_to_layered.RasterToLayeredDataPostReadConverterPlugin
 
-  - bsmu.vision.plugins.visualizers.image.flat.FlatImageVisualizerPlugin
-#  - bsmu.vision.plugins.visualizers.image.volume.VolumeImageVisualizerPlugin
-  - bsmu.vision.plugins.visualizers.image.layered.LayeredImageVisualizerPlugin
+  - bsmu.vision.plugins.visualizers.raster.flat.FlatRasterVisualizerPlugin
+#  - bsmu.vision.plugins.visualizers.raster.volume.VolumeRasterVisualizerPlugin
+  - bsmu.vision.plugins.visualizers.layered.LayeredDataVisualizerPlugin
 
   - bsmu.vision.plugins.overlayers.image.ImageViewerOverlayerPlugin
   - bsmu.vision.plugins.overlayers.path.ImageViewerPathOverlayerPlugin
 #  - bsmu.vision.plugins.overlayers.intersection.ImageViewerIntersectionOverlayerPlugin
 
-  - bsmu.vision.plugins.writers.image.common.CommonImageFileWriterPlugin
+  - bsmu.vision.plugins.io.raster.common.CommonRasterFileWriterPlugin
 
   - bsmu.vision.plugins.layers_view.LayersTableViewPlugin
   - bsmu.vision.plugins.task_storage_view.TaskStorageViewPlugin

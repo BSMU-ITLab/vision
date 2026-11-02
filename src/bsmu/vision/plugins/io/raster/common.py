@@ -6,18 +6,23 @@ from typing import TYPE_CHECKING
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from bsmu.vision.io.raster.common import CommonRasterFileWriter
+from bsmu.vision.io.raster.common import CommonRasterFileReader, CommonRasterFileWriter
+from bsmu.vision.plugins.io.raster import RasterFileReaderPlugin, RasterFileWriterPlugin
 from bsmu.vision.plugins.windows.main import FileMenu
-from bsmu.vision.plugins.writers.file import FileWriterPlugin
 from bsmu.vision.widgets.viewers.layered import LayeredDataViewerHolder
 
 if TYPE_CHECKING:
-    from bsmu.vision.core.image import Image
-    from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
-    from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
+    from bsmu.vision.core.data.raster import Raster
+    from bsmu.vision.plugins.doc_interfaces.mdi import Mdi, MdiPlugin
+    from bsmu.vision.plugins.windows.main import MainWindow, MainWindowPlugin
 
 
-class CommonImageFileWriterPlugin(FileWriterPlugin):
+class CommonRasterFileReaderPlugin(RasterFileReaderPlugin):
+    def __init__(self):
+        super().__init__(CommonRasterFileReader)
+
+
+class CommonRasterFileWriterPlugin(RasterFileWriterPlugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
@@ -51,7 +56,7 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
 
         self._mdi = self._mdi_plugin.mdi
 
-    def _active_window_image(self) -> tuple[Image | None, Path | None]:
+    def _active_window_image(self) -> tuple[Raster | None, Path | None]:
         """
         :return: path is the active layer path (to use as default save directory)
         """
@@ -92,7 +97,7 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
 
         self._select_path_and_save_image(image, active_layer_path)
 
-    def _select_path_and_save_image(self, image: Image, dialog_dir: Path = None):
+    def _select_path_and_save_image(self, image: Raster, dialog_dir: Path = None):
         if image.path is not None:
             dialog_dir = image.path
         elif self._last_saved_file_dir is not None:
@@ -108,7 +113,7 @@ class CommonImageFileWriterPlugin(FileWriterPlugin):
         if self._save_image(image, save_path):
             image.path = save_path
 
-    def _save_image(self, image: Image, path: Path) -> bool:
+    def _save_image(self, image: Raster, path: Path) -> bool:
         try:
             self._file_writer_cls().write_to_file(image, path)
             return True

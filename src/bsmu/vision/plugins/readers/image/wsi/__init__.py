@@ -1,1 +1,0 @@
-from .wsi import WholeSlideImageFileReaderPlugin

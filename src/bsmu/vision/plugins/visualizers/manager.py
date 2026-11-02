@@ -9,6 +9,7 @@ from bsmu.vision.core.data import Data
 from bsmu.vision.core.plugins import Plugin
 
 if TYPE_CHECKING:
+    from bsmu.vision.core.plugins.processor import ProcessorClsWithSettings
     from bsmu.vision.core.plugins.processor.registry import ProcessorRegistry
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.visualizers.registry import DataVisualizerRegistryPlugin
@@ -59,14 +60,29 @@ class DataVisualizationManager(QObject):
         self.mdi = mdi
 
     def can_visualize_data(self, data: Data) -> bool:
-        return self.data_visualizer_registry.contains(type(data))
+        return self._visualizer_cls_with_settings(data) is not None
 
     def visualize_data(self, data: Data) -> list[DataViewerSubWindow]:
         logging.info(f'Visualize data: {type(data)}')
-        visualizer_cls_with_settings = self.data_visualizer_registry.processor_cls_with_settings(type(data))
-        if visualizer_cls_with_settings is not None:
-            visualizer = visualizer_cls_with_settings.processor_cls(
-                self.mdi, visualizer_cls_with_settings.processor_settings)
-            data_viewer_sub_windows = visualizer.visualize_data(data)
-            self.data_visualized.emit(data, data_viewer_sub_windows)
-            return data_viewer_sub_windows
+        visualizer_cls_with_settings = self._visualizer_cls_with_settings(data)
+        if visualizer_cls_with_settings is None:
+            logging.info(f'No visualizer can handle data of type {type(data)}')
+            return []
+
+        visualizer = visualizer_cls_with_settings.processor_cls(
+            self.mdi, visualizer_cls_with_settings.processor_settings)
+        data_viewer_sub_windows = visualizer.visualize_data(data)
+        self.data_visualized.emit(data, data_viewer_sub_windows)
+        return data_viewer_sub_windows
+
+    def _visualizer_cls_with_settings(self, data: Data) -> ProcessorClsWithSettings | None:
+        """Return the first visualizer that matches `data` by type and can_handle()."""
+        candidates = self.data_visualizer_registry.processor_classes_with_settings(type(data))
+        if candidates is None:
+            return None
+
+        for visualizer_cls_with_settings in candidates:
+            if visualizer_cls_with_settings.processor_cls.can_handle(data):
+                return visualizer_cls_with_settings
+
+        return None

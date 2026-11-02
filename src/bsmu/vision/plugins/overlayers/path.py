@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject
 
-from bsmu.vision.core.image.layered import LayeredImage
+from bsmu.vision.core.data.layered import LayeredData
 from bsmu.vision.core.palette import Palette
 from bsmu.vision.core.plugins import Plugin
 from bsmu.vision.core.visibility import Visibility
 
 if TYPE_CHECKING:
     from bsmu.vision.core.data import Data
-    from bsmu.vision.plugins.readers.manager import FileReadingManager, FileReadingManagerPlugin
+    from bsmu.vision.plugins.io.manager import FileReadingManager, FileReadingManagerPlugin
     from bsmu.vision.plugins.palette.settings import PalettePackSettings, PalettePackSettingsPlugin
     from bsmu.vision.plugins.postread.manager import (
         PostReadConversionManagerPlugin, PostReadConversionManager,
@@ -22,7 +22,7 @@ class ImageViewerPathOverlayerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'post_read_conversion_manager_plugin':
             'bsmu.vision.plugins.postread.manager.PostReadConversionManagerPlugin',
-        'file_reading_manager_plugin': 'bsmu.vision.plugins.readers.manager.FileReadingManagerPlugin',
+        'file_reading_manager_plugin': 'bsmu.vision.plugins.io.manager.FileReadingManagerPlugin',
         'palette_pack_settings_plugin': 'bsmu.vision.plugins.palette.settings.PalettePackSettingsPlugin',
     }
 
@@ -75,12 +75,12 @@ class ImageViewerPathOverlayer(QObject):
         self._palette_pack_settings = palette_pack_settings
 
     def overlay_sibling_dirs_images(self, data: Data):
-        if not isinstance(data, LayeredImage):
+        if not isinstance(data, LayeredData):
             return
 
         first_layer = data.layers[0]
         layers_dir = first_layer.path.parent
-        relative_image_path = first_layer.image_path.relative_to(first_layer.path)
+        relative_image_path = first_layer.data_path.relative_to(first_layer.path)
 
         # Find the first raster layer with data (reference image) for spacing adjustment.
         reference_data = data.first_raster_data()

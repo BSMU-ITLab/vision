@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.data import Data
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.visualizers.manager import DataVisualizationManagerPlugin, DataVisualizationManager
-    from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
+    from bsmu.vision.plugins.io.manager import FileReadingManagerPlugin, FileReadingManager
     from bsmu.vision.plugins.postread.manager import (
         PostReadConversionManagerPlugin, PostReadConversionManager)
 
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class FileDropperPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
-        'file_reading_manager_plugin': 'bsmu.vision.plugins.readers.manager.FileReadingManagerPlugin',
+        'file_reading_manager_plugin': 'bsmu.vision.plugins.io.manager.FileReadingManagerPlugin',
         'post_read_conversion_manager_plugin':
             'bsmu.vision.plugins.postread.manager.PostReadConversionManagerPlugin',
         'data_visualization_manager_plugin': 'bsmu.vision.plugins.visualizers.manager.DataVisualizationManagerPlugin',

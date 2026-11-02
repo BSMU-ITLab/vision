@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from bsmu.vision.core.data.raster import Raster
     from bsmu.vision.plugins.doc_interfaces.mdi import MdiPlugin, Mdi
     from bsmu.vision.plugins.palette.settings import PalettePackSettingsPlugin, PalettePackSettings
-    from bsmu.vision.plugins.readers.manager import FileReadingManagerPlugin, FileReadingManager
+    from bsmu.vision.plugins.io.manager import FileReadingManagerPlugin, FileReadingManager
     from bsmu.vision.plugins.windows.main import MainWindowPlugin, MainWindow
 
 
@@ -24,7 +24,7 @@ class ImageViewerOverlayerPlugin(Plugin):
     _DEFAULT_DEPENDENCY_PLUGIN_FULL_NAME_BY_KEY = {
         'main_window_plugin': 'bsmu.vision.plugins.windows.main.MainWindowPlugin',
         'mdi_plugin': 'bsmu.vision.plugins.doc_interfaces.mdi.MdiPlugin',
-        'file_reading_manager_plugin': 'bsmu.vision.plugins.readers.manager.FileReadingManagerPlugin',
+        'file_reading_manager_plugin': 'bsmu.vision.plugins.io.manager.FileReadingManagerPlugin',
         'palette_pack_settings_plugin': 'bsmu.vision.plugins.palette.settings.PalettePackSettingsPlugin',
     }
 

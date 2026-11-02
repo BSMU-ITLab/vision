@@ -7,18 +7,13 @@ import nibabel as nib
 import numpy as np
 
 from bsmu.vision.core.image import VolumeImage, SpatialAttrs
-from bsmu.vision.plugins.readers.file import FileReaderPlugin, FileReader
+from bsmu.vision.core.io.raster import RasterFileReader
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class NiftiFileReaderPlugin(FileReaderPlugin):
-    def __init__(self):
-        super().__init__(NiftiFileReader)
-
-
-class NiftiFileReader(FileReader):
+class NiftiRasterFileReader(RasterFileReader):
     _FORMATS = ('nii.gz',)
 
     def _read_file(self, path: Path, palette=None, **kwargs) -> VolumeImage:

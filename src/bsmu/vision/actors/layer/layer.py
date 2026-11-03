@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import numpy as np
 from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QImage
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QGraphicsItem
 
 import bsmu.vision.core.converters.image as image_converter
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from PySide6.QtCore import QObject
-    from PySide6.QtGui import QPainter
     from PySide6.QtWidgets import QStyleOptionGraphicsItem, QWidget
 
     from bsmu.vision.actors.shape import VectorShapeActor
@@ -208,6 +208,8 @@ class RasterLayerGraphicsItem(QGraphicsItem):
         if self._qimage is None:
             return
 
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
         # Qt clips painting to the exposed/dirty region automatically.
         # We draw the full image mapped to the scene coordinate rect;
         # the renderer only processes the visible viewport area.
@@ -324,36 +326,25 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
             self.scene_bounding_rect_changed.emit()
 
     def _create_display_qimage(self) -> QImage:
+        pixels = self.display_slice.pixels
+
         if self.display_slice.is_indexed:
-            self._displayed_pixels = self.display_slice.pixels
+            self._displayed_pixels = pixels
             display_qimage_format = QImage.Format.Format_Indexed8
         else:
-            # self._displayed_pixels = image_converter.converted_to_normalized_uint8(self.image.array)
-            # self._displayed_pixels = image_converter.converted_to_rgba(self._displayed_pixels)
-
-            # Conversion to RGBA will consume additional memory,
-            # but the QPainter can draw QImage.Format_RGBA8888_Premultiplied faster
-            # (when multiple layers is drawn with semi-transparency), unlike QImage.Format_RGB888.
-            # See: https://doc.qt.io/qt-6/qimage.html#Format-enum
-            self._displayed_pixels = image_converter.converted_to_rgba(self.display_slice.pixels)
-            display_qimage_format = (
-                QImage.Format.Format_RGBA8888_Premultiplied
-                if self._displayed_pixels.itemsize == 1
-                else QImage.Format.Format_RGBA64_Premultiplied
-            )
-
-        if not self._displayed_pixels.flags.c_contiguous:
-            if self.display_slice.is_indexed:
-                # QImage(Format_Indexed8) shares memory with the numpy array.
-                # A non-contiguous array would be silently copied by ascontiguousarray,
-                # breaking memory sharing: in-place pixel edits become invisible to QImage.
-                raise RuntimeError(
-                    f'Indexed raster pixels must be C-contiguous for QImage memory sharing. '
-                    f'Shape: {self._displayed_pixels.shape}, strides: {self._displayed_pixels.strides}. '
-                    f'Ensure the source array is contiguous before creating a Raster.'
+            display_qimage_format = self._qimage_format_by_channels()
+            if display_qimage_format is None:
+                # Exotic formats (e.g. 16-bit without windowing): convert to RGBA
+                self._displayed_pixels = image_converter.converted_to_rgba(pixels)
+                display_qimage_format = (
+                    QImage.Format.Format_RGBA8888_Premultiplied
+                    if self._displayed_pixels.itemsize == 1
+                    else QImage.Format.Format_RGBA64_Premultiplied
                 )
-            # For RGBA etc. a copy is safe: QImage does not share memory anyway.
-            self._displayed_pixels = np.ascontiguousarray(self._displayed_pixels)
+            else:
+                self._displayed_pixels = pixels
+
+        self._ensure_contiguous_pixels()
 
         display_qimage = image_converter.numpy_array_to_qimage(self._displayed_pixels, display_qimage_format)
         if self.display_slice.is_indexed:
@@ -361,6 +352,36 @@ class RasterLayerActor(LayerActor[RasterLayer, RasterLayerGraphicsItem]):
 
         self._modified_bboxes = []
         return display_qimage
+
+    def _qimage_format_by_channels(self) -> QImage.Format | None:
+        """Return QImage format for non-indexed data by channel count, or None if conversion is needed."""
+        match self.display_slice.n_channels:
+            case 1:
+                return QImage.Format.Format_Grayscale8
+            case 3:
+                return QImage.Format.Format_RGB888
+            case 4:
+                return QImage.Format.Format_RGBA8888_Premultiplied
+            case _:
+                return None
+
+    def _ensure_contiguous_pixels(self) -> None:
+        """Ensure pixels are C-contiguous so QImage's bytes_per_line matches the buffer layout."""
+        if self._displayed_pixels.flags.c_contiguous:
+            return
+
+        if self.display_slice.is_indexed:
+            # Indexed masks share memory with the source for in-place editing
+            # and fast region repaints. A contiguous copy would break that sharing,
+            # so fail loudly instead of silently copying.
+            raise RuntimeError(
+                f'Indexed raster pixels must be C-contiguous for QImage memory sharing. '
+                f'Shape: {self._displayed_pixels.shape}, strides: {self._displayed_pixels.strides}. '
+                f'Ensure the source array is contiguous before creating a Raster.'
+            )
+
+        # Non-indexed images are not edited in place, so a contiguous copy is safe.
+        self._displayed_pixels = np.ascontiguousarray(self._displayed_pixels)
 
     def _on_layer_data_changed(self, data: Raster | None) -> None:
         self.image_changed.emit(data)

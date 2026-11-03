@@ -174,19 +174,25 @@ class ImageLayerFileWalker(QObject):
                 return None
         return self._main_layer_file_index
 
-    def show_next_image(self):
+    def show_next_image(self) -> None:
         if self.main_layer_file_index is not None:
             self._show_image_with_index(self.main_layer_file_index + 1)
 
-    def show_prev_image(self):
+    def show_prev_image(self) -> None:
         if self.main_layer_file_index is not None:
             self._show_image_with_index(self.main_layer_file_index - 1)
 
-    def _show_image_with_index(self, index: int):
+    def _show_image_with_index(self, index: int) -> None:
+        file_count = len(self.main_layer_dir_relative_file_paths)
+        new_index = index % file_count
+        # Nothing to navigate to: single file in the folder, or wrap-around to the current file.
+        if new_index == self.main_layer_file_index:
+            return
+
         normalized_view_region = self._image_viewer.capture_normalized_view_region()
 
-        self._main_layer_file_index = index % len(self.main_layer_dir_relative_file_paths)
-        requested_file_relative_path = self.main_layer_dir_relative_file_paths[self._main_layer_file_index]
+        self._main_layer_file_index = new_index
+        requested_file_relative_path = self.main_layer_dir_relative_file_paths[new_index]
 
         # First raster layer with loaded data becomes the reference for spacing adjustment
         reference_raster: Raster | None = None

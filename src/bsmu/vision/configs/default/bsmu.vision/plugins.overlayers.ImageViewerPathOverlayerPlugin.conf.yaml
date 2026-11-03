@@ -4,6 +4,11 @@ layers:
     palette: null  # if null, then default palette will be used
     opacity: 0.5
 
+  masks-1:
+    extension: 'png'
+    palette: null
+    opacity: 0.5
+
   masks-2:
     extension: 'png'
     palette: null

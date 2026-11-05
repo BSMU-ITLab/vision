@@ -6,6 +6,7 @@ plugins:
   - bsmu.vision.plugins.io.raster.common.CommonRasterFileReaderPlugin
   - bsmu.vision.plugins.io.raster.wsi.WholeSlideRasterFileReaderPlugin
 #  - bsmu.vision.plugins.io.raster.nifti.NiftiRasterFileReaderPlugin
+  - bsmu.vision.plugins.io.raster.pdf.PdfRasterFileReaderPlugin
 
   - bsmu.vision.plugins.postread.raster_to_layered.RasterToLayeredDataPostReadConverterPlugin
 

@@ -58,13 +58,14 @@ common = [
 nn_inference = [ 'onnxruntime-gpu' ]
 data_analysis = [ 'pandas' ]
 
-# Dependencies for handling various medical imaging formats
+# Dependencies for handling various file formats
 nifti = [ 'nibabel' ]
 dicom = [ 'pydicom' ]
 wsi = [
     'slideio',
     'tifffile',
 ]
+pdf = [ 'pypdfium2' ]
 
 test = [ 'pytest' ]
 build = [ 'cx-Freeze' ]

@@ -40,6 +40,7 @@ dependencies:
       - pluggy==1.5.0
       - protobuf==5.28.3
       - pydicom==3.0.1
+      - pypdfium2==5.14.0
       - pyreadline3==3.5.4
       - pyside6==6.8.0.2
       - pyside6-addons==6.8.0.2

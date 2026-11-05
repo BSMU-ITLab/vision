@@ -1,0 +1,4 @@
+# Render scale of the PDF page (1.0 = 72 DPI). Higher = better quality, more memory.
+scale: 3.0
+# Zero-based index of the page to read.
+page_index: 0

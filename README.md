@@ -16,7 +16,7 @@ Necessary plugins can be enabled/disabled using plugin manager.
 
 python 3.11
 ```bash
-pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcontainers onnxruntime-gpu pandas nibabel pydicom slideio tifffile pytest cx-freeze
+pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcontainers onnxruntime-gpu pandas nibabel pydicom slideio tifffile pypdfium2 pytest cx-freeze
 ```
 
 ### Mandatory Dependencies
@@ -44,6 +44,7 @@ pip install pyside6 ruamel-yaml numpy opencv-python scikit-image scipy sortedcon
   - **pydicom**: Reads DICOM files.
   - **slideio**: Reads high-resolution medical slides (Whole Slide Imaging).
   - **tifffile**: Manages tiled multi-resolution (pyramid) TIFF files.
+  - **pypdfium2**: Renders PDF pages into raster images for further analysis.
 
 - **Testing**
   - **pytest**: Testing framework.

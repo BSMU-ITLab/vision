@@ -7,7 +7,7 @@ name = 'bsmu.vision'
 dynamic = [ 'version' ]
 description = 'Base data processing application for extension by plugins'
 readme = 'README.md'
-requires-python = '>= 3.10'
+requires-python = '>= 3.11'
 license = { file = 'LICENSE' }
 authors = [
     { name = 'Ivan Kosik', email = 'ivankosik91@gmail.com' },
@@ -26,8 +26,8 @@ classifiers = [
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: BSD License',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
     'Operating System :: OS Independent',
     'Topic :: Software Development :: Version Control :: Git',
 ]
@@ -67,8 +67,14 @@ wsi = [
 ]
 pdf = [ 'pypdfium2' ]
 
-test = [ 'pytest' ]
-build = [ 'cx-Freeze' ]
+# Repo-local dev tools
+# TODO: move to [dependency-groups] (PEP 735) once pip >= 25.1
+dev = [
+    'pytest>=8',
+    'ruff==0.17.4',  # Keep equal to pre-commit hook rev
+    'pre-commit>=4',
+    'cx-Freeze==7.2.5',
+]
 
 [tool.setuptools.dynamic]
 version = { attr = 'bsmu.vision.__version__' }
@@ -78,3 +84,42 @@ where = [ 'src' ]
 
 [tool.setuptools.package-data]
 '*' = [ '**/*.conf.yaml' ]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = [
+    'temp',
+    '*_rc.py',  # E.g. icons_rc.py
+]
+
+[tool.ruff.lint]
+future-annotations = true
+select = [
+    'E',  # pycodestyle errors
+    'W',  # pycodestyle warnings
+    'F',  # Pyflakes
+    'I',  # isort
+    'UP',  # pyupgrade
+    'B',  # flake8-bugbear
+    'SIM',  # flake8-simplify
+    'C4',  # flake8-comprehensions
+    'TC',  # flake8-type-checking
+    # TODO: switch to full 'N' on Python 3.12 (typing.override for Qt methods)
+    'N999',  # Module names
+    'N801',  # Class names
+    'N818',  # Exception names
+]
+ignore = [
+    'E501',  # Line length handled by formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+'__init__.py' = ['F401']  # Allow unused imports for re-exports
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    'PySide6.QtCore.QModelIndex',
+]
+
+[tool.ruff.format]
+quote-style = 'single'

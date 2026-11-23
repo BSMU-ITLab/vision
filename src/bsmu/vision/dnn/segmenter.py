@@ -59,8 +59,20 @@ class Segmenter(Inferencer):
         assert len(model_inputs) == 1, 'Segmenter can process only models with one input'
         input_feed = {model_inputs[0].name: input_image_batch}
         model_outputs: List[ort.NodeArg] = self._inference_session.get_outputs()
+
+        output_name = self._model_config.output_name_or_index
         output_names = [model_output.name for model_output in model_outputs]
-        outputs = self._inference_session.run(output_names, input_feed)
+        if isinstance(output_name, str):
+            assert any(name == output_name for name in output_names), \
+                f'Output name should be index or one of {output_names}'
+        else:
+            try:
+                output_name = output_names[output_name]
+            except IndexError:
+                raise IndexError(
+                    f"Index '{output_name}' is out of bound for model with {len(output_names)} elements")
+
+        outputs = self._inference_session.run([output_name], input_feed)
         assert len(outputs) == 1, 'Segmenter can process only models with one output'
         output_mask_batch = outputs[0]
         output_channels_axis = self.model_config.channels_axis + 1  # Use '+ 1' to take into account the batch axis

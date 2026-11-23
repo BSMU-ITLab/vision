@@ -50,6 +50,8 @@ class ImageModelConfig(ModelConfig):
     # (can slightly improve GPU inference speed). Otherwise, np.float32 is recommended.
     input_type: npt.DTypeLike = np.float32
 
+    # Which output to use from model.
+    output_name_or_index: int | str = 0
     # Which output channels to return: 'all' (default), a single index, or a list of indices.
     output_channels: IntSequenceOrAll = field(default_factory=IntSequenceOrAll)
     # Class name(s) corresponding to output_channels.

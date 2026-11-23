@@ -50,6 +50,12 @@ class ImageModelConfig(ModelConfig):
     # (can slightly improve GPU inference speed). Otherwise, np.float32 is recommended.
     input_type: npt.DTypeLike = np.float32
 
+    # Which model output to use as the segmentation mask: index or name.
+    # Negative indices are supported (Python-style, e.g. -1 means the last output).
+    # None (default): the model must have exactly one output - use it;
+    # if the model has several outputs, one of them must be selected explicitly.
+    output_index_or_name: int | str | None = None
+
     # Which output channels to return: 'all' (default), a single index, or a list of indices.
     output_channels: IntSequenceOrAll = field(default_factory=IntSequenceOrAll)
     # Class name(s) corresponding to output_channels.

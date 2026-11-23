@@ -60,8 +60,33 @@ class Segmenter(Inferencer):
         input_feed = {model_inputs[0].name: input_image_batch}
         model_outputs: List[ort.NodeArg] = self._inference_session.get_outputs()
         output_names = [model_output.name for model_output in model_outputs]
-        outputs = self._inference_session.run(output_names, input_feed)
-        assert len(outputs) == 1, 'Segmenter can process only models with one output'
+
+        output_index_or_name = self._model_config.output_index_or_name
+        if output_index_or_name is None:
+            if len(output_names) != 1:
+                raise ValueError(
+                    f'`output_index_or_name` is not set, but the model has {len(output_names)} '
+                    f'outputs: {output_names}. Select one of them explicitly '
+                    f'(the default None means the model must have exactly one output).'
+                )
+            output_name = output_names[0]
+        elif isinstance(output_index_or_name, str):
+            if output_index_or_name not in output_names:
+                raise ValueError(
+                    f'Unknown output name {output_index_or_name!r}. '
+                    f'Model outputs: {output_names}.'
+                )
+            output_name = output_index_or_name
+        else:
+            if not -len(output_names) <= output_index_or_name < len(output_names):
+                raise ValueError(
+                    f'Output index {output_index_or_name} is out of range for model '
+                    f'with {len(output_names)} output(s): {output_names}.'
+                )
+            output_name = output_names[output_index_or_name]  # Negative indices are Python-style
+
+        # Request only the selected output, so ORT does not fetch/copy unused tensors
+        outputs = self._inference_session.run([output_name], input_feed)
         output_mask_batch = outputs[0]
         output_channels_axis = self.model_config.channels_axis + 1  # Use '+ 1' to take into account the batch axis
         if not self.model_config.output_channels.is_all:

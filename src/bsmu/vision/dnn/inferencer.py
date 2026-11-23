@@ -52,7 +52,7 @@ class ImageModelConfig(ModelConfig):
 
     # Which model output to use as the segmentation mask: index or name.
     # Negative indices are supported (Python-style, e.g. -1 means the last output).
-    # None (default): the model must have exactly one output — use it;
+    # None (default): the model must have exactly one output - use it;
     # if the model has several outputs, one of them must be selected explicitly.
     output_index_or_name: int | str | None = None
 
